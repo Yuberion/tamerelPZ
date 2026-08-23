@@ -3,6 +3,7 @@ import type { ModEntry } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useMenu } from '@renderer/components/Menu'
 import { useToast } from '@renderer/components/Toast'
+import { useI18n } from '@renderer/i18n'
 import { categoryMeta, primaryCategory, SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText, formatCount, segmentByIndices } from '@renderer/lib/format'
 import { useVirtual } from '@renderer/lib/useVirtual'
@@ -32,6 +33,7 @@ export function ModList({
   const v = useVirtual(rows.length, ROW_H)
   const { openMenu } = useMenu()
   const { notify } = useToast()
+  const { t } = useI18n()
 
   // Keep the selected mod on screen when the selection changes elsewhere.
   useEffect(() => {
@@ -110,43 +112,43 @@ export function ModList({
                   onSelect(mod)
                   openMenu(e, [
                     {
-                      label: 'Open folder',
+                      label: t('menu.openFolder'),
                       icon: 'folder-open',
                       onClick: () => void window.pz.shell.open(mod.path)
                     },
                     {
-                      label: 'Reveal in Explorer',
+                      label: t('menu.reveal'),
                       icon: 'external',
                       onClick: () => void window.pz.shell.reveal(mod.path)
                     },
                     {
-                      label: 'Open terminal here',
+                      label: t('menu.openTerminal'),
                       icon: 'terminal',
                       onClick: () => void window.pz.shell.terminal(mod.path)
                     },
                     { separator: true },
                     {
-                      label: 'Copy mod id',
+                      label: t('menu.copyModId'),
                       icon: 'hash',
                       disabled: !mod.modId,
                       onClick: () => {
                         if (mod.modId) {
                           void copyText(mod.modId)
-                          notify(`Copied ${mod.modId}`, 'ok')
+                          notify(t('toast.copiedValue', { value: mod.modId }), 'ok')
                         }
                       }
                     },
                     {
-                      label: 'Copy path',
+                      label: t('menu.copyPath'),
                       icon: 'copy',
                       onClick: () => {
                         void copyText(mod.path)
-                        notify('Path copied', 'ok')
+                        notify(t('toast.pathCopied'), 'ok')
                       }
                     },
                     { separator: true },
                     {
-                      label: 'Open Workshop page',
+                      label: t('menu.openWorkshop'),
                       icon: 'link',
                       disabled: !mod.workshopId,
                       onClick: () =>
@@ -177,15 +179,19 @@ export function ModList({
                 {/* Distinct glyphs so a drive full of duplicates does not drown
                     out the mods that are genuinely broken. */}
                 {mod.warnings.length > 0 && (
-                  <Icon name="alert" size={12} color="var(--blood)" title="Has warnings" />
+                  <Icon name="alert" size={12} color="var(--blood)" title={t('glyph.warnings')} />
                 )}
                 {isMissing && (
-                  <Icon name="link" size={12} color="var(--ember)" title="Unresolved requires" />
+                  <Icon name="link" size={12} color="var(--ember)" title={t('glyph.unresolved')} />
                 )}
                 {isDup && (
-                  <Icon name="copy" size={11} color="var(--steel)" title="Duplicate mod id" />
+                  <Icon name="copy" size={11} color="var(--steel)" title={t('glyph.duplicate')} />
                 )}
-                <span className="modrow__src" style={{ color: src.color }} title={src.label}>
+                <span
+                  className="modrow__src"
+                  style={{ color: src.color }}
+                  title={t(src.labelKey)}
+                >
                   {src.glyph}
                 </span>
               </div>
@@ -196,7 +202,7 @@ export function ModList({
       {rows.length === 0 && (
         <div className="pane__empty">
           <Icon name="search" size={22} />
-          <span className="label">Nothing matches</span>
+          <span className="label">{t('list.nothingMatches')}</span>
         </div>
       )}
     </div>

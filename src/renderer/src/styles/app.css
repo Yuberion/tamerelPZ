@@ -70,6 +70,42 @@
   margin-left: 4px;
 }
 
+/* RU/EN switch. Sits inside .titlebar__brand, which is already no-drag, so the
+   segments stay clickable without carving out an extra drag exception. */
+.langtoggle {
+  display: flex;
+  margin-left: 2px;
+  border: 1px solid var(--edge);
+  background: #14181d;
+}
+.langtoggle__opt {
+  min-width: 26px;
+  height: 17px;
+  padding: 0 4px;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ash-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition:
+    color 90ms ease,
+    background 90ms ease;
+}
+.langtoggle__opt + .langtoggle__opt {
+  border-left: 1px solid var(--edge);
+}
+.langtoggle__opt:hover {
+  color: var(--ash);
+  background: #1b2027;
+}
+.langtoggle__opt.is-on {
+  color: var(--rust-hot);
+  background: #241a13;
+}
+
 .titlebar__drag {
   flex: 1 1 auto;
   -webkit-app-region: drag;

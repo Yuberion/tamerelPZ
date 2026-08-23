@@ -3,6 +3,7 @@ import type { GroupMode, ModCategory, ModSource, ModSourceKind, SortMode } from 
 import { Icon } from '@renderer/components/Icon'
 import { useMenu } from '@renderer/components/Menu'
 import { CATEGORY_ORDER, categoryMeta } from '@renderer/lib/catmeta'
+import { useI18n } from '@renderer/i18n'
 import { formatCount } from '@renderer/lib/format'
 import type { IssueFilter, ModFilters } from './useModRows'
 
@@ -59,6 +60,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
   searchRef
 ) {
   const { openMenu } = useMenu()
+  const { t } = useI18n()
 
   const toggleSource = (kind: ModSourceKind): void => {
     const next = new Set(filters.sourceKinds)
@@ -91,9 +93,9 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
   return (
     <div className="toolbar">
       <div className="toolbar__row">
-        <button className="btn" onClick={onExit} title="Back to hub (Esc)">
+        <button className="btn" onClick={onExit} title={t('tb.backToHub')}>
           <Icon name="arrow-left" size={13} />
-          Hub
+          {t('tb.hub')}
         </button>
 
         <div className="divider-v" />
@@ -110,8 +112,8 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
                   onClick={() => toggleSource(b.kind)}
                   title={
                     disabled
-                      ? `${b.label}: not found on this machine`
-                      : `${on ? 'Hide' : 'Show only'} ${b.label}`
+                      ? t('tb.sourceMissing', { label: b.label })
+                      : t(on ? 'tb.hideSource' : 'tb.showOnlySource', { label: b.label })
                   }
                 >
                   <Icon name={b.icon} size={13} />
@@ -121,7 +123,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
                 <button
                   className="srcbtn__aux"
                   disabled={disabled}
-                  title="Open container folder"
+                  title={t('tb.openContainer')}
                   onClick={(e) => {
                     if (b.sources.length === 1) {
                       void window.pz.shell.open(b.sources[0]!.path)
@@ -146,9 +148,9 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
 
         <div className="divider-v" />
 
-        <button className="btn" onClick={onRescan} disabled={scanning} title="Rescan drive (F5)">
+        <button className="btn" onClick={onRescan} disabled={scanning} title={t('tb.rescanTitle')}>
           <Icon name="refresh" size={13} className={scanning ? 'spin' : undefined} />
-          {scanning ? 'Scanning' : 'Rescan'}
+          {scanning ? t('tb.scanning') : t('tb.rescan')}
         </button>
 
         <div className="toolbar__spacer" />
@@ -159,7 +161,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             ref={searchRef}
             value={filters.query}
             onChange={(e) => setFilters({ query: e.target.value })}
-            placeholder="Search name, id, author, workshop id…"
+            placeholder={t('tb.searchPlaceholder')}
             spellCheck={false}
           />
           {filters.query && (
@@ -170,31 +172,31 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
         </div>
 
         <label className="pick">
-          <span className="label">Group</span>
+          <span className="label">{t('tb.group')}</span>
           <select value={group} onChange={(e) => onGroup(e.target.value as GroupMode)}>
-            <option value="type">Type</option>
-            <option value="source">Source</option>
-            <option value="build">Build</option>
-            <option value="none">Flat</option>
+            <option value="type">{t('tb.groupType')}</option>
+            <option value="source">{t('tb.groupSource')}</option>
+            <option value="build">{t('tb.groupBuild')}</option>
+            <option value="none">{t('tb.groupFlat')}</option>
           </select>
         </label>
 
         <label className="pick">
-          <span className="label">Sort</span>
+          <span className="label">{t('tb.sort')}</span>
           <select value={sort} onChange={(e) => onSort(e.target.value as SortMode)}>
-            <option value="name">Name A→Z</option>
-            <option value="name-desc">Name Z→A</option>
-            <option value="type">Type</option>
-            <option value="recent">Newest</option>
-            <option value="id">Mod id</option>
-            <option value="source">Source</option>
+            <option value="name">{t('tb.sortNameAsc')}</option>
+            <option value="name-desc">{t('tb.sortNameDesc')}</option>
+            <option value="type">{t('tb.sortType')}</option>
+            <option value="recent">{t('tb.sortRecent')}</option>
+            <option value="id">{t('tb.sortId')}</option>
+            <option value="source">{t('tb.sortSource')}</option>
           </select>
         </label>
 
         <button
           className={`btn btn-icon ${showFilters || activeFilters ? 'is-active' : ''}`}
           onClick={onToggleFilters}
-          title="Filters"
+          title={t('tb.filters')}
         >
           <Icon name="filter" size={13} />
         </button>
@@ -202,7 +204,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
 
       {showFilters && (
         <div className="toolbar__row toolbar__row--filters">
-          <span className="label toolbar__legend">Type</span>
+          <span className="label toolbar__legend">{t('tb.legendType')}</span>
           {CATEGORY_ORDER.filter((c) => (categoryCounts.get(c) ?? 0) > 0).map((c) => {
             const meta = categoryMeta(c)
             const on = filters.categories.has(c)
@@ -214,14 +216,14 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
                 onClick={() => toggleCategory(c)}
               >
                 <Icon name={meta.icon} size={11} color={meta.color} />
-                {meta.label}
+                {t(meta.labelKey)}
                 <span className="chip__n mono">{categoryCounts.get(c)}</span>
               </button>
             )
           })}
 
           <div className="divider-v" />
-          <span className="label toolbar__legend">Build</span>
+          <span className="label toolbar__legend">{t('tb.legendBuild')}</span>
           {[...buildCounts.entries()]
             .sort()
             .map(([b, n]) => (
@@ -236,14 +238,14 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             ))}
 
           <div className="divider-v" />
-          <span className="label toolbar__legend">Issues</span>
+          <span className="label toolbar__legend">{t('tb.legendIssues')}</span>
           <button
             className={`chip ${filters.issue === 'duplicates' ? 'is-on' : ''}`}
             onClick={() => setIssue('duplicates')}
             disabled={!issueCounts.duplicates}
           >
             <Icon name="alert" size={11} color="var(--blood)" />
-            Duplicate ids
+            {t('tb.duplicateIds')}
             <span className="chip__n mono">{issueCounts.duplicates}</span>
           </button>
           <button
@@ -252,7 +254,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             disabled={!issueCounts.missing}
           >
             <Icon name="link" size={11} color="var(--ember)" />
-            Broken requires
+            {t('tb.brokenRequires')}
             <span className="chip__n mono">{issueCounts.missing}</span>
           </button>
           <button
@@ -261,7 +263,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             disabled={!issueCounts.noinfo}
           >
             <Icon name="info" size={11} />
-            No mod.info
+            {t('tb.noModInfo')}
             <span className="chip__n mono">{issueCounts.noinfo}</span>
           </button>
 
@@ -275,7 +277,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
                 }
               >
                 <Icon name="close" size={12} />
-                Clear {activeFilters}
+                {t('tb.clear', { n: activeFilters })}
               </button>
             </>
           )}

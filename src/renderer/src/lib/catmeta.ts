@@ -1,28 +1,30 @@
-import type { ModCategory, ModEntry, ModSourceKind } from '@shared/types'
+import type { ModCategory, ModEntry, ModSource, ModSourceKind } from '@shared/types'
 import type { IconName } from '@renderer/components/Icon'
+import type { TKey } from '@renderer/i18n'
 
 export interface CategoryMeta {
-  label: string
+  /** Dictionary key — resolve with `t()` at the render site. */
+  labelKey: TKey
   color: string
   icon: IconName
 }
 
 export const CATEGORY_META: Record<ModCategory, CategoryMeta> = {
-  map: { label: 'Maps', color: 'var(--cat-map)', icon: 'map' },
-  vehicle: { label: 'Vehicles', color: 'var(--cat-vehicle)', icon: 'car' },
-  weapon: { label: 'Weapons', color: 'var(--cat-weapon)', icon: 'gun' },
-  clothing: { label: 'Clothing', color: 'var(--cat-clothing)', icon: 'shirt' },
-  item: { label: 'Items', color: 'var(--cat-item)', icon: 'cube' },
-  build: { label: 'Crafting', color: 'var(--cat-build)', icon: 'hammer' },
-  translation: { label: 'Translations', color: 'var(--cat-translation)', icon: 'globe' },
-  library: { label: 'Libraries', color: 'var(--cat-library)', icon: 'book' },
-  ui: { label: 'Interface', color: 'var(--cat-ui)', icon: 'monitor' },
-  texture: { label: 'Textures & Tiles', color: 'var(--cat-texture)', icon: 'palette' },
-  sound: { label: 'Audio', color: 'var(--cat-sound)', icon: 'volume' },
-  model: { label: 'Models & Anims', color: 'var(--cat-model)', icon: 'layers' },
-  balance: { label: 'Balance', color: 'var(--cat-balance)', icon: 'scales' },
-  server: { label: 'Server', color: 'var(--cat-server)', icon: 'server' },
-  misc: { label: 'Unclassified', color: 'var(--cat-misc)', icon: 'dots' }
+  map: { labelKey: 'cat.map', color: 'var(--cat-map)', icon: 'map' },
+  vehicle: { labelKey: 'cat.vehicle', color: 'var(--cat-vehicle)', icon: 'car' },
+  weapon: { labelKey: 'cat.weapon', color: 'var(--cat-weapon)', icon: 'gun' },
+  clothing: { labelKey: 'cat.clothing', color: 'var(--cat-clothing)', icon: 'shirt' },
+  item: { labelKey: 'cat.item', color: 'var(--cat-item)', icon: 'cube' },
+  build: { labelKey: 'cat.build', color: 'var(--cat-build)', icon: 'hammer' },
+  translation: { labelKey: 'cat.translation', color: 'var(--cat-translation)', icon: 'globe' },
+  library: { labelKey: 'cat.library', color: 'var(--cat-library)', icon: 'book' },
+  ui: { labelKey: 'cat.ui', color: 'var(--cat-ui)', icon: 'monitor' },
+  texture: { labelKey: 'cat.texture', color: 'var(--cat-texture)', icon: 'palette' },
+  sound: { labelKey: 'cat.sound', color: 'var(--cat-sound)', icon: 'volume' },
+  model: { labelKey: 'cat.model', color: 'var(--cat-model)', icon: 'layers' },
+  balance: { labelKey: 'cat.balance', color: 'var(--cat-balance)', icon: 'scales' },
+  server: { labelKey: 'cat.server', color: 'var(--cat-server)', icon: 'server' },
+  misc: { labelKey: 'cat.misc', color: 'var(--cat-misc)', icon: 'dots' }
 }
 
 /** Display order for groups in the mod tree. */
@@ -52,12 +54,25 @@ export function categoryMeta(c: ModCategory): CategoryMeta {
   return CATEGORY_META[c] ?? CATEGORY_META.misc
 }
 
-export const SOURCE_META: Record<ModSourceKind, { label: string; glyph: string; color: string }> = {
-  local: { label: 'Local', glyph: 'L', color: 'var(--moss)' },
-  workshop: { label: 'Workshop', glyph: 'W', color: 'var(--steel)' },
-  game: { label: 'Game', glyph: 'G', color: 'var(--ember)' },
-  project: { label: 'Project', glyph: 'P', color: 'var(--rust-hot)' },
-  custom: { label: 'Custom', glyph: 'C', color: 'var(--ash)' }
+export const SOURCE_META: Record<
+  ModSourceKind,
+  { labelKey: TKey; glyph: string; color: string }
+> = {
+  local: { labelKey: 'src.local', glyph: 'L', color: 'var(--moss)' },
+  workshop: { labelKey: 'src.workshop', glyph: 'W', color: 'var(--steel)' },
+  game: { labelKey: 'src.game', glyph: 'G', color: 'var(--ember)' },
+  project: { labelKey: 'src.project', glyph: 'P', color: 'var(--rust-hot)' },
+  custom: { labelKey: 'src.custom', glyph: 'C', color: 'var(--ash)' }
+}
+
+/**
+ * Display label for a concrete source directory.
+ *
+ * Built-in sources carry a `labelKey` from main and are translated; user-defined
+ * sources keep their own `label` verbatim, since it is not ours to translate.
+ */
+export function sourceLabel(source: ModSource, t: (key: TKey) => string): string {
+  return source.labelKey ? t(`srcLabel.${source.labelKey}` as TKey) : source.label
 }
 
 const EXT_ICONS: Record<string, IconName> = {

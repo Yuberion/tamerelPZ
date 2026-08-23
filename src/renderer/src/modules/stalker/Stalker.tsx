@@ -12,6 +12,7 @@ import { Icon } from '@renderer/components/Icon'
 import { MenuProvider } from '@renderer/components/Menu'
 import { Splitter } from '@renderer/components/Splitter'
 import { useToast } from '@renderer/components/Toast'
+import { useI18n, type I18n, type TKey } from '@renderer/i18n'
 import { formatCount, formatDuration, shortenPath } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/state/store'
 import { InfoPanel } from './InfoPanel'
@@ -25,13 +26,13 @@ const LS_RIGHT = 'pz.stalker.rightWidth'
 
 const SOURCE_BUTTONS: Array<{
   kind: ModSourceKind
-  label: string
+  labelKey: TKey
   icon: 'folder' | 'download' | 'target' | 'wrench'
 }> = [
-  { kind: 'local', label: 'Local mods', icon: 'folder' },
-  { kind: 'workshop', label: 'Workshop', icon: 'download' },
-  { kind: 'game', label: 'Game', icon: 'target' },
-  { kind: 'project', label: 'Projects', icon: 'wrench' }
+  { kind: 'local', labelKey: 'srcLabel.local', icon: 'folder' },
+  { kind: 'workshop', labelKey: 'src.workshop', icon: 'download' },
+  { kind: 'game', labelKey: 'src.game', icon: 'target' },
+  { kind: 'project', labelKey: 'tb.srcProjects', icon: 'wrench' }
 ]
 
 function readWidth(key: string, fallback: number): number {
@@ -42,6 +43,7 @@ function readWidth(key: string, fallback: number): number {
 export function Stalker({ onExit }: { onExit: () => void }) {
   const { scan, scanning, settings, refresh, saveSettings, byKey } = useAppStore()
   const { notify } = useToast()
+  const { t, p } = useI18n()
 
   const [filters, setFiltersState] = useState<ModFilters>({
     query: '',
@@ -125,11 +127,12 @@ export function Stalker({ onExit }: { onExit: () => void }) {
         const owned = sources.filter((s) => s.kind === b.kind && s.exists)
         return {
           ...b,
+          label: t(b.labelKey),
           sources: owned,
           count: mods.reduce((acc, m) => (m.sourceKind === b.kind ? acc + 1 : acc), 0)
         }
       }),
-    [sources, mods]
+    [sources, mods, t]
   )
 
   const issueCounts = useMemo(
@@ -277,7 +280,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
           <section className="pane pane--left" style={{ width: leftW, flex: `0 0 ${leftW}px` }}>
             <div className="pane__head">
               <Icon name="list" size={13} color="var(--rust)" />
-              <span className="pane__title stencil">Mods</span>
+              <span className="pane__title stencil">{t('pane.mods')}</span>
               <span className="pane__count mono">
                 {formatCount(matched.length)}
                 {matched.length !== mods.length && (
@@ -287,7 +290,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
               <div className="pane__head-spacer" />
               <button
                 className="btn btn-icon"
-                title="Collapse all groups"
+                title={t('pane.collapseGroups')}
                 onClick={() =>
                   setCollapsed(
                     new Set(rows.filter((r) => r.kind === 'group').map((r) => r.id))
@@ -298,7 +301,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
               </button>
               <button
                 className="btn btn-icon"
-                title="Expand all groups"
+                title={t('pane.expandGroups')}
                 onClick={() => setCollapsed(new Set())}
               >
                 <Icon name="plus" size={13} />
@@ -350,6 +353,8 @@ export function Stalker({ onExit }: { onExit: () => void }) {
           durationMs={scan?.durationMs}
           fromCache={scan?.fromCache}
           selectedPath={selectedNode?.path ?? selectedMod?.path}
+          t={t}
+          p={p}
         />
       </div>
     </MenuProvider>
@@ -363,7 +368,9 @@ function StatusBar({
   issueCounts,
   durationMs,
   fromCache,
-  selectedPath
+  selectedPath,
+  t,
+  p
 }: {
   matched: number
   total: number
@@ -378,40 +385,48 @@ function StatusBar({
   durationMs: number | undefined
   fromCache: number | undefined
   selectedPath: string | undefined
+  t: I18n['t']
+  p: I18n['p']
 }) {
+  const sourceCount = sources.filter((s) => s.exists).length
   return (
     <footer className="statusbar mono">
       <span>
-        {formatCount(matched)} / {formatCount(total)} mods
+        {formatCount(matched)} / {formatCount(total)} {p('mods', total)}
       </span>
       <span className="statusbar__sep">·</span>
-      <span>{sources.filter((s) => s.exists).length} sources</span>
+      <span>
+        {sourceCount} {p('sources', sourceCount)}
+      </span>
       {issueCounts.duplicates > 0 && (
         <>
           <span className="statusbar__sep">·</span>
           <span className="is-bad">
-            {issueCounts.duplicates} duplicate ids ({issueCounts.duplicateMods} folders)
+            {issueCounts.duplicates} {p('duplicateIds', issueCounts.duplicates)} (
+            {issueCounts.duplicateMods} {p('folders', issueCounts.duplicateMods)})
           </span>
         </>
       )}
       {issueCounts.missing > 0 && (
         <>
           <span className="statusbar__sep">·</span>
-          <span className="is-warn">{issueCounts.missing} broken requires</span>
+          <span className="is-warn">
+            {issueCounts.missing} {p('brokenRequires', issueCounts.missing)}
+          </span>
         </>
       )}
       {issueCounts.noinfo > 0 && (
         <>
           <span className="statusbar__sep">·</span>
-          <span className="is-dim">{issueCounts.noinfo} without mod.info</span>
+          <span className="is-dim">{t('sb.withoutInfo', { n: issueCounts.noinfo })}</span>
         </>
       )}
       {durationMs !== undefined && (
         <>
           <span className="statusbar__sep">·</span>
           <span className="is-dim">
-            scan {formatDuration(durationMs)}
-            {fromCache ? ` (${fromCache} cached)` : ''}
+            {t('sb.scan', { d: formatDuration(durationMs) })}
+            {fromCache ? ` ${t('sb.cached', { n: fromCache })}` : ''}
           </span>
         </>
       )}

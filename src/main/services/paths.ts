@@ -137,6 +137,7 @@ export async function buildSources(settings: AppSettings): Promise<ModSource[]> 
       id: 'local',
       kind: 'local',
       label: 'Local mods',
+      labelKey: 'local',
       hint: local,
       path: local,
       exists: await isDir(local)
@@ -148,6 +149,7 @@ export async function buildSources(settings: AppSettings): Promise<ModSource[]> 
       id: `workshop:${ws}`,
       kind: 'workshop',
       label: 'Workshop',
+      labelKey: 'workshop',
       hint: ws,
       path: ws,
       exists: true
@@ -162,6 +164,7 @@ export async function buildSources(settings: AppSettings): Promise<ModSource[]> 
           id: `game:${p}`,
           kind: 'game',
           label: rel === 'mods' ? 'Game mods' : 'Game media mods',
+          labelKey: rel === 'mods' ? 'gameMods' : 'gameMediaMods',
           hint: p,
           path: p,
           exists: true
@@ -177,6 +180,7 @@ export async function buildSources(settings: AppSettings): Promise<ModSource[]> 
         id: 'project',
         kind: 'project',
         label: 'Workshop projects',
+        labelKey: 'workshopProjects',
         hint: proj,
         path: proj,
         exists: true

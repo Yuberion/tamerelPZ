@@ -102,11 +102,13 @@ export const EN = {
   'tb.brokenRequires': 'Broken requires',
   'tb.noModInfo': 'No mod.info',
   'tb.clear': 'Clear {n}',
+  'tb.srcProjects': 'Projects',
 
   // ---- mods pane ----------------------------------------------------------
   'pane.mods': 'Mods',
   'pane.collapseGroups': 'Collapse all groups',
   'pane.expandGroups': 'Expand all groups',
+  'list.nothingMatches': 'Nothing matches',
   'group.unknownBuild': 'Unknown build',
 
   // ---- context menus ------------------------------------------------------
@@ -230,6 +232,13 @@ export const EN = {
   'src.project': 'Project',
   'src.custom': 'Custom',
 
+  // ---- built-in source labels (ModSource.labelKey) ------------------------
+  'srcLabel.local': 'Local mods',
+  'srcLabel.workshop': 'Workshop',
+  'srcLabel.gameMods': 'Game mods',
+  'srcLabel.gameMediaMods': 'Game media mods',
+  'srcLabel.workshopProjects': 'Workshop projects',
+
   // ---- status bar ---------------------------------------------------------
   'sb.scan': 'scan {d}',
   'sb.cached': '({n} cached)',
@@ -332,10 +341,12 @@ export const RU: Record<TKey, string> = {
   'tb.brokenRequires': 'Битые зависимости',
   'tb.noModInfo': 'Без mod.info',
   'tb.clear': 'Сбросить: {n}',
+  'tb.srcProjects': 'Проекты',
 
   'pane.mods': 'Моды',
   'pane.collapseGroups': 'Свернуть все группы',
   'pane.expandGroups': 'Развернуть все группы',
+  'list.nothingMatches': 'Ничего не найдено',
   'group.unknownBuild': 'Сборка неизвестна',
 
   'menu.openFolder': 'Открыть папку',
@@ -449,6 +460,12 @@ export const RU: Record<TKey, string> = {
   'src.game': 'Игра',
   'src.project': 'Проект',
   'src.custom': 'Свои',
+
+  'srcLabel.local': 'Локальные моды',
+  'srcLabel.workshop': 'Workshop',
+  'srcLabel.gameMods': 'Моды игры',
+  'srcLabel.gameMediaMods': 'Моды в media игры',
+  'srcLabel.workshopProjects': 'Проекты Workshop',
 
   'sb.scan': 'скан {d}',
   'sb.cached': '({n} из кэша)',

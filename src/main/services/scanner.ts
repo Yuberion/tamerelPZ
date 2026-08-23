@@ -167,7 +167,7 @@ async function analyzeMod(c: Candidate): Promise<ModEntry | undefined> {
       break
     }
   }
-  if (!infoFile) warnings.push('No readable mod.info — the game may ignore this folder')
+  if (!infoFile) warnings.push('no-modinfo')
 
   // --- media evidence ----------------------------------------------------
   const mediaRoots: string[] = []
@@ -231,8 +231,8 @@ async function analyzeMod(c: Candidate): Promise<ModEntry | undefined> {
   const posterPath = await resolveAsset(assetDirs, posterNames)
   const iconPath = await resolveAsset(assetDirs, iconNames)
 
-  if (infoFile && !modId) warnings.push('mod.info has no `id=` — dependencies cannot resolve this mod')
-  if (fields['poster']?.length && !posterPath) warnings.push('Declared poster file is missing on disk')
+  if (infoFile && !modId) warnings.push('no-id')
+  if (fields['poster']?.length && !posterPath) warnings.push('poster-missing')
 
   return {
     key: `${c.source.id}::${c.path}`,

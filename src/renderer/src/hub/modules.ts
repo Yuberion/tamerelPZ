@@ -1,4 +1,5 @@
 import type { IconName } from '@renderer/components/Icon'
+import type { TKey } from '@renderer/i18n'
 
 export type ModuleId =
   | 'stalker'
@@ -15,9 +16,10 @@ export interface ModuleDef {
   id: ModuleId
   /** Two digit index printed on the tile. */
   code: string
+  /** Codename, deliberately not translated — it is an identifier, like the wordmark. */
   name: string
-  tagline: string
-  description: string
+  taglineKey: TKey
+  descKey: TKey
   icon: IconName
   status: 'live' | 'sealed'
 }
@@ -28,9 +30,8 @@ export const MODULES: ModuleDef[] = [
     id: 'stalker',
     code: '01',
     name: 'Stalker',
-    tagline: 'Mod explorer',
-    description:
-      'Walk every mod on the drive. Structure, metadata, artwork and files — straight to Explorer.',
+    taglineKey: 'module.stalker.tagline',
+    descKey: 'module.stalker.desc',
     icon: 'crosshair',
     status: 'live'
   },
@@ -38,8 +39,8 @@ export const MODULES: ModuleDef[] = [
     id: 'loadout',
     code: '02',
     name: 'Loadout',
-    tagline: 'Load order & profiles',
-    description: 'Order mods, build named profiles and push them into the game config.',
+    taglineKey: 'module.loadout.tagline',
+    descKey: 'module.loadout.desc',
     icon: 'list',
     status: 'sealed'
   },
@@ -47,8 +48,8 @@ export const MODULES: ModuleDef[] = [
     id: 'signal',
     code: '03',
     name: 'Signal',
-    tagline: 'Workshop sync',
-    description: 'Track Workshop updates, spot stale downloads and re-subscribe broken items.',
+    taglineKey: 'module.signal.tagline',
+    descKey: 'module.signal.desc',
     icon: 'radio',
     status: 'sealed'
   },
@@ -56,8 +57,8 @@ export const MODULES: ModuleDef[] = [
     id: 'workbench',
     code: '04',
     name: 'Workbench',
-    tagline: 'Authoring tools',
-    description: 'Scaffold mods, edit mod.info, validate scripts and pack builds for upload.',
+    taglineKey: 'module.workbench.tagline',
+    descKey: 'module.workbench.desc',
     icon: 'wrench',
     status: 'sealed'
   },
@@ -65,8 +66,8 @@ export const MODULES: ModuleDef[] = [
     id: 'triage',
     code: '05',
     name: 'Triage',
-    tagline: 'Conflict doctor',
-    description: 'Duplicate ids, missing requirements, overwritten scripts and item collisions.',
+    taglineKey: 'module.triage.tagline',
+    descKey: 'module.triage.desc',
     icon: 'pulse',
     status: 'sealed'
   },
@@ -74,8 +75,8 @@ export const MODULES: ModuleDef[] = [
     id: 'cartograph',
     code: '06',
     name: 'Cartograph',
-    tagline: 'Map manager',
-    description: 'Map cell overlaps, spawn regions and the map load order that actually works.',
+    taglineKey: 'module.cartograph.tagline',
+    descKey: 'module.cartograph.desc',
     icon: 'map',
     status: 'sealed'
   },
@@ -83,8 +84,8 @@ export const MODULES: ModuleDef[] = [
     id: 'bunker',
     code: '07',
     name: 'Bunker',
-    tagline: 'Backups & vault',
-    description: 'Snapshot mods and saves before an update wipes a 300 hour run.',
+    taglineKey: 'module.bunker.tagline',
+    descKey: 'module.bunker.desc',
     icon: 'archive',
     status: 'sealed'
   },
@@ -92,8 +93,8 @@ export const MODULES: ModuleDef[] = [
     id: 'outpost',
     code: '08',
     name: 'Outpost',
-    tagline: 'Server & collections',
-    description: 'Generate server ini mod lines, Workshop id lists and shareable collections.',
+    taglineKey: 'module.outpost.tagline',
+    descKey: 'module.outpost.desc',
     icon: 'server',
     status: 'sealed'
   },
@@ -101,8 +102,8 @@ export const MODULES: ModuleDef[] = [
     id: 'ledger',
     code: '09',
     name: 'Ledger',
-    tagline: 'Logs & settings',
-    description: 'Crash logs, console noise, lua errors and the suite configuration.',
+    taglineKey: 'module.ledger.tagline',
+    descKey: 'module.ledger.desc',
     icon: 'book',
     status: 'sealed'
   }

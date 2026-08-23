@@ -9,7 +9,14 @@ import type {
   SortMode
 } from '@shared/types'
 import type { IconName } from '@renderer/components/Icon'
-import { CATEGORY_ORDER, categoryMeta, primaryCategory, SOURCE_META } from '@renderer/lib/catmeta'
+import { useI18n } from '@renderer/i18n'
+import {
+  CATEGORY_ORDER,
+  categoryMeta,
+  primaryCategory,
+  sourceLabel,
+  SOURCE_META
+} from '@renderer/lib/catmeta'
 import { fuzzyMatch } from '@renderer/lib/format'
 
 export type IssueFilter = 'all' | 'duplicates' | 'missing' | 'noinfo' | 'warnings'
@@ -54,11 +61,18 @@ export interface ModRowsResult {
   categoryCounts: Map<ModCategory, number>
 }
 
-function sortMods(mods: ModEntry[], sort: SortMode, sources: ModSource[]): ModEntry[] {
+function sortMods(
+  mods: ModEntry[],
+  sort: SortMode,
+  sources: ModSource[],
+  labelOf: (s: ModSource) => string
+): ModEntry[] {
   const byName = (a: ModEntry, b: ModEntry): number =>
     a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
-  const sourceLabel = (m: ModEntry): string =>
-    sources.find((s) => s.id === m.sourceId)?.label ?? m.sourceKind
+  const sourceLabelFor = (m: ModEntry): string => {
+    const s = sources.find((x) => x.id === m.sourceId)
+    return s ? labelOf(s) : m.sourceKind
+  }
   const copy = [...mods]
   switch (sort) {
     case 'name-desc':
@@ -74,7 +88,7 @@ function sortMods(mods: ModEntry[], sort: SortMode, sources: ModSource[]): ModEn
           byName(a, b)
       )
     case 'source':
-      return copy.sort((a, b) => sourceLabel(a).localeCompare(sourceLabel(b)) || byName(a, b))
+      return copy.sort((a, b) => sourceLabelFor(a).localeCompare(sourceLabelFor(b)) || byName(a, b))
     default:
       return copy.sort(byName)
   }
@@ -90,7 +104,9 @@ export function useModRows({
   sort,
   collapsed
 }: Params): ModRowsResult {
+  const { t } = useI18n()
   return useMemo(() => {
+    const labelOf = (s: ModSource): string => sourceLabel(s, t)
     const dupKeys = new Set<string>()
     for (const keys of Object.values(issues?.duplicateIds ?? {})) for (const k of keys) dupKeys.add(k)
     const missingKeys = new Set(Object.keys(issues?.missingRequires ?? {}))
@@ -135,7 +151,8 @@ export function useModRows({
       : sortMods(
           scored.map((s) => s.mod),
           sort,
-          sources
+          sources,
+          labelOf
         )
 
     const indicesByKey = new Map(scored.map((s) => [s.mod.key, s.indices]))
@@ -164,7 +181,7 @@ export function useModRows({
         rows.push({
           kind: 'group',
           id: `type:${cat}`,
-          label: meta.label,
+          label: t(meta.labelKey),
           color: meta.color,
           icon: meta.icon,
           count: list.length,
@@ -186,7 +203,7 @@ export function useModRows({
         rows.push({
           kind: 'group',
           id: `source:${s.id}`,
-          label: s.label,
+          label: labelOf(s),
           color: SOURCE_META[s.kind].color,
           icon: s.kind === 'workshop' ? 'download' : s.kind === 'game' ? 'target' : 'folder',
           count: list.length,
@@ -195,21 +212,23 @@ export function useModRows({
         if (!isCollapsed) for (const m of list) emitMod(m)
       }
     } else {
+      // Bucket by the raw build string so group ids stay stable across a language
+      // switch; only the rendered label is translated.
       const buckets = new Map<string, ModEntry[]>()
       for (const m of matched) {
-        const label = m.builds.length ? m.builds.join(' + ') : 'Unknown build'
-        const list = buckets.get(label)
+        const key = m.builds.join(' + ')
+        const list = buckets.get(key)
         if (list) list.push(m)
-        else buckets.set(label, [m])
+        else buckets.set(key, [m])
       }
-      for (const label of [...buckets.keys()].sort()) {
-        const list = buckets.get(label) ?? []
-        const isCollapsed = collapsed.has(`build:${label}`)
+      for (const key of [...buckets.keys()].sort()) {
+        const list = buckets.get(key) ?? []
+        const isCollapsed = collapsed.has(`build:${key}`)
         rows.push({
           kind: 'group',
-          id: `build:${label}`,
-          label,
-          color: label.includes('B42') ? 'var(--moss)' : 'var(--ember)',
+          id: `build:${key}`,
+          label: key || t('group.unknownBuild'),
+          color: key.includes('B42') ? 'var(--moss)' : 'var(--ember)',
           icon: 'hash',
           count: list.length,
           collapsed: isCollapsed
@@ -224,5 +243,5 @@ export function useModRows({
     })
 
     return { rows, matched, indexByKey, categoryCounts }
-  }, [mods, sources, issues, filters, group, sort, collapsed])
+  }, [mods, sources, issues, filters, group, sort, collapsed, t])
 }

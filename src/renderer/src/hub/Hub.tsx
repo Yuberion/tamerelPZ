@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
+import { useI18n, type TKey } from '@renderer/i18n'
 import { formatCount, formatDuration } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/state/store'
 import { MODULES, type ModuleId } from './modules'
@@ -9,9 +10,17 @@ interface HubProps {
   onOpen: (id: ModuleId) => void
 }
 
+const PROGRESS_KEYS: Record<string, TKey> = {
+  sources: 'progress.sources',
+  enumerate: 'progress.enumerate',
+  analyze: 'progress.analyze',
+  done: 'progress.done'
+}
+
 export function Hub({ onOpen }: HubProps) {
   const { scan, paths, scanning, progress, refresh, error } = useAppStore()
   const { notify } = useToast()
+  const { t } = useI18n()
 
   const stats = useMemo(() => {
     const mods = scan?.mods ?? []
@@ -36,30 +45,31 @@ export function Hub({ onOpen }: HubProps) {
     <div className="hub">
       <div className="hub__top">
         <div className="hub__title">
-          <div className="hub__eyebrow label">Project Zomboid · management suite</div>
+          <div className="hub__eyebrow label">{t('hub.eyebrow')}</div>
           <h1 className="hub__h1 stencil">PZ Management</h1>
           <div className="hub__rule" />
-          <p className="hub__lede">
-            Nine modules. One drive. Everything you installed, finally accounted for.
-          </p>
+          <p className="hub__lede">{t('hub.lede')}</p>
         </div>
 
         <div className="hub__readout brackets">
-          <div className="readout__head label">Site status</div>
+          <div className="readout__head label">{t('hub.status')}</div>
           <Readout
-            label="Build"
-            value={paths?.gameVersion?.split(' ')[0] ?? (scanning ? 'scanning' : 'unknown')}
+            label={t('hub.build')}
+            value={
+              paths?.gameVersion?.split(' ')[0] ??
+              (scanning ? t('hub.scanningShort') : t('hub.unknown'))
+            }
           />
-          <Readout label="Mods found" value={formatCount(stats.total)} />
-          <Readout label="Local" value={formatCount(stats.local)} />
-          <Readout label="Workshop" value={formatCount(stats.workshop)} />
+          <Readout label={t('hub.modsFound')} value={formatCount(stats.total)} />
+          <Readout label={t('hub.local')} value={formatCount(stats.local)} />
+          <Readout label={t('hub.workshop')} value={formatCount(stats.workshop)} />
           <Readout
-            label="Duplicate ids"
+            label={t('hub.duplicateIds')}
             value={formatCount(stats.duplicates)}
             tone={stats.duplicates ? 'warn' : undefined}
           />
           <Readout
-            label="Broken requires"
+            label={t('hub.brokenRequires')}
             value={formatCount(stats.missing)}
             tone={stats.missing ? 'warn' : undefined}
           />
@@ -68,13 +78,14 @@ export function Hub({ onOpen }: HubProps) {
               <div className="readout__scan">
                 <Icon name="refresh" size={11} className="spin" />
                 <span className="mono">
-                  {progress?.label ?? 'Scanning'} {pct ? `${pct}%` : ''}
+                  {progress ? t(PROGRESS_KEYS[progress.phase] ?? 'hub.scanning') : t('hub.scanning')}{' '}
+                  {pct ? `${pct}%` : ''}
                 </span>
               </div>
             ) : (
               <button className="btn btn--tiny" onClick={() => void refresh(true)}>
                 <Icon name="refresh" size={12} />
-                Rescan drive
+                {t('hub.rescanDrive')}
               </button>
             )}
             {scan && !scanning && (
@@ -101,7 +112,7 @@ export function Hub({ onOpen }: HubProps) {
               style={{ animationDelay: `${i * 28}ms` }}
               onClick={() => {
                 if (live) onOpen(m.id)
-                else notify(`${m.name.toUpperCase()} is sealed in this build`, 'warn')
+                else notify(t('hub.sealedToast', { name: m.name.toUpperCase() }), 'warn')
               }}
             >
               <span className="tile__code mono">{m.code}</span>
@@ -110,20 +121,20 @@ export function Hub({ onOpen }: HubProps) {
               </span>
               <span className="tile__body">
                 <span className="tile__name stencil">{m.name}</span>
-                <span className="tile__tagline label">{m.tagline}</span>
-                <span className="tile__desc">{m.description}</span>
+                <span className="tile__tagline label">{t(m.taglineKey)}</span>
+                <span className="tile__desc">{t(m.descKey)}</span>
               </span>
               <span className="tile__foot">
                 {live ? (
                   <>
                     <span className="tile__pulse" />
-                    <span className="label tile__status">Online</span>
+                    <span className="label tile__status">{t('hub.online')}</span>
                     <Icon name="chevron-right" size={13} className="tile__go" />
                   </>
                 ) : (
                   <>
                     <Icon name="lock" size={12} />
-                    <span className="label tile__status">Sealed</span>
+                    <span className="label tile__status">{t('hub.sealed')}</span>
                   </>
                 )}
               </span>
@@ -133,9 +144,9 @@ export function Hub({ onOpen }: HubProps) {
       </div>
 
       <div className="hub__foot mono">
-        <span>{paths?.gameDir ?? 'game directory not found'}</span>
+        <span>{paths?.gameDir ?? t('hub.noGameDir')}</span>
         <span className="hub__foot-sep">·</span>
-        <span>{paths?.zomboidDir ?? 'user directory not found'}</span>
+        <span>{paths?.zomboidDir ?? t('hub.noUserDir')}</span>
       </div>
     </div>
   )

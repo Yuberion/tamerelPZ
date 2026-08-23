@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { I18nProvider } from './i18n'
 import { TitleBar } from './components/TitleBar'
 import { ToastProvider } from './components/Toast'
 import { Hub } from './hub/Hub'
@@ -30,18 +31,20 @@ export default function App() {
   }, [view, goHome])
 
   return (
-    <ToastProvider>
-      <div className="shell">
-        <TitleBar
-          section={view === 'hub' ? undefined : moduleById(view).name}
-          onHome={view === 'hub' ? undefined : goHome}
-          busy={scanning}
-        />
-        <main className="shell__body">
-          {view === 'hub' ? <Hub onOpen={setView} /> : null}
-          {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
-        </main>
-      </div>
-    </ToastProvider>
+    <I18nProvider>
+      <ToastProvider>
+        <div className="shell">
+          <TitleBar
+            section={view === 'hub' ? undefined : moduleById(view).name}
+            onHome={view === 'hub' ? undefined : goHome}
+            busy={scanning}
+          />
+          <main className="shell__body">
+            {view === 'hub' ? <Hub onOpen={setView} /> : null}
+            {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
+          </main>
+        </div>
+      </ToastProvider>
+    </I18nProvider>
   )
 }
