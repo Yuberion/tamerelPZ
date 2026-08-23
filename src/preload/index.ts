@@ -1,0 +1,48 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import type { PzApi, ScanRequest } from '../shared/api'
+import { IPC } from '../shared/ipc'
+import type { AppSettings, ScanProgress } from '../shared/types'
+
+function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
+  const listener = (_event: Electron.IpcRendererEvent, payload: T): void => cb(payload)
+  ipcRenderer.on(channel, listener)
+  return () => ipcRenderer.removeListener(channel, listener)
+}
+
+const api: PzApi = {
+  app: {
+    info: () => ipcRenderer.invoke(IPC.appInfo)
+  },
+  window: {
+    minimize: () => ipcRenderer.invoke(IPC.windowMinimize),
+    toggleMaximize: () => ipcRenderer.invoke(IPC.windowMaximize),
+    close: () => ipcRenderer.invoke(IPC.windowClose),
+    onState: (cb) => subscribe<{ maximized: boolean }>(IPC.windowState, cb)
+  },
+  paths: {
+    detect: () => ipcRenderer.invoke(IPC.pathsDetect),
+    pickFolder: (title?: string) => ipcRenderer.invoke(IPC.pathsPickFolder, title)
+  },
+  mods: {
+    scan: (req: ScanRequest = {}) => ipcRenderer.invoke(IPC.modsScan, req),
+    stats: (path: string) => ipcRenderer.invoke(IPC.modsStats, path),
+    onProgress: (cb) => subscribe<ScanProgress>(IPC.modsProgress, cb)
+  },
+  fs: {
+    list: (path: string) => ipcRenderer.invoke(IPC.fsList, path),
+    tree: (path: string, depth?: number) => ipcRenderer.invoke(IPC.fsTree, path, depth),
+    preview: (path: string) => ipcRenderer.invoke(IPC.fsPreview, path)
+  },
+  shell: {
+    reveal: (path: string) => ipcRenderer.invoke(IPC.shellReveal, path),
+    open: (path: string) => ipcRenderer.invoke(IPC.shellOpen, path),
+    external: (url: string) => ipcRenderer.invoke(IPC.shellExternal, url),
+    terminal: (path: string) => ipcRenderer.invoke(IPC.shellTerminal, path)
+  },
+  settings: {
+    get: () => ipcRenderer.invoke(IPC.settingsGet),
+    set: (patch: Partial<AppSettings>) => ipcRenderer.invoke(IPC.settingsSet, patch)
+  }
+}
+
+contextBridge.exposeInMainWorld('pz', api)

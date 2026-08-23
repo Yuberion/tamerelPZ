@@ -1,0 +1,107 @@
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.pnp/
+.pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ---------------------------------------------------------------------------
+# Build output (electron-vite -> out/, packagers -> dist/ release/)
+# ---------------------------------------------------------------------------
+out/
+dist/
+dist-electron/
+build/
+release/
+*.asar
+
+# Packaged installers / binaries
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.AppImage
+*.snap
+*.zip
+*.7z
+
+# ---------------------------------------------------------------------------
+# TypeScript incremental build info
+# ---------------------------------------------------------------------------
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Caches
+# ---------------------------------------------------------------------------
+.cache/
+.temp/
+.tmp/
+.vite/
+.eslintcache
+.stylelintcache
+.turbo/
+.parcel-cache/
+
+# ---------------------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------------------------------------------------------------------------
+# Environment / secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ---------------------------------------------------------------------------
+# Editors & IDEs
+# ---------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ---------------------------------------------------------------------------
+# Agent / tooling local state
+# Note: .kilo/command/ and .kilo/agent/ are shareable project config —
+# only local/recovery state is ignored here.
+# ---------------------------------------------------------------------------
+.kilo/agent-manager.json
+.kilo/state/
+.kilo/cache/
+.kilocode/
+.opencode/
+.claude/
+.aider*
+
+# ---------------------------------------------------------------------------
+# OS cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk

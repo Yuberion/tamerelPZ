@@ -1,0 +1,44 @@
+# Normalise line endings: LF in the repository, native in the working tree.
+* text=auto eol=lf
+
+# Windows batch files must keep CRLF — CMD can mis-parse labels/goto with LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# PowerShell scripts are safest with CRLF on Windows.
+*.ps1 text eol=crlf
+
+# Explicit text types
+*.ts    text
+*.tsx   text
+*.mjs   text
+*.cjs   text
+*.js    text
+*.json  text
+*.jsonc text
+*.css   text
+*.html  text
+*.md    text
+*.yml   text
+*.yaml  text
+
+# Binary — never diff or normalise
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.bmp  binary
+*.ico  binary
+*.webp binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.zip binary
+*.7z  binary
+*.exe binary
+*.dll binary
+*.asar binary
+
+# Collapse lockfile noise in diffs and PR reviews
+package-lock.json -diff linguist-generated=true
