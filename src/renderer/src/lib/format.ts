@@ -1,26 +1,35 @@
+import { getLang, translate, type TKey } from '@renderer/i18n'
+
+const BYTE_UNITS = ['bytes.B', 'bytes.KB', 'bytes.MB', 'bytes.GB', 'bytes.TB'] as const
+
 export function formatBytes(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1)
+  const lang = getLang()
+  if (!Number.isFinite(n) || n <= 0) return `0 ${translate(lang, 'bytes.B')}`
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), BYTE_UNITS.length - 1)
   const value = n / 1024 ** i
   const digits = value >= 100 || i === 0 ? 0 : value >= 10 ? 1 : 2
-  return `${value.toFixed(digits)} ${units[i]}`
+  return `${value.toFixed(digits)} ${translate(lang, BYTE_UNITS[i] as TKey)}`
 }
 
 export function formatCount(n: number): string {
-  return n.toLocaleString('en-US')
+  return n.toLocaleString(getLang() === 'ru' ? 'ru-RU' : 'en-US')
 }
 
 export function formatDate(ms: number): string {
   if (!ms) return '—'
   const d = new Date(ms)
   const pad = (v: number): string => String(v).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  if (getLang() === 'ru') {
+    return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${time}`
+  }
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`
 }
 
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)} ms`
-  return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`
+  const lang = getLang()
+  if (ms < 1000) return `${Math.round(ms)} ${translate(lang, 'unit.ms')}`
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} ${translate(lang, 'unit.s')}`
 }
 
 export interface FuzzyHit {

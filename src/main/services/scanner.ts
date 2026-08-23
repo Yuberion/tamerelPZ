@@ -4,6 +4,7 @@ import type {
   ModEntry,
   ModSource,
   ModVersionFolder,
+  ModWarning,
   ScanIssues,
   ScanProgress,
   ScanResult
@@ -124,7 +125,7 @@ async function analyzeMod(c: Candidate): Promise<ModEntry | undefined> {
   if (!entries.length) return undefined
 
   const folderName = basename(c.path)
-  const warnings: string[] = []
+  const warnings: ModWarning[] = []
   const names = new Map(entries.map((e) => [e.name.toLowerCase(), e]))
 
   // --- build sub-folders (B42 layout) -------------------------------------

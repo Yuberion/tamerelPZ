@@ -5,12 +5,28 @@
 
 export type ModSourceKind = 'local' | 'workshop' | 'game' | 'project' | 'custom'
 
+/**
+ * Stable identifier for a built-in source label.
+ *
+ * Main emits this instead of display text so the renderer can localise it. Custom
+ * sources have no key and keep their user-supplied `label` verbatim.
+ */
+export type ModSourceLabelKey =
+  | 'local'
+  | 'workshop'
+  | 'gameMods'
+  | 'gameMediaMods'
+  | 'workshopProjects'
+
 /** A root directory that holds Project Zomboid mods. */
 export interface ModSource {
   /** Stable identifier, e.g. `local`, `workshop:E:\SteamLibrary`. */
   id: string
   kind: ModSourceKind
+  /** English fallback text; prefer `labelKey` when it is set. */
   label: string
+  /** Translation key for built-in sources. Absent for user-defined ones. */
+  labelKey?: ModSourceLabelKey
   /** Absolute path of the container directory. */
   path: string
   /** Short hint shown under the label in the UI. */
@@ -47,6 +63,14 @@ export interface ModVersionFolder {
   /** Numeric weight used to pick the most relevant folder. */
   weight: number
 }
+
+/**
+ * Non-fatal problem codes, not display text.
+ *
+ * Main emits codes so the renderer can render them in the active language; adding a
+ * code here requires a matching `warn.*` entry in the renderer dictionary.
+ */
+export type ModWarning = 'no-modinfo' | 'no-id' | 'poster-missing'
 
 /** One discovered mod. */
 export interface ModEntry {
@@ -87,7 +111,7 @@ export interface ModEntry {
   hasInfo: boolean
   mtime: number
   /** Non-fatal problems found while analysing the mod. */
-  warnings: string[]
+  warnings: ModWarning[]
 }
 
 export interface ScanProgress {
