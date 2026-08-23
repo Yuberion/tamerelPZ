@@ -11,26 +11,23 @@ node_modules/
 !.yarn/versions
 
 # ---------------------------------------------------------------------------
-# Build output (electron-vite -> out/, packagers -> dist/ release/)
+# Build output. Root-anchored on purpose: unanchored `dist/` or `build/` also
+# match nested source directories like src/renderer/src/lib/dist/.
+#
+# `build/` is deliberately NOT ignored — it is electron-builder's default
+# buildResources directory (app icon, entitlements, installer scripts), which
+# belongs in the repo.
+#
+# Packaged artifacts (*.exe, *.msi, *.zip, ...) need no rules of their own:
+# they land inside the ignored output directories below, and unanchored
+# extension globs would silently drop legitimate committed assets anywhere in
+# the tree while contradicting the binary attributes in .gitattributes.
 # ---------------------------------------------------------------------------
-out/
-dist/
-dist-electron/
-build/
-release/
-*.asar
-
-# Packaged installers / binaries
-*.exe
-*.msi
-*.dmg
-*.pkg
-*.deb
-*.rpm
-*.AppImage
-*.snap
-*.zip
-*.7z
+/out/
+/dist/
+/dist-electron/
+/release/
+/*.asar
 
 # ---------------------------------------------------------------------------
 # TypeScript incremental build info

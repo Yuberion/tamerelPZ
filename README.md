@@ -4,7 +4,7 @@
 
 Built with Electron 43, React 19, TypeScript and electron-vite. **Zero runtime dependencies.**
 
-> **Status: early build (v0.1.0).** This is currently a *read-only inventory and inspection tool*, not a full mod manager. It never writes to your game or mod files. See [Roadmap](#roadmap) for what is and isn't implemented.
+> **Status: early build (v0.1.0).** This is currently a *read-only inventory and inspection tool*, not a full mod manager. It never writes to, moves or deletes your game or mod files — the only file it writes is its own `settings.json`. See [Roadmap](#roadmap) for what is and isn't implemented.
 
 ---
 
@@ -56,7 +56,7 @@ Plus: filter chips with live counts, context menus (open folder, reveal in Explo
 ## Requirements
 
 - **Windows** (see [Platform support](#platform-support))
-- **Node.js 20+**
+- **Node.js 22.12+** — required by `electron@43.4.1` (`engines.node: ">= 22.12.0"`); no Node 20.x release satisfies the pinned toolchain
 - Project Zomboid installed (Steam or GOG)
 
 ## Getting started
@@ -129,7 +129,9 @@ start.bat                Windows launcher
 
 - `contextIsolation: true`, `nodeIntegration: false`, `webSecurity: true`; the renderer sees a single typed `window.pz` object
 - **Path allowlist guard** — renderer-supplied paths are untrusted. Every path-taking IPC handler and the `pzfile://` protocol handler funnels through `assertPathAllowed`, which rejects empty paths, anything containing `..`, and anything outside the detected roots. Roots are cached for 30s and invalidated on `settings:set`.
-- **No destructive filesystem operations exist anywhere in the codebase.** A repo-wide grep for `unlink` / `rmdir` / `rm(` / `copyFile` / `rename` / `writeFile` matches only `settings.ts` writing its own config. The app cannot damage a mod install.
+- **The allowlist is defined by settings, and `settings:set` does not validate its patch.** `customSources[].path`, `gameDirOverride` and `zomboidDirOverride` become guard roots, so a compromised renderer can widen its own allowlist. Treat the guard as defence in depth against path bugs, not as a boundary against a hostile renderer.
+- **No `fs` write, delete, move or copy call exists outside `settings.ts`**, which writes only its own `settings.json`. A repo-wide grep for `unlink` / `rmdir` / `rm(` / `copyFile` / `rename` / `writeFile` matches nothing else, so the app never modifies a mod file itself.
+- **Two handlers do hand untrusted content to the OS, though.** `shell:open` refuses ~50 executable and script extensions and reveals them in Explorer instead, and `shell:terminal` spawns an absolute `System32` interpreter path so a mod cannot shadow `powershell.exe` from its own folder. Everything else in a mod folder still opens with its registered default handler, so the usual "don't run unknown files" caution applies.
 - `shell:external` rejects anything that isn't `http(s)://`; `setWindowOpenHandler` and `will-navigate` push external links to the OS browser and deny in-app navigation
 - CSP declared in `index.html`; `uncaughtException` / `unhandledRejection` are logged, not fatal — a stray rejection in a filesystem walk must never kill the app
 
@@ -191,18 +193,24 @@ Written atomically (tmp file + rename) and treated as best-effort — a corrupt 
 
 ```jsonc
 {
-  "disabledSources": [],        // source ids to skip
-  "customSources": [],          // extra mod container paths
-  "sortMode": "name",           // name | name-desc | type | newest | id | source
-  "groupMode": "type",          // type | source | build | flat
+  // Source ids to skip.
+  "disabledSources": [],
+  // Extra mod containers. Objects, not bare paths — `kind` drives the on-disk layout
+  // the scanner expects, so use "custom" unless you are mimicking a built-in source.
+  "customSources": [
+    { "id": "extra", "label": "Extra mods", "path": "E:\\Mods", "kind": "custom" }
+  ],
+  // name | name-desc | type | recent | id | source   ("recent" is labelled "Newest" in the UI)
+  "sortMode": "name",
+  // type | source | build | none                     ("none" is labelled "Flat" in the UI)
+  "groupMode": "type",
   "gameDirOverride": "…",       // optional: override PZ game dir detection
   "zomboidDirOverride": "…",    // optional: override %USERPROFILE%\Zomboid
-  "lastModKey": "…",
-  "lastSourceFilter": "…"
+  "lastModKey": "…"             // last selected mod, restored on launch
 }
 ```
 
-`disabledSources`, `customSources`, `gameDirOverride` and `zomboidDirOverride` are honoured by the scanner but **have no UI yet** — set them by hand-editing the file. Pane widths are stored separately in `localStorage`.
+`disabledSources`, `customSources`, `gameDirOverride` and `zomboidDirOverride` are honoured by the scanner but **have no UI yet** — set them by hand-editing the file. An unrecognised `sortMode` or `groupMode` value is ignored silently, so use the exact values above. Pane widths are stored separately in `localStorage`.
 
 ---
 

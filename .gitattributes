@@ -40,5 +40,7 @@
 *.dll binary
 *.asar binary
 
-# Collapse lockfile noise in diffs and PR reviews
-package-lock.json -diff linguist-generated=true
+# Collapse lockfile noise in reviews. `linguist-generated` hides the diff behind an
+# expandable "Load diff" on GitHub while keeping it reviewable and patchable — do not
+# add `-diff` here, which marks the file binary and removes the diff entirely.
+package-lock.json linguist-generated=true

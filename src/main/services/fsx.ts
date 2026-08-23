@@ -24,7 +24,19 @@ export function pLimit(concurrency: number) {
   }
 }
 
+/** Leaf I/O queue: individual stat/readdir calls. Nothing scheduled here may await it. */
 const limit = pLimit(48)
+
+/**
+ * Separate queue for directory *recursion*.
+ *
+ * This must never be `limit`. A task that holds a slot while awaiting work from the
+ * same limiter deadlocks it permanently as soon as every slot is held by such a
+ * waiter — and because `limit` is a module singleton, that would strand `fs:list`,
+ * `fs:tree` and `mods:stats` for the rest of the process. Ordering is one-way:
+ * `treeLimit` tasks wait on `limit`, never the reverse.
+ */
+const treeLimit = pLimit(24)
 
 export async function readdirSafe(dir: string): Promise<Dirent[]> {
   try {
@@ -133,20 +145,32 @@ export async function listDir(dir: string, withChildCount = true): Promise<FsNod
   return nodes.filter((n): n is FsNode => Boolean(n)).sort(compareNodes)
 }
 
-/** Eagerly build a tree down to `depth` levels (depth 1 = direct children only). */
+/**
+ * Eagerly build a tree down to `depth` levels (depth 1 = direct children only).
+ *
+ * Expansion is breadth-first on purpose. The obvious recursive form —
+ * `limit(() => buildTree(child, depth - 1))` — holds a slot for the whole subtree
+ * while `listDir` underneath needs slots from that same limiter, so held slots
+ * accumulate with depth until the queue is saturated by waiters and never drains.
+ * Level-by-level expansion keeps every limiter acquisition short-lived instead.
+ */
 export async function buildTree(dir: string, depth: number): Promise<FsNode[]> {
-  const children = await listDir(dir)
-  if (depth <= 1) return children
-  await Promise.all(
-    children
-      .filter((c) => c.dir && c.childCount > 0)
-      .map((c) =>
-        limit(async () => {
-          c.children = await buildTree(c.path, depth - 1)
-        })
-      )
-  )
-  return children
+  const roots = await listDir(dir)
+  let frontier = depth > 1 ? roots.filter((c) => c.dir && c.childCount > 0) : []
+
+  for (let level = 1; level < depth && frontier.length; level++) {
+    const expanded = await Promise.all(frontier.map((node) => treeLimit(() => listDir(node.path))))
+    const next: FsNode[] = []
+    for (let i = 0; i < frontier.length; i++) {
+      const children = expanded[i] ?? []
+      frontier[i].children = children
+      if (level + 1 < depth) {
+        for (const c of children) if (c.dir && c.childCount > 0) next.push(c)
+      }
+    }
+    frontier = next
+  }
+  return roots
 }
 
 const MAX_WALK_ENTRIES = 250_000

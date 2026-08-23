@@ -30,9 +30,23 @@ if not defined MODE set "MODE=dev"
 where node >nul 2>nul
 if errorlevel 1 (
     echo [ERROR] Node.js was not found in PATH.
-    echo         Install Node.js 20+ from https://nodejs.org, then reopen the terminal.
+    echo         Install Node.js 22.12+ from https://nodejs.org, then reopen the terminal.
     goto :fail
 )
+
+rem electron@43 declares engines.node ">= 22.12.0". npm only warns on a mismatch and
+rem installs anyway, so the failure would otherwise surface later as an opaque build
+rem error. Fail loudly here instead, before npm install.
+set "NODE_MAJOR="
+set "NODE_MINOR="
+for /f "tokens=1,2 delims=." %%a in ('node -p "process.versions.node"') do (
+    set "NODE_MAJOR=%%a"
+    set "NODE_MINOR=%%b"
+)
+if not defined NODE_MAJOR goto :badnode
+if not defined NODE_MINOR goto :badnode
+if %NODE_MAJOR% LSS 22 goto :oldnode
+if %NODE_MAJOR% EQU 22 if %NODE_MINOR% LSS 12 goto :oldnode
 
 if not exist "node_modules\electron\package.json" (
     echo [setup] Installing dependencies, this may take a few minutes...
@@ -88,6 +102,16 @@ call npm run typecheck
 if errorlevel 1 goto :fail
 echo [ok] Typecheck passed.
 goto :done
+
+:badnode
+echo [ERROR] Could not determine the Node.js version ^('node -p' failed^).
+echo         Reinstall Node.js 22.12+ from https://nodejs.org
+goto :fail
+
+:oldnode
+echo [ERROR] Node.js %NODE_MAJOR%.%NODE_MINOR% is too old for this toolchain.
+echo         electron@43 requires Node.js 22.12 or newer. Get it from https://nodejs.org
+goto :fail
 
 :fail
 echo.

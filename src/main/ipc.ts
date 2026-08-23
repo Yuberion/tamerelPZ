@@ -1,12 +1,30 @@
 import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 import { spawn } from 'node:child_process'
+import { extname, join } from 'node:path'
 import { IPC } from '../shared/ipc'
 import type { AppInfo, AppSettings, ScanProgress } from '../shared/types'
 import { assertPathAllowed, invalidateGuard } from './services/guard'
-import { buildTree, listDir, readPreview, walkStats } from './services/fsx'
+import { buildTree, exists, listDir, readPreview, walkStats } from './services/fsx'
 import { detectPaths } from './services/paths'
 import { scanMods, type ScanOptions } from './services/scanner'
 import { getSettings, setSettings } from './services/settings'
+
+/**
+ * Extensions Windows *executes* rather than opens.
+ *
+ * `assertPathAllowed` only proves a path sits inside a known mod root — and mod roots
+ * are exactly where untrusted third-party Workshop content lives. `shell.openPath` is
+ * ShellExecute, so pointing it at one of these runs the file: a mod shipping
+ * `readme.exe` would otherwise execute from a single click in the file inspector.
+ */
+const EXECUTABLE_EXTS = new Set([
+  'exe', 'com', 'bat', 'cmd', 'pif', 'scr', 'scf', 'cpl', 'msc', 'msi', 'msp', 'mst',
+  'hta', 'jar', 'lnk', 'url', 'inf', 'ins', 'isp', 'its', 'reg', 'sct', 'shb', 'shs',
+  'ps1', 'ps1xml', 'psc1', 'psc2', 'psm1', 'psd1', 'msh', 'msh1', 'msh2', 'mshxml',
+  'vb', 'vbs', 'vbe', 'vsw', 'vxd', 'ws', 'wsf', 'wsc', 'wsh', 'js', 'jse', 'jnlp',
+  'dll', 'ocx', 'sys', 'drv', 'gadget', 'application', 'appref-ms', 'appx', 'appxbundle',
+  'chm', 'sh', 'bash', 'py', 'pyw', 'pl', 'rb', 'php'
+])
 
 function senderWindow(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -84,7 +102,14 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.shellOpen, async (_e, path: string) => {
-    return shell.openPath(await assertPathAllowed(path))
+    const target = await assertPathAllowed(path)
+    const ext = extname(target).slice(1).toLowerCase()
+    if (ext && EXECUTABLE_EXTS.has(ext)) {
+      // Same contract as shell.openPath: a non-empty string is the failure reason.
+      shell.showItemInFolder(target)
+      return `Refused to launch .${ext} from a mod folder. Revealed it in Explorer instead.`
+    }
+    return shell.openPath(target)
   })
 
   ipcMain.handle(IPC.shellExternal, async (_e, url: string) => {
@@ -95,7 +120,15 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.shellTerminal, async (_e, path: string) => {
     const cwd = await assertPathAllowed(path)
     if (process.platform !== 'win32') return
-    const child = spawn(process.env['COMSPEC'] ?? 'cmd.exe', ['/c', 'start', '', 'powershell.exe', '-NoExit'], {
+    // Absolute interpreter path on purpose. `cmd /c start powershell.exe` resolves the
+    // name through ShellExecute, which searches the working directory before System32
+    // and PATH — and the working directory here is an untrusted mod folder that may
+    // ship its own powershell.exe. Spawning the binary directly skips that lookup
+    // entirely; `detached` still gives the child its own console window on Windows.
+    const system32 = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32')
+    const powershell = join(system32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+    const usePowershell = await exists(powershell)
+    const child = spawn(usePowershell ? powershell : join(system32, 'cmd.exe'), usePowershell ? ['-NoExit'] : [], {
       cwd,
       detached: true,
       stdio: 'ignore',
