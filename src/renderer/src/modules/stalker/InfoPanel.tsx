@@ -1,13 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { pzFileUrl } from '@shared/ipc'
-import type { FilePreview, FsNode, ModEntry, ModSource, ModStats, ScanIssues } from '@shared/types'
+import type {
+  FilePreview,
+  FsNode,
+  ModEntry,
+  ModSource,
+  ModStats,
+  ModWarning,
+  ScanIssues
+} from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
-import { categoryMeta, fileColor, fileIcon, SOURCE_META } from '@renderer/lib/catmeta'
+import { useI18n, type TKey } from '@renderer/i18n'
+import { categoryMeta, fileColor, fileIcon, sourceLabel, SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText, formatBytes, formatCount, formatDate } from '@renderer/lib/format'
 import { highlight } from '@renderer/lib/highlight'
 
 const MAX_PREVIEW_LINES = 1200
+
+/** Warning codes emitted by the scanner, mapped to dictionary entries. */
+const WARNING_KEYS: Record<ModWarning, TKey> = {
+  'no-modinfo': 'warn.noModInfo',
+  'no-id': 'warn.noId',
+  'poster-missing': 'warn.posterMissing'
+}
 
 interface InfoPanelProps {
   mod: ModEntry | undefined
@@ -32,6 +48,7 @@ export function InfoPanel({
   knownIds,
   onJumpToMod
 }: InfoPanelProps) {
+  const { t } = useI18n()
   return (
     <>
       <div className="pane__head pane__head--tabs">
@@ -39,20 +56,20 @@ export function InfoPanel({
           className={`ptab stencil ${tab === 'mod' ? 'is-on' : ''}`}
           onClick={() => onTab('mod')}
         >
-          Mod
+          {t('ip.tabMod')}
         </button>
         <button
           className={`ptab stencil ${tab === 'file' ? 'is-on' : ''}`}
           onClick={() => onTab('file')}
           disabled={!node}
         >
-          File
+          {t('ip.tabFile')}
         </button>
         <div className="pane__head-spacer" />
         {mod && (
           <button
             className="btn btn-icon"
-            title="Reveal in Explorer"
+            title={t('ip.reveal')}
             onClick={() => void window.pz.shell.reveal(mod.path)}
           >
             <Icon name="external" size={13} />
@@ -87,6 +104,7 @@ function ModInfo({
   onJumpToMod
 }: Omit<InfoPanelProps, 'node' | 'tab' | 'onTab'>) {
   const { notify } = useToast()
+  const { t, p } = useI18n()
   const [stats, setStats] = useState<ModStats>()
   const [posterFailed, setPosterFailed] = useState(false)
   const req = useRef(0)
@@ -123,16 +141,16 @@ function ModInfo({
     return (
       <div className="pane__empty pane__empty--big">
         <Icon name="info" size={30} strokeWidth={1.2} />
-        <span className="label">No mod selected</span>
+        <span className="label">{t('ip.noModSelected')}</span>
       </div>
     )
   }
 
   const source = sources.find((s) => s.id === mod.sourceId)
   const artwork = !posterFailed ? (mod.posterPath ?? mod.iconPath) : mod.iconPath
-  const copy = (value: string, what: string): void => {
+  const copy = (value: string, messageKey: TKey): void => {
     void copyText(value)
-    notify(`${what} copied`, 'ok')
+    notify(t(messageKey), 'ok')
   }
 
   return (
@@ -148,7 +166,7 @@ function ModInfo({
         ) : (
           <div className="info__poster-empty">
             <Icon name="image" size={26} />
-            <span className="label">No poster</span>
+            <span className="label">{t('ip.noPoster')}</span>
           </div>
         )}
       </div>
@@ -161,7 +179,7 @@ function ModInfo({
           return (
             <span key={c} className="catchip" style={{ borderColor: meta.color }}>
               <Icon name={meta.icon} size={11} color={meta.color} />
-              {meta.label}
+              {t(meta.labelKey)}
             </span>
           )
         })}
@@ -173,9 +191,11 @@ function ModInfo({
             <div className="alert alert--bad">
               <Icon name="alert" size={13} />
               <div>
-                <strong>Duplicate mod id.</strong> {duplicates.length} other cop
-                {duplicates.length === 1 ? 'y' : 'ies'} of <code>{mod.modId}</code> installed — the
-                game loads only one.
+                <strong>{t('ip.duplicateTitle')}</strong>{' '}
+                {t('ip.duplicateBody', {
+                  copies: `${duplicates.length} ${p('copies', duplicates.length)}`,
+                  id: mod.modId ?? '—'
+                })}
                 <div className="alert__links">
                   {duplicates.map((k) => (
                     <button key={k} className="linkish mono" onClick={() => onJumpToMod(k)}>
@@ -189,7 +209,7 @@ function ModInfo({
           {mod.warnings.map((w) => (
             <div key={w} className="alert alert--warn">
               <Icon name="alert" size={13} />
-              <span>{w}</span>
+              <span>{t(WARNING_KEYS[w])}</span>
             </div>
           ))}
         </div>
@@ -197,28 +217,30 @@ function ModInfo({
 
       {mod.description && <p className="info__desc">{mod.description}</p>}
 
-      <Section title="Identity">
-        <Field label="Mod id" value={mod.modId ?? '—'} onCopy={mod.modId ? () => copy(mod.modId as string, 'Mod id') : undefined} mono />
+      <Section title={t('ip.identity')}>
+        <Field label={t('ip.modId')} value={mod.modId ?? '—'} onCopy={mod.modId ? () => copy(mod.modId as string, 'toast.modIdCopied') : undefined} mono />
         {mod.rawModId && mod.rawModId !== mod.modId && (
-          <Field label="Raw id" value={mod.rawModId} mono />
+          <Field label={t('ip.rawId')} value={mod.rawModId} mono />
         )}
-        <Field label="Folder" value={mod.folderName} mono />
-        <Field label="Author" value={mod.authors ?? '—'} />
-        <Field label="Version" value={mod.modVersion ?? '—'} />
-        <Field label="Builds" value={mod.builds.join(' + ') || 'unknown'} />
-        {mod.pzVersion && <Field label="PZ version" value={mod.pzVersion} />}
+        <Field label={t('ip.folder')} value={mod.folderName} mono />
+        <Field label={t('ip.author')} value={mod.authors ?? '—'} />
+        <Field label={t('ip.version')} value={mod.modVersion ?? '—'} />
+        <Field label={t('ip.builds')} value={mod.builds.join(' + ') || t('ip.unknown')} />
+        {mod.pzVersion && <Field label={t('ip.pzVersion')} value={mod.pzVersion} />}
         <Field
-          label="Source"
-          value={`${SOURCE_META[mod.sourceKind].label}${source?.label ? ` · ${source.label}` : ''}`}
+          label={t('ip.source')}
+          value={`${t(SOURCE_META[mod.sourceKind].labelKey)}${
+            source ? ` · ${sourceLabel(source, t)}` : ''
+          }`}
         />
         {mod.workshopId && (
           <Field
-            label="Workshop"
+            label={t('ip.workshop')}
             value={mod.workshopId}
             mono
             action={{
               icon: 'link',
-              title: 'Open Workshop page',
+              title: t('ip.openWorkshopPage'),
               onClick: () =>
                 void window.pz.shell.external(
                   `https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.workshopId}`
@@ -228,28 +250,28 @@ function ModInfo({
         )}
         {mod.url && (
           <Field
-            label="Url"
+            label={t('ip.url')}
             value={mod.url}
             action={{
               icon: 'external',
-              title: 'Open link',
+              title: t('ip.openLink'),
               onClick: () => void window.pz.shell.external(mod.url as string)
             }}
           />
         )}
-        <Field label="Modified" value={formatDate(mod.mtime)} />
+        <Field label={t('ip.modified')} value={formatDate(mod.mtime)} />
       </Section>
 
-      <Section title="On disk">
+      <Section title={t('ip.onDisk')}>
         <Field
-          label="Path"
+          label={t('ip.path')}
           value={mod.path}
           mono
           wrap
-          onCopy={() => copy(mod.path, 'Path')}
+          onCopy={() => copy(mod.path, 'toast.pathCopied')}
           action={{
             icon: 'folder-open',
-            title: 'Open folder',
+            title: t('ip.openFolder'),
             onClick: () => void window.pz.shell.open(mod.path)
           }}
         />
@@ -261,15 +283,15 @@ function ModInfo({
             wrap
             action={{
               icon: 'external',
-              title: 'Reveal mod.info',
+              title: t('ip.revealModInfo'),
               onClick: () => void window.pz.shell.reveal(mod.infoFile as string)
             }}
           />
         )}
         <div className="statgrid">
-          <Stat label="Files" value={stats ? formatCount(stats.files) : '…'} />
-          <Stat label="Folders" value={stats ? formatCount(stats.dirs) : '…'} />
-          <Stat label="Size" value={stats ? formatBytes(stats.bytes) : '…'} />
+          <Stat label={t('ip.files')} value={stats ? formatCount(stats.files) : '…'} />
+          <Stat label={t('ip.folders')} value={stats ? formatCount(stats.dirs) : '…'} />
+          <Stat label={t('ip.size')} value={stats ? formatBytes(stats.bytes) : '…'} />
         </div>
         {topExts.length > 0 && (
           <div className="extbars">
@@ -295,13 +317,13 @@ function ModInfo({
       </Section>
 
       {mod.versionFolders.length > 0 && (
-        <Section title="Build folders">
+        <Section title={t('ip.buildFolders')}>
           <div className="pillrow">
             {mod.versionFolders.map((v) => (
               <button
                 key={v.path}
                 className="pill"
-                title={`Open ${v.path}`}
+                title={t('ip.openTarget', { path: v.path })}
                 onClick={() => void window.pz.shell.open(v.path)}
               >
                 <Icon name="folder" size={11} />
@@ -314,10 +336,10 @@ function ModInfo({
       )}
 
       {(mod.requires.length > 0 || dependents.length > 0) && (
-        <Section title="Dependencies">
+        <Section title={t('ip.dependencies')}>
           {mod.requires.length > 0 && (
             <div className="deps">
-              <div className="deps__head label">Requires</div>
+              <div className="deps__head label">{t('ip.requires')}</div>
               {mod.requires.map((r) => {
                 const ok = knownIds.has(r)
                 const target = allMods.find((m) => m.modId === r)
@@ -330,7 +352,9 @@ function ModInfo({
                   >
                     <Icon name={ok ? 'check' : 'close'} size={11} />
                     <span className="mono truncate">{r}</span>
-                    <span className="dep__note label">{ok ? (target?.name ?? '') : 'missing'}</span>
+                    <span className="dep__note label">
+                      {ok ? (target?.name ?? '') : t('ip.depMissing')}
+                    </span>
                   </button>
                 )
               })}
@@ -338,7 +362,9 @@ function ModInfo({
           )}
           {dependents.length > 0 && (
             <div className="deps">
-              <div className="deps__head label">Required by {dependents.length}</div>
+              <div className="deps__head label">
+                {t('ip.requiredBy', { n: dependents.length })}
+              </div>
               {dependents.slice(0, 12).map((d) => (
                 <button key={d.key} className="dep is-neutral" onClick={() => onJumpToMod(d.key)}>
                   <Icon name="link" size={11} />
@@ -351,11 +377,11 @@ function ModInfo({
       )}
 
       {mod.tags.length > 0 && (
-        <Section title="Tags">
+        <Section title={t('ip.tags')}>
           <div className="pillrow">
-            {mod.tags.map((t) => (
-              <span key={t} className="tag">
-                {t}
+            {mod.tags.map((t2) => (
+              <span key={t2} className="tag">
+                {t2}
               </span>
             ))}
           </div>
@@ -363,7 +389,7 @@ function ModInfo({
       )}
 
       {mod.mediaDirs.length > 0 && (
-        <Section title={`Media (${mod.mediaDirs.length})`}>
+        <Section title={t('ip.media', { n: mod.mediaDirs.length })}>
           <div className="pillrow">
             {mod.mediaDirs.map((d) => (
               <span key={d} className="pill pill--flat mono">
@@ -382,6 +408,7 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
   const [error, setError] = useState<string>()
   const req = useRef(0)
   const { notify } = useToast()
+  const { t } = useI18n()
 
   useEffect(() => {
     setPreview(undefined)
@@ -415,7 +442,7 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
     return (
       <div className="pane__empty pane__empty--big">
         <Icon name="file" size={30} strokeWidth={1.2} />
-        <span className="label">Select a file in the skeleton</span>
+        <span className="label">{t('ip.selectFile')}</span>
       </div>
     )
   }
@@ -434,32 +461,35 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
       <div className="btnrow">
         <button className="btn" onClick={() => void window.pz.shell.reveal(node.path)}>
           <Icon name="external" size={12} />
-          Explorer
+          {t('ip.explorer')}
         </button>
         <button className="btn" onClick={() => void window.pz.shell.open(node.path)}>
           <Icon name="eye" size={12} />
-          Open
+          {t('ip.open')}
         </button>
         <button
           className="btn"
           onClick={() => {
             void copyText(node.path)
-            notify('Path copied', 'ok')
+            notify(t('toast.pathCopied'), 'ok')
           }}
         >
           <Icon name="copy" size={12} />
-          Path
+          {t('ip.pathShort')}
         </button>
       </div>
 
-      <Section title="File">
-        <Field label="Type" value={node.dir ? 'Folder' : node.ext ? `.${node.ext}` : 'file'} />
+      <Section title={t('ip.file')}>
         <Field
-          label={node.dir ? 'Entries' : 'Size'}
+          label={t('ip.type')}
+          value={node.dir ? t('ip.typeFolder') : node.ext ? `.${node.ext}` : t('ip.typeFile')}
+        />
+        <Field
+          label={node.dir ? t('ip.entries') : t('ip.size')}
           value={node.dir ? formatCount(node.childCount) : formatBytes(node.size)}
         />
-        <Field label="Modified" value={formatDate(node.mtime)} />
-        <Field label="Path" value={node.path} mono wrap />
+        <Field label={t('ip.modified')} value={formatDate(node.mtime)} />
+        <Field label={t('ip.path')} value={node.path} mono wrap />
       </Section>
 
       {error && (
@@ -471,7 +501,9 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
 
       {preview?.kind === 'image' && (
         <Section
-          title={`Preview${preview.width ? ` · ${preview.width}×${preview.height}` : ''}`}
+          title={`${t('ip.preview')}${
+            preview.width ? ` · ${preview.width}×${preview.height}` : ''
+          }`}
         >
           <div className="imgpreview brackets">
             <img src={pzFileUrl(preview.path)} alt="" draggable={false} />
@@ -480,7 +512,9 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
       )}
 
       {preview?.kind === 'text' && (
-        <Section title={`Preview${preview.truncated ? ' · truncated' : ''}`}>
+        <Section
+          title={`${t('ip.preview')}${preview.truncated ? ` · ${t('ip.truncated')}` : ''}`}
+        >
           <div className="code">
             <div className="code__gutter mono">
               {Array.from({ length: lineCount }).map((_, i) => (
@@ -503,10 +537,12 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
       )}
 
       {preview?.kind === 'binary' && (
-        <Section title="Preview">
+        <Section title={t('ip.preview')}>
           <div className="binary">
             <Icon name="hard-drive" size={20} />
-            <span className="label">Binary file · {formatBytes(preview.size)}</span>
+            <span className="label">
+              {t('ip.binaryFile')} · {formatBytes(preview.size)}
+            </span>
           </div>
         </Section>
       )}
@@ -541,6 +577,7 @@ function Field({
   onCopy?: () => void
   action?: { icon: Parameters<typeof Icon>[0]['name']; title: string; onClick: () => void }
 }) {
+  const { t } = useI18n()
   return (
     <div className="field">
       <span className="field__label label">{label}</span>
@@ -548,7 +585,7 @@ function Field({
         {value}
       </span>
       {onCopy && (
-        <button className="field__btn" title="Copy" onClick={onCopy}>
+        <button className="field__btn" title={t('ip.copy')} onClick={onCopy}>
           <Icon name="copy" size={12} />
         </button>
       )}

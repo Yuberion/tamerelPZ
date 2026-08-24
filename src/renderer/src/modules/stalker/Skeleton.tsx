@@ -51,6 +51,7 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
   const requestId = useRef(0)
   const { openMenu } = useMenu()
   const { notify } = useToast()
+  const { t, p } = useI18n()
 
   useEffect(() => {
     setFilter('')
@@ -136,11 +137,17 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
       setRoots(nodes)
       setExpanded(dirs)
       setDeepLoaded(true)
-      notify(`Loaded ${formatCount(dirs.size)} folders`, 'ok')
+      notify(
+        t('toast.loadedFolders', {
+          n: formatCount(dirs.size),
+          folders: p('folders', dirs.size)
+        }),
+        'ok'
+      )
     } finally {
       setBusy(false)
     }
-  }, [mod, notify])
+  }, [mod, notify, t, p])
 
   const flat = useMemo(() => {
     const out: FlatNode[] = []
@@ -177,20 +184,20 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
     (e: React.MouseEvent, node: FsNode) => {
       openMenu(e, [
         {
-          label: node.dir ? 'Open folder in Explorer' : 'Reveal in Explorer',
+          label: node.dir ? t('menu.openFolderExplorer') : t('menu.reveal'),
           icon: 'external',
-          hint: 'dbl-click',
+          hint: t('menu.hintDblClick'),
           onClick: () =>
             void (node.dir ? window.pz.shell.open(node.path) : window.pz.shell.reveal(node.path))
         },
         {
-          label: 'Open with default app',
+          label: t('menu.openDefaultApp'),
           icon: 'eye',
           disabled: node.dir,
           onClick: () => void window.pz.shell.open(node.path)
         },
         {
-          label: 'Open terminal here',
+          label: t('menu.openTerminal'),
           icon: 'terminal',
           onClick: () =>
             void window.pz.shell.terminal(
@@ -199,32 +206,32 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
         },
         { separator: true },
         {
-          label: 'Copy full path',
+          label: t('menu.copyFullPath'),
           icon: 'copy',
           onClick: () => {
             void copyText(node.path)
-            notify('Path copied', 'ok')
+            notify(t('toast.pathCopied'), 'ok')
           }
         },
         {
-          label: 'Copy name',
+          label: t('menu.copyName'),
           icon: 'hash',
           onClick: () => {
             void copyText(node.name)
-            notify('Name copied', 'ok')
+            notify(t('toast.nameCopied'), 'ok')
           }
         }
       ])
     },
-    [openMenu, notify]
+    [openMenu, notify, t]
   )
 
   if (!mod) {
     return (
       <div className="pane__empty pane__empty--big">
         <Icon name="crosshair" size={34} strokeWidth={1.2} />
-        <span className="stencil">Pick a mod</span>
-        <span className="label">Its skeleton opens here</span>
+        <span className="stencil">{t('sk.pickMod')}</span>
+        <span className="label">{t('sk.skeletonHere')}</span>
       </div>
     )
   }
@@ -241,7 +248,7 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="filter files"
+            placeholder={t('sk.filterFiles')}
             spellCheck={false}
           />
           {filter && (
@@ -252,7 +259,7 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
         </div>
         <button
           className="btn btn-icon"
-          title={`Load full tree (depth ${DEEP_DEPTH})`}
+          title={t('sk.loadFullTree', { n: DEEP_DEPTH })}
           onClick={() => void expandDeep()}
           disabled={busy || deepLoaded}
         >
@@ -260,14 +267,14 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
         </button>
         <button
           className="btn btn-icon"
-          title="Collapse all"
+          title={t('sk.collapseAll')}
           onClick={() => setExpanded(new Set())}
         >
           <Icon name="minus" size={13} />
         </button>
         <button
           className="btn btn-icon"
-          title="Open mod folder in Explorer"
+          title={t('sk.openModFolder')}
           onClick={() => void window.pz.shell.open(mod.path)}
         >
           <Icon name="folder-open" size={13} />
@@ -328,7 +335,7 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
         {!busy && flat.length === 0 && (
           <div className="pane__empty">
             <Icon name="folder" size={22} />
-            <span className="label">{filter ? 'No files match' : 'Empty mod folder'}</span>
+            <span className="label">{filter ? t('sk.noFilesMatch') : t('sk.emptyFolder')}</span>
           </div>
         )}
       </div>

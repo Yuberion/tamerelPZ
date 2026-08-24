@@ -134,6 +134,8 @@ export const EN = {
   'toast.nameCopied': 'Name copied',
   'toast.modIdCopied': 'Mod id copied',
   'toast.copiedValue': 'Copied {value}',
+  'toast.loadedFolders': 'Loaded {n} {folders}',
+  'toast.jumpedTo': 'Jumped to {name}',
 
   // ---- skeleton pane ------------------------------------------------------
   'sk.pickMod': 'Pick a mod',
@@ -369,6 +371,8 @@ export const RU: Record<TKey, string> = {
   'toast.nameCopied': 'Имя скопировано',
   'toast.modIdCopied': 'Id мода скопирован',
   'toast.copiedValue': 'Скопировано: {value}',
+  'toast.loadedFolders': 'Загружено {n} {folders}',
+  'toast.jumpedTo': 'Переход к {name}',
 
   'sk.pickMod': 'Выберите мод',
   'sk.skeletonHere': 'Его структура откроется здесь',

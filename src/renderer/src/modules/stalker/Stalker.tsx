@@ -179,9 +179,9 @@ export function Stalker({ onExit }: { onExit: () => void }) {
       })
       setCollapsed(new Set())
       selectMod(target)
-      notify(`Jumped to ${target.name}`, 'ok')
+      notify(t('toast.jumpedTo', { name: target.name }), 'ok')
     },
-    [byKey, selectMod, notify]
+    [byKey, selectMod, notify, t]
   )
 
   const toggleGroup = useCallback((id: string) => {
