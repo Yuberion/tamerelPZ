@@ -83,11 +83,14 @@ lerna-debug.log*
 # ---------------------------------------------------------------------------
 # Agent / tooling local state
 # Note: .kilo/command/ and .kilo/agent/ are shareable project config —
-# only local/recovery state is ignored here.
+# only local/recovery state and tooling caches are ignored here.
+# `.kilo/worktrees/` holds full checkouts of this repo and must never be added.
 # ---------------------------------------------------------------------------
 .kilo/agent-manager.json
 .kilo/state/
 .kilo/cache/
+.kilo/node_modules/
+.kilo/worktrees/
 .kilocode/
 .opencode/
 .claude/
