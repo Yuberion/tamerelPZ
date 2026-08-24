@@ -5,6 +5,7 @@ import { AppStoreProvider } from './state/store'
 import './styles/theme.css'
 import './styles/app.css'
 import './styles/stalker.css'
+import './styles/workbench.css'
 
 const container = document.getElementById('root')
 if (!container) throw new Error('Root container missing')

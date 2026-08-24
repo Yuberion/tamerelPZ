@@ -5,6 +5,7 @@ import { ToastProvider } from './components/Toast'
 import { Hub } from './hub/Hub'
 import { moduleById, type ModuleId } from './hub/modules'
 import { Stalker } from './modules/stalker/Stalker'
+import { Workbench } from './modules/workbench/Workbench'
 import { useAppStore } from './state/store'
 
 type View = 'hub' | ModuleId
@@ -42,6 +43,7 @@ export default function App() {
           <main className="shell__body">
             {view === 'hub' ? <Hub onOpen={setView} /> : null}
             {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
+            {view === 'workbench' ? <Workbench onExit={goHome} /> : null}
           </main>
         </div>
       </ToastProvider>

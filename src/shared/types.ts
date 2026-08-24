@@ -216,3 +216,208 @@ export interface AppInfo {
   node: string
   platform: string
 }
+
+/* =========================================================================
+   Workbench (module 04) — authoring contracts
+   =========================================================================
+   Everything below drives the only part of the suite that writes to mod
+   folders. The write allowlist is deliberately narrower than the read one:
+   see `writableRoots()` in main/services/guard.ts.
+   ========================================================================= */
+
+/** A container directory the Workbench may create new mods inside. */
+export interface AuthoringTarget {
+  id: string
+  kind: ModSourceKind
+  /** English fallback text; prefer `labelKey` when set. */
+  label: string
+  labelKey?: ModSourceLabelKey
+  path: string
+  exists: boolean
+}
+
+/** `media` sub-trees the scaffolder can lay down. */
+export type ScaffoldFolder =
+  | 'lua-client'
+  | 'lua-server'
+  | 'lua-shared'
+  | 'scripts'
+  | 'textures'
+  | 'sounds'
+  | 'models'
+  | 'translate'
+  | 'maps'
+  | 'ui'
+
+/**
+ * Build layout of a generated mod.
+ *
+ * `b41` puts `media/` at the mod root (Build 41 layout), `b42` puts it inside a
+ * `common/` sub-folder, and `both` lays down `common/` plus a `41/` override so
+ * one folder serves both builds.
+ */
+export type ScaffoldLayout = 'b41' | 'b42' | 'both'
+
+export interface ScaffoldOptions {
+  /** `AuthoringTarget.id` of the container to create the mod in. */
+  targetId: string
+  /** Folder name on disk. Sanitised and validated by the main process. */
+  folderName: string
+  modId: string
+  name: string
+  author: string
+  description: string
+  modVersion: string
+  pzVersion: string
+  url: string
+  layout: ScaffoldLayout
+  tags: string[]
+  requires: string[]
+  folders: ScaffoldFolder[]
+  /** Write starter lua / script / translation files instead of bare folders. */
+  examples: boolean
+  /** Generate a placeholder `poster.png`. */
+  poster: boolean
+}
+
+export interface ScaffoldResult {
+  modPath: string
+  infoFile: string
+  /** Everything created, relative to `modPath`. Directories end with `/`. */
+  created: string[]
+  bytes: number
+}
+
+/** A `mod.info` key with no dedicated field, preserved verbatim on save. */
+export interface ModInfoExtra {
+  key: string
+  value: string
+}
+
+/** Editable projection of a `mod.info` file. */
+export interface ModInfoDraft {
+  /** The file this draft came from. May not exist yet. */
+  file: string
+  modPath: string
+  exists: boolean
+  /** False when the file sits outside the Workbench write allowlist. */
+  writable: boolean
+  /** Verbatim file text, empty when the file does not exist. */
+  raw: string
+  name: string
+  id: string
+  description: string
+  authors: string
+  modVersion: string
+  pzVersion: string
+  url: string
+  poster: string
+  icon: string
+  requires: string[]
+  tags: string[]
+  extra: ModInfoExtra[]
+}
+
+export interface WriteModInfoRequest {
+  file: string
+  /** When present this text is written verbatim and `draft` is ignored. */
+  raw?: string
+  draft?: ModInfoDraft
+  /** Keep the previous content as `mod.info.bak`. */
+  backup: boolean
+}
+
+export interface WriteModInfoResult {
+  file: string
+  bytes: number
+  backupFile?: string
+}
+
+export type ValidationSeverity = 'error' | 'warn' | 'info'
+
+/**
+ * One validator finding.
+ *
+ * `rule` is a stable identifier, not display text — the renderer resolves it
+ * through the `wbrule.*` dictionary and interpolates `params`.
+ */
+export interface ValidationIssue {
+  rule: string
+  severity: ValidationSeverity
+  /** Absolute path of the offending file, when the finding is file-scoped. */
+  file?: string
+  /** 1-based line number. */
+  line?: number
+  params?: Record<string, string | number>
+}
+
+export interface ValidationReport {
+  modPath: string
+  durationMs: number
+  filesChecked: number
+  bytesChecked: number
+  issues: ValidationIssue[]
+  /** A scan limit was hit, so the report is incomplete. */
+  truncated: boolean
+}
+
+/** Context the renderer already has, passed in so the validator need not rescan. */
+export interface ValidateOptions {
+  /** Normalised mod ids present on this machine, for `require=` resolution. */
+  knownIds?: string[]
+  /** The `mod.info` the scanner picked for this mod. */
+  infoFile?: string
+}
+
+/** `workshop` stages an uploadable project tree; `zip` writes one archive. */
+export type PackMode = 'workshop' | 'zip'
+
+/** Which build sub-folders reach the output. */
+export type PackBuilds = 'all' | 'b41' | 'b42'
+
+/** Fields written into `workshop.txt` for the in-game uploader. */
+export interface PackWorkshopMeta {
+  title: string
+  description: string
+  tags: string[]
+  visibility: 'public' | 'friends' | 'private'
+  /** Existing Workshop item id; blank creates a new item. */
+  id: string
+}
+
+export interface PackOptions {
+  modPath: string
+  mode: PackMode
+  builds: PackBuilds
+  /** Project folder name (`workshop`) or archive base name (`zip`). */
+  outputName: string
+  /** Output container. Defaults to `<Zomboid>\Workshop`. */
+  outputDir?: string
+  /** Case-insensitive name patterns to skip. `*` is the only wildcard. */
+  exclude: string[]
+  workshop?: PackWorkshopMeta
+  /** Copy the mod poster to the project root as `preview.png`. */
+  preview: boolean
+}
+
+export interface PackResult {
+  mode: PackMode
+  /** Archive file (`zip`) or staged project directory (`workshop`). */
+  output: string
+  files: number
+  /** Total uncompressed bytes of the packed files. */
+  bytes: number
+  /** Bytes actually written — lower than `bytes` for a compressed archive. */
+  writtenBytes: number
+  skipped: number
+  durationMs: number
+}
+
+export interface WorkbenchProgress {
+  task: 'validate' | 'pack'
+  phase: 'collect' | 'read' | 'write' | 'done'
+  done: number
+  total: number
+  /** Current file name. Data, not prose — the renderer localises `phase`. */
+  label: string
+}

@@ -24,7 +24,7 @@ export interface ModuleDef {
   status: 'live' | 'sealed'
 }
 
-/** The nine hub tiles. Only STALKER is wired up in this build. */
+/** The nine hub tiles. STALKER and WORKBENCH are wired up in this build. */
 export const MODULES: ModuleDef[] = [
   {
     id: 'stalker',
@@ -60,7 +60,7 @@ export const MODULES: ModuleDef[] = [
     taglineKey: 'module.workbench.tagline',
     descKey: 'module.workbench.desc',
     icon: 'wrench',
-    status: 'sealed'
+    status: 'live'
   },
   {
     id: 'triage',

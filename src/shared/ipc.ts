@@ -23,7 +23,16 @@ export const IPC = {
   shellTerminal: 'shell:terminal',
 
   settingsGet: 'settings:get',
-  settingsSet: 'settings:set'
+  settingsSet: 'settings:set',
+
+  /* Workbench — the only channels in the app that write to mod folders. */
+  wbTargets: 'wb:targets',
+  wbScaffold: 'wb:scaffold',
+  wbReadInfo: 'wb:read-info',
+  wbWriteInfo: 'wb:write-info',
+  wbValidate: 'wb:validate',
+  wbPack: 'wb:pack',
+  wbProgress: 'wb:progress'
 } as const
 
 /** Custom protocol used to render local images inside the renderer. */

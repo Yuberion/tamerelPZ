@@ -1,4 +1,4 @@
-import type { ModCategory, ModEntry, ModSource, ModSourceKind } from '@shared/types'
+import type { ModCategory, ModEntry, ModSourceKind, ModSourceLabelKey } from '@shared/types'
 import type { IconName } from '@renderer/components/Icon'
 import type { TKey } from '@renderer/i18n'
 
@@ -70,8 +70,12 @@ export const SOURCE_META: Record<
  *
  * Built-in sources carry a `labelKey` from main and are translated; user-defined
  * sources keep their own `label` verbatim, since it is not ours to translate.
+ * Typed structurally so `AuthoringTarget` works here too.
  */
-export function sourceLabel(source: ModSource, t: (key: TKey) => string): string {
+export function sourceLabel(
+  source: { label: string; labelKey?: ModSourceLabelKey },
+  t: (key: TKey) => string
+): string {
   return source.labelKey ? t(`srcLabel.${source.labelKey}` as TKey) : source.label
 }
 

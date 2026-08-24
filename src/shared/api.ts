@@ -1,12 +1,23 @@
 import type {
   AppInfo,
   AppSettings,
+  AuthoringTarget,
   FilePreview,
   FsNode,
+  ModInfoDraft,
   ModStats,
+  PackOptions,
+  PackResult,
   PathsReport,
+  ScaffoldOptions,
+  ScaffoldResult,
   ScanProgress,
-  ScanResult
+  ScanResult,
+  ValidateOptions,
+  ValidationReport,
+  WorkbenchProgress,
+  WriteModInfoRequest,
+  WriteModInfoResult
 } from './types'
 
 export interface ScanRequest {
@@ -50,5 +61,20 @@ export interface PzApi {
   settings: {
     get(): Promise<AppSettings>
     set(patch: Partial<AppSettings>): Promise<AppSettings>
+  }
+  /**
+   * Authoring tools. Every call here is guarded by a write allowlist that is
+   * narrower than the read one — the game install and Steam Workshop content
+   * are never writable.
+   */
+  workbench: {
+    /** Containers new mods may be created in. */
+    targets(): Promise<AuthoringTarget[]>
+    scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult>
+    readInfo(modPath: string): Promise<ModInfoDraft>
+    writeInfo(req: WriteModInfoRequest): Promise<WriteModInfoResult>
+    validate(modPath: string, opts?: ValidateOptions): Promise<ValidationReport>
+    pack(opts: PackOptions): Promise<PackResult>
+    onProgress(cb: (p: WorkbenchProgress) => void): () => void
   }
 }

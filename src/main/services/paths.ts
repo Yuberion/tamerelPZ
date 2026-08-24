@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join, normalize } from 'node:path'
 import { promisify } from 'node:util'
-import type { AppSettings, ModSource, PathsReport } from '../../shared/types'
+import type { AppSettings, AuthoringTarget, ModSource, PathsReport } from '../../shared/types'
 import { exists, isDir, readTextSafe } from './fsx'
 
 const run = promisify(execFile)
@@ -212,5 +212,69 @@ export async function allowedRoots(settings: AppSettings): Promise<string[]> {
   for (const c of settings.customSources) roots.add(c.path)
   const out: string[] = []
   for (const r of roots) if (await exists(r)) out.push(normalize(r).toLowerCase())
+  return out
+}
+
+/**
+ * Roots the Workbench may *write* into. Deliberately a strict subset of
+ * `allowedRoots`.
+ *
+ * The game install and every Steam library are excluded on purpose: Workshop
+ * content is Steam-managed (a write there is silently reverted on the next
+ * validation) and `ProjectZomboid\` is replaced wholesale by game updates.
+ * That leaves the two directories a mod author actually owns — `Zomboid\mods`
+ * and `Zomboid\Workshop` — plus containers the user declared themselves.
+ *
+ * Unlike `allowedRoots` these are returned even when they do not exist yet, so
+ * the scaffolder can create `Zomboid\Workshop` on first use.
+ */
+export async function writableRoots(settings: AppSettings): Promise<string[]> {
+  const zomboidDir = await detectZomboidDir(settings)
+  const roots = new Set<string>()
+  if (zomboidDir) {
+    roots.add(join(zomboidDir, 'mods'))
+    roots.add(join(zomboidDir, 'Workshop'))
+  }
+  for (const c of settings.customSources) if (c.path) roots.add(c.path)
+  return [...roots].map((r) => normalize(r).toLowerCase())
+}
+
+/** The two containers the Workbench offers as scaffold destinations. */
+export async function authoringTargets(settings: AppSettings): Promise<AuthoringTarget[]> {
+  const zomboidDir = await detectZomboidDir(settings)
+  const out: AuthoringTarget[] = []
+
+  if (zomboidDir) {
+    const local = join(zomboidDir, 'mods')
+    out.push({
+      id: 'local',
+      kind: 'local',
+      label: 'Local mods',
+      labelKey: 'local',
+      path: local,
+      exists: await isDir(local)
+    })
+    const projects = join(zomboidDir, 'Workshop')
+    out.push({
+      id: 'project',
+      kind: 'project',
+      label: 'Workshop projects',
+      labelKey: 'workshopProjects',
+      path: projects,
+      exists: await isDir(projects)
+    })
+  }
+
+  for (const c of settings.customSources) {
+    if (!c.path) continue
+    out.push({
+      id: `custom:${c.id}`,
+      kind: c.kind,
+      label: c.label,
+      path: c.path,
+      exists: await isDir(c.path)
+    })
+  }
+
   return out
 }

@@ -4,7 +4,7 @@
 
 Built with Electron 43, React 19, TypeScript and electron-vite. **Zero runtime dependencies.**
 
-> **Status: early build (v0.1.0).** This is currently a *read-only inventory and inspection tool*, not a full mod manager. It never writes to, moves or deletes your game or mod files — the only file it writes is its own `settings.json`. See [Roadmap](#roadmap) for what is and isn't implemented.
+> **Status: early build (v0.1.0).** Two of nine modules are live: **Stalker** (read-only inventory and inspection) and **Workbench** (mod authoring). Workbench is the only part of the suite that writes to disk, and it is restricted to mod containers you own — see [Write model](#write-model). See [Roadmap](#roadmap) for what is and isn't implemented.
 
 ---
 
@@ -19,6 +19,8 @@ On launch the app auto-detects your Steam installation, every Steam library fold
 - finds mod artwork (`poster.png`, `preview.png`, `icon.png`, …)
 
 Then it reports cross-mod problems: **duplicate mod ids**, **unresolved requires**, and **mods with no readable `mod.info`**.
+
+The **Workbench** module then lets you author mods: scaffold a new one, edit its `mod.info`, run ~30 static checks over it, and pack it for the Workshop.
 
 ## Features
 
@@ -39,6 +41,34 @@ Three panes with draggable, persisted splitters:
 | **Right** | Info panel — **Mod** tab (artwork, categories, alerts, identity fields, on-disk stats with per-extension size bars, build folders, dependency graph with jump links, tags) and **File** tab (image preview with intrinsic dimensions, syntax-highlighted text preview, binary placeholder) |
 
 Plus: filter chips with live counts, context menus (open folder, reveal in Explorer, open PowerShell here, copy mod id / path, open Workshop page), toast notifications, and a status bar with matched/total counts and scan timings.
+
+### Authoring (the "Workbench" module)
+
+Four tools over a virtualised list of the mods you can actually edit (mods outside a writable root are listed but flagged read-only):
+
+| Tool | What it does |
+|---|---|
+| **Scaffold** | Creates a mod folder from scratch: `mod.info` per build, `media` sub-trees you tick, optional runnable starter files (lua entry points, an example item script, a translation stub) and a generated placeholder `poster.png`. Build 41 / Build 42 / both layouts. Refuses to touch an existing folder. |
+| **mod.info** | Field editor and raw text editor over the same file, switchable without losing unsaved edits. Atomic writes, optional rolling `mod.info.bak`, `Ctrl+S`. |
+| **Validate** | ~30 static checks across `mod.info`, Lua, `media/scripts` and translations, graded error / warning / note. Findings carry a stable rule id and are localised in the renderer. |
+| **Pack** | Stages the `Contents/mods/…` + `workshop.txt` + `preview.png` layout the in-game uploader expects, or writes a single `.zip`. Build filtering and exclude patterns; version control, editor state, backups and logs are always skipped. |
+
+The validator's Lua scanner runs a real lexer over strings, long strings (`[==[ … ]==]`) and both comment forms before checking bracket and block balance, so `end` inside a string or a `)` inside a comment does not produce a finding. Rules that could fire on legitimate content are warnings, never errors.
+
+### Write model
+
+The Workbench is the only writer, and it uses a **stricter allowlist than the read guard**:
+
+| Location | Read | Write |
+|---|---|---|
+| `Zomboid\mods`, `Zomboid\Workshop` | yes | **yes** |
+| `customSources[].path` | yes | **yes** |
+| Steam Workshop content (`steamapps\workshop\…`) | yes | no |
+| Game install (`ProjectZomboid\`) | yes | no |
+
+Workshop content is Steam-managed — a write there is reverted on the next validation — and the game directory is replaced wholesale by updates, so neither is ever written to. Folder names and mod ids are restricted to `A-Za-z0-9._+-` before they are concatenated into a path, and `assertPathWritable` is the second line of defence. Nothing in the module deletes or moves files; the strongest operation is replacing a `mod.info` it has just backed up.
+
+Zip archives, PNG placeholders and CRC32 are hand-rolled in `services/binfmt.ts` to preserve the zero-dependency constraint (DEFLATE comes from Node's builtin `zlib`).
 
 ### Hotkeys
 
@@ -109,7 +139,11 @@ src/
       modinfo.ts         mod.info parser + id normalisation
       detect.ts          heuristic category classifier
       fsx.ts             pLimit, listDir, buildTree, walkStats, readPreview
-      guard.ts           path allowlist for untrusted renderer paths
+      guard.ts           read + write path allowlists for untrusted renderer paths
+      authoring.ts       scaffold, mod.info read/write (Workbench)
+      validate.ts        static validator: mod.info, lua, scripts, translations
+      pack.ts            Workshop staging + zip archive (Workbench)
+      binfmt.ts          hand-rolled CRC32, ZIP and PNG writers
       settings.ts        settings.json load/save (atomic)
   preload/index.ts       contextBridge.exposeInMainWorld('pz', api)
   shared/                types.ts (data contracts), ipc.ts (channels), api.ts (PzApi)
@@ -117,7 +151,8 @@ src/
     App.tsx              view switch: 'hub' | ModuleId
     hub/                 tile grid + dashboard, 9-module registry
     modules/stalker/     Stalker, Toolbar, ModList, Skeleton, InfoPanel, useModRows
-    components/          TitleBar, Menu, Splitter, Toast, Icon (~50 inline SVGs)
+    modules/workbench/   Workbench, ScaffoldTool, InfoTool, ValidateTool, PackTool, Form
+    components/          TitleBar, Menu, Splitter, Toast, Icon (~60 inline SVGs)
     lib/                 useVirtual, catmeta, format (fuzzy), highlight
     state/store.tsx      React Context store
     styles/              theme.css (tokens), app.css, stalker.css
@@ -129,8 +164,9 @@ start.bat                Windows launcher
 
 - `contextIsolation: true`, `nodeIntegration: false`, `webSecurity: true`; the renderer sees a single typed `window.pz` object
 - **Path allowlist guard** — renderer-supplied paths are untrusted. Every path-taking IPC handler and the `pzfile://` protocol handler funnels through `assertPathAllowed`, which rejects empty paths, anything containing `..`, and anything outside the detected roots. Roots are cached for 30s and invalidated on `settings:set`.
+- **Writes use a second, narrower allowlist** (`assertPathWritable`) covering only `Zomboid\mods`, `Zomboid\Workshop` and user-declared custom sources. See [Write model](#write-model).
 - **The allowlist is defined by settings, and `settings:set` does not validate its patch.** `customSources[].path`, `gameDirOverride` and `zomboidDirOverride` become guard roots, so a compromised renderer can widen its own allowlist. Treat the guard as defence in depth against path bugs, not as a boundary against a hostile renderer.
-- **No `fs` write, delete, move or copy call exists outside `settings.ts`**, which writes only its own `settings.json`. A repo-wide grep for `unlink` / `rmdir` / `rm(` / `copyFile` / `rename` / `writeFile` matches nothing else, so the app never modifies a mod file itself.
+- **Outside the Workbench, no `fs` write, delete, move or copy call exists** except `settings.ts`, which writes only its own `settings.json`. The Workbench never deletes or moves anything either: it creates files, and replaces a `mod.info` it has just backed up.
 - **Two handlers do hand untrusted content to the OS, though.** `shell:open` refuses ~50 executable and script extensions and reveals them in Explorer instead, and `shell:terminal` spawns an absolute `System32` interpreter path so a mod cannot shadow `powershell.exe` from its own folder. Everything else in a mod folder still opens with its registered default handler, so the usual "don't run unknown files" caution applies.
 - `shell:external` rejects anything that isn't `http(s)://`; `setWindowOpenHandler` and `will-navigate` push external links to the OS browser and deny in-app navigation
 - CSP declared in `index.html`; `uncaughtException` / `unhandledRejection` are logged, not fatal — a stray rejection in a filesystem walk must never kill the app
@@ -152,6 +188,11 @@ Mod artwork and image previews load over a custom privileged scheme, `pzfile://f
 | `fs:list` · `fs:tree` · `fs:preview` | Directory children, tree (depth 1–6), file preview |
 | `shell:reveal` · `shell:open` · `shell:external` · `shell:terminal` | Shell integrations |
 | `settings:get` · `settings:set` | Read / merge-patch settings |
+| `wb:targets` | Containers new mods may be scaffolded into |
+| `wb:scaffold` | Create a mod skeleton |
+| `wb:read-info` · `wb:write-info` | Read / write a `mod.info` (write-guarded) |
+| `wb:validate` · `wb:progress` | Static validation; progress *(event)* |
+| `wb:pack` | Stage a Workshop project or write a `.zip` |
 
 ### Notable implementation details
 
@@ -160,7 +201,8 @@ Everything below is hand-rolled — the project has **no runtime dependencies at
 - **Virtualiser** (`lib/useVirtual.ts`, ~65 lines) — fixed-height rows, overscan 12, `ResizeObserver`-measured viewport. Keeps 900+ mod rows and 10k+ file rows scrolling at native speed.
 - **Fuzzy matcher** (`lib/format.ts`) — exact-substring fast path with word-start bonus, subsequence scoring with streak bonuses and gap penalty; returns match indices for `<mark>` highlighting. Fast enough to run over ~1000 mods per keystroke.
 - **Syntax highlighter** (`lib/highlight.ts`, ~82 lines) — regex tokenizers for Lua, JSON, XML and INI (`mod.info` highlights as INI).
-- **Icon set** (`components/Icon.tsx`) — ~50 inline 24×24 stroke SVGs.
+- **Icon set** (`components/Icon.tsx`) — ~65 inline 24×24 stroke SVGs.
+- **Zip / PNG writers** (`services/binfmt.ts`) — CRC32 table, local + central directory records and PNG chunk framing written by hand; DEFLATE borrowed from Node's builtin `zlib`. Already-compressed extensions are stored rather than re-deflated.
 - **`pLimit`** (`fsx.ts`, ~20 lines) — used at 48 (stat/listing), 32 (source enumeration) and 28 (mod analysis) so thousands of `stat` calls don't stampede.
 - **Frameless titlebar** — `frame: false` plus a React `TitleBar` with `-webkit-app-region` drag zones; native menu removed.
 - **Image dimensions without decoding** — PNG/GIF/BMP/JPEG headers parsed from the first ≤64KB.
@@ -216,14 +258,14 @@ Written atomically (tmp file + rename) and treated as best-effort — a corrupt 
 
 ## Roadmap
 
-The hub shows nine module tiles. **One is live; eight are sealed placeholders** that currently only show a toast:
+The hub shows nine module tiles. **Two are live; seven are sealed placeholders** that currently only show a toast:
 
 | Module | Purpose | Status |
 |---|---|---|
 | **Stalker** | Mod explorer | ✅ Live |
 | Loadout | Load order & profiles | 🔒 Sealed |
 | Signal | Workshop sync | 🔒 Sealed |
-| Workbench | Mod authoring | 🔒 Sealed |
+| **Workbench** | Mod authoring | ✅ Live |
 | Triage | Conflict doctor | 🔒 Sealed |
 | Cartograph | Map manager | 🔒 Sealed |
 | Bunker | Backups | 🔒 Sealed |
@@ -232,7 +274,9 @@ The hub shows nine module tiles. **One is live; eight are sealed placeholders** 
 
 ### Known limitations
 
-- **No enable/disable, load order writing, `mods.txt` generation, install/uninstall or backups.** Inventory and inspection only.
+- **No enable/disable, load order writing, `mods.txt` generation, install/uninstall or backups.** Inventory, inspection and authoring only.
+- **The validator is heuristic.** Its Lua and script scanners are hand-written lexers, not full parsers, tuned to avoid false errors; a clean report is not a guarantee the game will load the mod.
+- **Packing does not upload.** It stages the Workshop project layout; publishing is still done from inside Project Zomboid.
 - **No packaging.** No electron-builder/forge config, no app icon, no CI, no releases. Distribution today is clone → `npm install` → `npm run build` → `npm start`.
 - **No UI for custom sources or directory overrides** — hand-edit `settings.json`.
 - **Scan cache is in-memory only** — a restart always does a cold scan.
@@ -257,6 +301,8 @@ Both TS projects are `strict` with `noUnusedLocals` and `noUnusedParameters`. No
 Guidelines:
 - `src/shared/` must not import `electron` or `node` at runtime — it is shared with the renderer.
 - Any new IPC handler that accepts a path **must** go through `assertPathAllowed` from `services/guard.ts`.
+- Any handler that *writes* **must** additionally go through `assertPathWritable`, and must not delete or move user files.
+- New validator rules need a matching `wbrule.<rule>` entry in **both** `EN` and `RU`; `RU` is typed as `Record<TKey, string>`, so a missing key is a compile error.
 - Keep the zero-runtime-dependency constraint unless there's a compelling reason not to.
 
 ## About the name

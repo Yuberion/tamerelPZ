@@ -1,7 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { PzApi, ScanRequest } from '../shared/api'
 import { IPC } from '../shared/ipc'
-import type { AppSettings, ScanProgress } from '../shared/types'
+import type {
+  AppSettings,
+  PackOptions,
+  ScaffoldOptions,
+  ScanProgress,
+  ValidateOptions,
+  WorkbenchProgress,
+  WriteModInfoRequest
+} from '../shared/types'
 
 function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, payload: T): void => cb(payload)
@@ -42,6 +50,16 @@ const api: PzApi = {
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
     set: (patch: Partial<AppSettings>) => ipcRenderer.invoke(IPC.settingsSet, patch)
+  },
+  workbench: {
+    targets: () => ipcRenderer.invoke(IPC.wbTargets),
+    scaffold: (opts: ScaffoldOptions) => ipcRenderer.invoke(IPC.wbScaffold, opts),
+    readInfo: (modPath: string) => ipcRenderer.invoke(IPC.wbReadInfo, modPath),
+    writeInfo: (req: WriteModInfoRequest) => ipcRenderer.invoke(IPC.wbWriteInfo, req),
+    validate: (modPath: string, opts: ValidateOptions = {}) =>
+      ipcRenderer.invoke(IPC.wbValidate, modPath, opts),
+    pack: (opts: PackOptions) => ipcRenderer.invoke(IPC.wbPack, opts),
+    onProgress: (cb) => subscribe<WorkbenchProgress>(IPC.wbProgress, cb)
   }
 }
 

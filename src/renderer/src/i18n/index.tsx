@@ -73,6 +73,18 @@ export function pluralWord(lang: Lang, key: PluralKey, n: number): string {
   return forms[pluralIndex(lang, n)]
 }
 
+/**
+ * Narrow a runtime-built key to `TKey`.
+ *
+ * The validator sends rule ids over IPC and the renderer maps them to
+ * `wbrule.*` entries. A rule added in main before its dictionary entry exists
+ * would otherwise reach `translate()` as an unknown key and throw on the
+ * placeholder replace, so callers check first and fall back to the raw id.
+ */
+export function hasKey(key: string): key is TKey {
+  return key in EN
+}
+
 export interface I18n {
   lang: Lang
   setLang: (lang: Lang) => void

@@ -2,12 +2,24 @@ import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import { extname, join } from 'node:path'
 import { IPC } from '../shared/ipc'
-import type { AppInfo, AppSettings, ScanProgress } from '../shared/types'
+import type {
+  AppInfo,
+  AppSettings,
+  PackOptions,
+  ScaffoldOptions,
+  ScanProgress,
+  ValidateOptions,
+  WorkbenchProgress,
+  WriteModInfoRequest
+} from '../shared/types'
+import { listAuthoringTargets, readModInfoDraft, scaffoldMod, writeModInfo } from './services/authoring'
 import { assertPathAllowed, invalidateGuard } from './services/guard'
 import { buildTree, exists, listDir, readPreview, walkStats } from './services/fsx'
+import { packMod } from './services/pack'
 import { detectPaths } from './services/paths'
 import { scanMods, type ScanOptions } from './services/scanner'
 import { getSettings, setSettings } from './services/settings'
+import { validateMod } from './services/validate'
 
 /**
  * Extensions Windows *executes* rather than opens.
@@ -144,5 +156,56 @@ export function registerIpc(): void {
     // Path-related changes alter which roots the renderer may read.
     invalidateGuard()
     return next
+  })
+
+  // --- Workbench (authoring: the only handlers that write to mod folders) ---
+
+  ipcMain.handle(IPC.wbTargets, async () => listAuthoringTargets(await getSettings()))
+
+  ipcMain.handle(IPC.wbScaffold, async (_e, opts: ScaffoldOptions) => {
+    const result = await scaffoldMod(await getSettings(), opts)
+    // A freshly created folder becomes a new allowed root for later reads.
+    invalidateGuard()
+    return result
+  })
+
+  ipcMain.handle(IPC.wbReadInfo, async (_e, modPath: string) => {
+    // Reading metadata only needs read access, so the wider allowlist applies.
+    return readModInfoDraft(await assertPathAllowed(modPath))
+  })
+
+  ipcMain.handle(IPC.wbWriteInfo, async (_e, req: WriteModInfoRequest) => {
+    // writeModInfo re-checks the path against the strict write allowlist.
+    return writeModInfo(req)
+  })
+
+  ipcMain.handle(IPC.wbValidate, async (e, modPath: string, opts: ValidateOptions = {}) => {
+    const target = await assertPathAllowed(modPath)
+    const sender = e.sender
+    let last = 0
+    const onProgress = (p: WorkbenchProgress): void => {
+      const now = Date.now()
+      if (p.phase === 'done' || now - last > 60) {
+        last = now
+        if (!sender.isDestroyed()) sender.send(IPC.wbProgress, p)
+      }
+    }
+    return validateMod(target, opts, onProgress)
+  })
+
+  ipcMain.handle(IPC.wbPack, async (e, opts: PackOptions) => {
+    const settings = await getSettings()
+    const sender = e.sender
+    let last = 0
+    const onProgress = (p: WorkbenchProgress): void => {
+      const now = Date.now()
+      if (p.phase === 'done' || now - last > 60) {
+        last = now
+        if (!sender.isDestroyed()) sender.send(IPC.wbProgress, p)
+      }
+    }
+    const result = await packMod(settings, opts, onProgress)
+    invalidateGuard()
+    return result
   })
 }
