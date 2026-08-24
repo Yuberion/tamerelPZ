@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from '@renderer/i18n'
+import { useHelp } from './Hint'
 import { Icon } from './Icon'
 
 interface TitleBarProps {
@@ -8,6 +9,9 @@ interface TitleBarProps {
   onHome?: () => void
   busy?: boolean
 }
+
+/** Popover identity for the app overview, which has exactly one anchor. */
+const OVERVIEW_ID = 'help.overview'
 
 export function TitleBar({ section, onHome, busy }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false)
@@ -29,6 +33,7 @@ export function TitleBar({ section, onHome, busy }: TitleBarProps) {
         <span className="titlebar__name stencil">PZ Management</span>
 
         <LangToggle />
+        <HelpToggle />
 
         {section && (
           <>
@@ -95,5 +100,59 @@ function LangToggle() {
         EN
       </button>
     </div>
+  )
+}
+
+/**
+ * Help mode.
+ *
+ * Turning it on lights every `?` badge in the app and opens the overview anchored
+ * here, so a first-time user gets both the map and the legend from one press. F1 is
+ * bound here rather than in the provider because this button is the anchor, and it
+ * is mounted exactly once for the lifetime of the window.
+ */
+function HelpToggle() {
+  const { t } = useI18n()
+  const help = useHelp()
+  const ref = useRef<HTMLButtonElement>(null)
+
+  const activate = useCallback(() => {
+    const wasOn = help.enabled
+    help.toggle()
+    if (wasOn) {
+      help.close()
+      return
+    }
+    if (ref.current) {
+      help.open(OVERVIEW_ID, ref.current, {
+        title: 'PZ Management',
+        body: t('help.app'),
+        note: t('help.hotkeys')
+      })
+    }
+  }, [help, t])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      // `repeat` guard: holding the key would otherwise flip help mode per tick.
+      if (e.key !== 'F1' || e.repeat) return
+      e.preventDefault()
+      activate()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [activate])
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={`titlebar__help ${help.enabled ? 'is-on' : ''}`}
+      onClick={activate}
+      title={t(help.enabled ? 'help.toggleOff' : 'help.toggleOn')}
+      aria-pressed={help.enabled}
+    >
+      ?
+    </button>
   )
 }

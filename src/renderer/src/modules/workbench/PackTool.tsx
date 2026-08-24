@@ -7,6 +7,7 @@ import type {
   PackResult,
   PackVisibility
 } from '@shared/types'
+import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n, type TKey } from '@renderer/i18n'
@@ -126,6 +127,7 @@ export function PackTool({ mod }: PackToolProps) {
       title={t('wb.pack.title')}
       lede={t('wb.pack.lede')}
       icon="package"
+      help={t('help.wb.pack.panel')}
       actions={
         <button className="btn is-primary" disabled={!nameValid || busy} onClick={() => void run()}>
           <Icon name={busy ? 'refresh' : 'package'} size={13} className={busy ? 'spin' : undefined} />
@@ -135,7 +137,7 @@ export function PackTool({ mod }: PackToolProps) {
     >
       {error && <Alert kind="bad">{error}</Alert>}
 
-      <Group title={t('wb.pack.mode')}>
+      <Group title={t('wb.pack.mode')} help={t('help.wb.pack.mode')}>
         <div className="wboptrow">
           <OptionCard
             on={mode === 'workshop'}
@@ -157,6 +159,7 @@ export function PackTool({ mod }: PackToolProps) {
       <Group title={t('wb.pack.destination')} cols>
         <TextField
           label={mode === 'zip' ? t('wb.pack.outputNameZip') : t('wb.pack.outputName')}
+          help={t('help.wb.pack.outputName')}
           value={outputName}
           onChange={setOutputName}
           mono
@@ -165,12 +168,16 @@ export function PackTool({ mod }: PackToolProps) {
         <SelectField
           label={t('wb.pack.builds')}
           hint={t('wb.pack.buildsHint')}
+          help={t('help.wb.pack.builds')}
           value={builds}
           onChange={setBuilds}
           options={BUILD_OPTIONS.map((b) => ({ value: b.value, label: t(b.labelKey) }))}
         />
         <div className="wbfield wbfield--wide">
-          <span className="wbfield__label label">{t('wb.pack.outputDir')}</span>
+          <span className="wbfield__label label">
+            {t('wb.pack.outputDir')}
+            <Hint title={t('wb.pack.outputDir')} body={t('help.wb.pack.outputDir')} />
+          </span>
           <div className="wbpick">
             <input className="wbfield__input mono" value={outputDir ?? ''} readOnly placeholder={defaultDir} />
             <button className="btn" onClick={() => void pick()}>
@@ -188,17 +195,25 @@ export function PackTool({ mod }: PackToolProps) {
       </Group>
 
       {mode === 'workshop' && (
-        <Group title={t('wb.pack.meta')}>
+        <Group title={t('wb.pack.meta')} help={t('help.wb.pack.meta')}>
           <div className="wbgrid">
-            <TextField label={t('wb.pack.metaTitle')} value={title} onChange={setTitle} wide />
+            <TextField
+              label={t('wb.pack.metaTitle')}
+              help={t('help.wb.pack.metaTitle')}
+              value={title}
+              onChange={setTitle}
+              wide
+            />
             <TextField
               label={t('wb.pack.metaTags')}
               hint={t('wb.pack.metaTagsHint')}
+              help={t('help.wb.pack.metaTags')}
               value={tags}
               onChange={setTags}
             />
             <SelectField
               label={t('wb.pack.metaVisibility')}
+              help={t('help.wb.pack.metaVisibility')}
               value={visibility}
               onChange={setVisibility}
               options={VISIBILITY.map((v) => ({ value: v.value, label: t(v.labelKey) }))}
@@ -206,18 +221,25 @@ export function PackTool({ mod }: PackToolProps) {
             <TextField
               label={t('wb.pack.metaId')}
               hint={t('wb.pack.metaIdHint')}
+              help={t('help.wb.pack.metaId')}
               value={workshopId}
               onChange={setWorkshopId}
               mono
             />
             <TextAreaField
               label={t('wb.pack.metaDescription')}
+              help={t('help.wb.pack.metaDescription')}
               value={description}
               onChange={setDescription}
               rows={3}
             />
           </div>
-          <CheckField label={t('wb.pack.preview')} checked={preview} onChange={setPreview} />
+          <CheckField
+            label={t('wb.pack.preview')}
+            help={t('help.wb.pack.preview')}
+            checked={preview}
+            onChange={setPreview}
+          />
         </Group>
       )}
 
@@ -225,6 +247,7 @@ export function PackTool({ mod }: PackToolProps) {
         <TextAreaField
           label={t('wb.pack.exclude')}
           hint={t('wb.pack.excludeHint')}
+          help={t('help.wb.pack.exclude')}
           value={exclude}
           onChange={setExclude}
           rows={2}

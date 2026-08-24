@@ -1,4 +1,5 @@
 import type { ChangeEvent, ReactNode } from 'react'
+import { Hint } from '@renderer/components/Hint'
 import { Icon, type IconName } from '@renderer/components/Icon'
 
 /**
@@ -6,18 +7,25 @@ import { Icon, type IconName } from '@renderer/components/Icon'
  *
  * Deliberately thin wrappers over native controls: the suite has no component
  * library, and the panels only need consistent label/hint/invalid framing.
+ *
+ * Two levels of help. `hint` is the one-line reminder printed under the control —
+ * character classes, separators, defaults. `help` is the prose behind the `?`
+ * badge, for the questions a label cannot answer: what the field is read by, and
+ * what happens if it is wrong. Both are optional and independent.
  */
 
 export function Panel({
   title,
   lede,
   icon,
+  help,
   actions,
   children
 }: {
   title: string
   lede?: string
   icon: IconName
+  help?: string
   actions?: ReactNode
   children: ReactNode
 }) {
@@ -26,7 +34,10 @@ export function Panel({
       <div className="wbpanel__head">
         <Icon name={icon} size={17} color="var(--rust-hot)" strokeWidth={1.4} />
         <div className="wbpanel__titles">
-          <h2 className="wbpanel__title stencil">{title}</h2>
+          <div className="wbpanel__titlerow">
+            <h2 className="wbpanel__title stencil">{title}</h2>
+            {help && <Hint title={title} body={help} />}
+          </div>
           {lede && <p className="wbpanel__lede">{lede}</p>}
         </div>
         {actions && <div className="wbpanel__actions">{actions}</div>}
@@ -39,11 +50,13 @@ export function Panel({
 export function Group({
   title,
   hint,
+  help,
   children,
   cols
 }: {
   title: string
   hint?: string
+  help?: string
   children: ReactNode
   /** Lay the fields out in two columns. */
   cols?: boolean
@@ -52,6 +65,7 @@ export function Group({
     <section className="isect wbgroup">
       <div className="isect__head">
         <span className="label">{title}</span>
+        {help && <Hint title={title} body={help} />}
         <span className="isect__rule" />
       </div>
       {hint && <p className="wbgroup__hint">{hint}</p>}
@@ -63,6 +77,8 @@ export function Group({
 interface BaseFieldProps {
   label: string
   hint?: string
+  /** Prose for the `?` badge next to the label. */
+  help?: string
   invalid?: boolean
   disabled?: boolean
 }
@@ -70,6 +86,7 @@ interface BaseFieldProps {
 export function TextField({
   label,
   hint,
+  help,
   value,
   onChange,
   placeholder,
@@ -86,7 +103,10 @@ export function TextField({
 }) {
   return (
     <label className={`wbfield ${wide ? 'wbfield--wide' : ''}`}>
-      <span className="wbfield__label label">{label}</span>
+      <span className="wbfield__label label">
+        {label}
+        {help && <Hint title={label} body={help} />}
+      </span>
       <input
         className={`wbfield__input ${mono ? 'mono' : ''} ${invalid ? 'is-invalid' : ''}`}
         value={value}
@@ -103,6 +123,7 @@ export function TextField({
 export function TextAreaField({
   label,
   hint,
+  help,
   value,
   onChange,
   rows = 3,
@@ -118,7 +139,10 @@ export function TextAreaField({
 }) {
   return (
     <label className="wbfield wbfield--wide">
-      <span className="wbfield__label label">{label}</span>
+      <span className="wbfield__label label">
+        {label}
+        {help && <Hint title={label} body={help} />}
+      </span>
       <textarea
         className={`wbfield__input wbfield__area ${mono ? 'mono' : ''}`}
         value={value}
@@ -136,6 +160,7 @@ export function TextAreaField({
 export function SelectField<T extends string>({
   label,
   hint,
+  help,
   value,
   options,
   onChange,
@@ -147,7 +172,10 @@ export function SelectField<T extends string>({
 }) {
   return (
     <label className="wbfield">
-      <span className="wbfield__label label">{label}</span>
+      <span className="wbfield__label label">
+        {label}
+        {help && <Hint title={label} body={help} />}
+      </span>
       <select
         className="wbfield__input"
         value={value}
@@ -168,12 +196,14 @@ export function SelectField<T extends string>({
 export function CheckField({
   label,
   hint,
+  help,
   checked,
   onChange,
   disabled
 }: {
   label: string
   hint?: string
+  help?: string
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
@@ -188,7 +218,10 @@ export function CheckField({
       />
       <span className="wbcheck__box">{checked && <Icon name="check" size={10} />}</span>
       <span className="wbcheck__text">
-        <span className="wbcheck__label">{label}</span>
+        <span className="wbcheck__label">
+          {label}
+          {help && <Hint title={label} body={help} />}
+        </span>
         {hint && <span className="wbcheck__hint">{hint}</span>}
       </span>
     </label>
@@ -232,6 +265,7 @@ export function OptionCard({
 export function ListField({
   label,
   hint,
+  help,
   values,
   onChange,
   addLabel,
@@ -241,6 +275,7 @@ export function ListField({
 }: {
   label: string
   hint?: string
+  help?: string
   values: string[]
   onChange: (values: string[]) => void
   addLabel: string
@@ -253,7 +288,10 @@ export function ListField({
   }
   return (
     <div className="wbfield wbfield--wide">
-      <span className="wbfield__label label">{label}</span>
+      <span className="wbfield__label label">
+        {label}
+        {help && <Hint title={label} body={help} />}
+      </span>
       <div className="wblist">
         {values.map((value, i) => (
           <div key={i} className="wblist__row">

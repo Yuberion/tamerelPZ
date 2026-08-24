@@ -157,6 +157,7 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
       title={t('wb.sc.title')}
       lede={t('wb.sc.lede')}
       icon="folder-plus"
+      help={t('help.wb.sc.panel')}
       actions={
         <button className="btn is-primary" disabled={!canCreate} onClick={() => void create()}>
           <Icon name={busy ? 'refresh' : 'folder-plus'} size={13} className={busy ? 'spin' : undefined} />
@@ -167,18 +168,21 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
       <Group title={t('wb.sc.identity')} cols>
         <TextField
           label={t('wb.sc.name')}
+          help={t('help.wb.sc.name')}
           value={name}
           onChange={onName}
           placeholder="My Mod"
         />
         <TextField
           label={t('wb.sc.author')}
+          help={t('help.wb.sc.author')}
           value={author}
           onChange={setAuthor}
         />
         <TextField
           label={t('wb.sc.folderName')}
           hint={t('wb.sc.folderHint')}
+          help={t('help.wb.sc.folderName')}
           value={folderName}
           mono
           invalid={folderName.length > 0 && !folderValid}
@@ -190,6 +194,7 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
         <TextField
           label={t('wb.sc.modId')}
           hint={t('wb.sc.modIdHint')}
+          help={t('help.wb.sc.modId')}
           value={modId}
           mono
           invalid={modId.length > 0 && !idValid}
@@ -198,24 +203,46 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
             setModId(v)
           }}
         />
-        <TextField label={t('wb.sc.modVersion')} value={modVersion} onChange={setModVersion} mono />
-        <TextField label={t('wb.sc.pzVersion')} value={pzVersion} onChange={setPzVersion} mono />
+        <TextField
+          label={t('wb.sc.modVersion')}
+          help={t('help.wb.sc.modVersion')}
+          value={modVersion}
+          onChange={setModVersion}
+          mono
+        />
+        <TextField
+          label={t('wb.sc.pzVersion')}
+          help={t('help.wb.sc.pzVersion')}
+          value={pzVersion}
+          onChange={setPzVersion}
+          mono
+        />
         <TextAreaField
           label={t('wb.sc.description')}
+          help={t('help.wb.sc.description')}
           value={description}
           onChange={setDescription}
           rows={2}
         />
-        <TextField label={t('wb.sc.url')} value={url} onChange={setUrl} mono wide />
+        <TextField
+          label={t('wb.sc.url')}
+          help={t('help.wb.sc.url')}
+          value={url}
+          onChange={setUrl}
+          mono
+          wide
+        />
         <TextField
           label={t('wb.sc.tags')}
           hint={t('wb.sc.tagsHint')}
+          help={t('help.wb.sc.tags')}
           value={tags}
           onChange={setTags}
         />
         <ListField
           label={t('wb.sc.requires')}
           hint={t('wb.sc.requiresHint')}
+          help={t('help.wb.sc.requires')}
           values={requires}
           onChange={setRequires}
           addLabel={t('wb.info.addRequire')}
@@ -226,6 +253,7 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
       <Group title={t('wb.sc.destination')}>
         <SelectField
           label={t('wb.sc.destination')}
+          help={t('help.wb.sc.destination')}
           value={targetId}
           onChange={setTargetId}
           options={targets.map((tg) => ({
@@ -235,7 +263,7 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
         />
       </Group>
 
-      <Group title={t('wb.sc.layout')}>
+      <Group title={t('wb.sc.layout')} help={t('help.wb.sc.layout')}>
         <div className="wboptrow">
           {LAYOUTS.map((l) => (
             <OptionCard
@@ -249,7 +277,7 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
         </div>
       </Group>
 
-      <Group title={t('wb.sc.contents')}>
+      <Group title={t('wb.sc.contents')} help={t('help.wb.sc.contents')}>
         <div className="wbchips">
           {FOLDER_OPTIONS.map((f) => {
             const on = folders.has(f.id)
@@ -270,12 +298,14 @@ export function ScaffoldTool({ targets, onCreated }: ScaffoldToolProps) {
           <CheckField
             label={t('wb.sc.examples')}
             hint={t('wb.sc.examplesHint')}
+            help={t('help.wb.sc.examples')}
             checked={examples}
             onChange={setExamples}
           />
           <CheckField
             label={t('wb.sc.poster')}
             hint={t('wb.sc.posterHint')}
+            help={t('help.wb.sc.poster')}
             checked={poster}
             onChange={setPoster}
           />

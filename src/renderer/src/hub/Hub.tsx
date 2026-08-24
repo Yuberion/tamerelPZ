@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n, type TKey } from '@renderer/i18n'
@@ -48,11 +49,17 @@ export function Hub({ onOpen }: HubProps) {
           <div className="hub__eyebrow label">{t('hub.eyebrow')}</div>
           <h1 className="hub__h1 stencil">PZ Management</h1>
           <div className="hub__rule" />
-          <p className="hub__lede">{t('hub.lede')}</p>
+          <p className="hub__lede">
+            {t('hub.lede')}
+            <Hint className="hint--inline" title="PZ Management" body={t('help.hub.modules')} />
+          </p>
         </div>
 
         <div className="hub__readout brackets">
-          <div className="readout__head label">{t('hub.status')}</div>
+          <div className="readout__head label">
+            {t('hub.status')}
+            <Hint title={t('hub.status')} body={t('help.hub.status')} />
+          </div>
           <Readout
             label={t('hub.build')}
             value={

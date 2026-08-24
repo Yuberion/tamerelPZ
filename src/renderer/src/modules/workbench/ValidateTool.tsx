@@ -5,6 +5,7 @@ import type {
   ValidationReport,
   ValidationSeverity
 } from '@shared/types'
+import { Hint } from '@renderer/components/Hint'
 import { Icon, type IconName } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { hasKey, useI18n, type TKey } from '@renderer/i18n'
@@ -91,6 +92,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
       title={t('wb.val.title')}
       lede={t('wb.val.lede')}
       icon="flask"
+      help={t('help.wb.val.panel')}
       actions={
         <>
           {report && (
@@ -169,6 +171,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
                     <span className="chip__n mono">{counts[sev]}</span>
                   </button>
                 ))}
+                <Hint title={t('wb.val.errors')} body={t('help.wb.val.severity')} />
               </div>
 
               <div className="wbissues">

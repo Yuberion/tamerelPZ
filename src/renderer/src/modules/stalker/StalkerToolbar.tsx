@@ -1,5 +1,6 @@
 import { forwardRef } from 'react'
 import type { GroupMode, ModCategory, ModSource, ModSourceKind, SortMode } from '@shared/types'
+import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
 import { useMenu } from '@renderer/components/Menu'
 import { CATEGORY_ORDER, categoryMeta } from '@renderer/lib/catmeta'
@@ -100,6 +101,8 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
 
         <div className="divider-v" />
 
+        <Hint title={t('ip.source')} body={t('help.tb.sources')} />
+
         <div className="srcgroup">
           {sourceButtons.map((b) => {
             const on = filters.sourceKinds.has(b.kind)
@@ -152,6 +155,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
           <Icon name="refresh" size={13} className={scanning ? 'spin' : undefined} />
           {scanning ? t('tb.scanning') : t('tb.rescan')}
         </button>
+        <Hint title={t('tb.rescan')} body={t('help.tb.rescan')} />
 
         <div className="toolbar__spacer" />
 
@@ -170,6 +174,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             </button>
           )}
         </div>
+        <Hint title={t('tb.searchPlaceholder')} body={t('help.tb.search')} />
 
         <label className="pick">
           <span className="label">{t('tb.group')}</span>
@@ -180,6 +185,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             <option value="none">{t('tb.groupFlat')}</option>
           </select>
         </label>
+        <Hint title={t('tb.group')} body={t('help.tb.group')} />
 
         <label className="pick">
           <span className="label">{t('tb.sort')}</span>
@@ -192,6 +198,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             <option value="source">{t('tb.sortSource')}</option>
           </select>
         </label>
+        <Hint title={t('tb.sort')} body={t('help.tb.sort')} />
 
         <button
           className={`btn btn-icon ${showFilters || activeFilters ? 'is-active' : ''}`}
@@ -200,6 +207,7 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
         >
           <Icon name="filter" size={13} />
         </button>
+        <Hint title={t('tb.filters')} body={t('help.tb.filters')} />
       </div>
 
       {showFilters && (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsNode, ModEntry } from '@shared/types'
+import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
 import { useMenu } from '@renderer/components/Menu'
 import { useToast } from '@renderer/components/Toast'
@@ -279,6 +280,7 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
         >
           <Icon name="folder-open" size={13} />
         </button>
+        <Hint title={mod.folderName} body={t('help.pane.skeleton')} />
       </div>
 
       <div className="pane__scroll" ref={v.ref}>

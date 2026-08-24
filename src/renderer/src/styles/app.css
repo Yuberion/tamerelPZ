@@ -106,6 +106,31 @@
   background: #241a13;
 }
 
+/* Help-mode switch: same 17px segment metrics as the language pair next to it. */
+.titlebar__help {
+  width: 18px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--edge);
+  background: #14181d;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ash-faint);
+  transition: color 90ms ease, background 90ms ease, border-color 90ms ease;
+}
+.titlebar__help:hover {
+  color: var(--ash);
+  background: #1b2027;
+  border-color: var(--edge-hot);
+}
+.titlebar__help.is-on {
+  color: var(--rust-hot);
+  border-color: var(--rust-dim);
+  background: #241a13;
+}
+
 .titlebar__drag {
   flex: 1 1 auto;
   -webkit-app-region: drag;
@@ -194,6 +219,9 @@
 }
 
 .readout__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   color: var(--rust);
   margin-bottom: 8px;
 }
@@ -487,6 +515,112 @@
   height: 1px;
   margin: 3px 5px;
   background: var(--edge);
+}
+
+/* ============================ inline help ============================ */
+
+.hint {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  background: #171b21;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ash-faint);
+  transition: color 0.12s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+.hint:hover {
+  color: var(--rust-hot);
+  border-color: var(--rust-dim);
+  background: #241a13;
+}
+.hint.is-on {
+  color: #e8dfd0;
+  border-color: var(--rust);
+  background: #2b2119;
+}
+/* Help mode: every badge at once, so the affordance is findable without hunting. */
+body.is-help .hint {
+  color: var(--rust-hot);
+  border-color: var(--rust-dim);
+  box-shadow: 0 0 0 2px #a8613a1c;
+}
+body.is-help .hint:hover,
+body.is-help .hint.is-on {
+  box-shadow: 0 0 0 2px #a8613a33;
+}
+/* Sitting in a run of text rather than in a flex row. */
+.hint--inline {
+  margin-left: 7px;
+  vertical-align: -2px;
+}
+
+.hintpop {
+  position: fixed;
+  z-index: 9700;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 9px 12px 11px;
+  border: 1px solid var(--edge-hot);
+  background: #1a1e24f7;
+  box-shadow: 0 14px 34px #000000aa;
+  animation: fade-up 0.14s ease both;
+}
+
+.hintpop__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 6px;
+  margin-bottom: 7px;
+  border-bottom: 1px solid var(--edge);
+}
+.hintpop__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: #ded5c6;
+}
+.hintpop__close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--ash-faint);
+  border: 1px solid transparent;
+}
+.hintpop__close:hover {
+  color: var(--bone);
+  border-color: var(--edge);
+  background: #20262e;
+}
+
+.hintpop__body,
+.hintpop__note {
+  margin: 0;
+  /* The whole shell is user-select:none; help text is the one thing worth copying. */
+  user-select: text;
+  cursor: text;
+}
+.hintpop__body {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #bab5aa;
+}
+.hintpop__note {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed #23282f;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ash-faint);
 }
 
 /* ============================ splitter ============================ */

@@ -212,6 +212,10 @@
   gap: 0;
   padding-left: 0;
 }
+/* The tab strip kills the row gap, so the help badge spaces itself. */
+.pane__head--tabs .hint {
+  margin-right: 7px;
+}
 .pane__title {
   font-size: 10.5px;
   color: var(--ash);

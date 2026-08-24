@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { I18nProvider } from './i18n'
+import { HelpProvider } from './components/Hint'
 import { TitleBar } from './components/TitleBar'
 import { ToastProvider } from './components/Toast'
 import { Hub } from './hub/Hub'
@@ -16,6 +17,8 @@ export default function App() {
 
   const goHome = useCallback(() => setView('hub'), [])
 
+  // Escape leaves a module. An open help popover swallows the key first (see
+  // HelpProvider), so one press never both closes a hint and navigates away.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape' || view === 'hub') return
@@ -33,20 +36,22 @@ export default function App() {
 
   return (
     <I18nProvider>
-      <ToastProvider>
-        <div className="shell">
-          <TitleBar
-            section={view === 'hub' ? undefined : moduleById(view).name}
-            onHome={view === 'hub' ? undefined : goHome}
-            busy={scanning}
-          />
-          <main className="shell__body">
-            {view === 'hub' ? <Hub onOpen={setView} /> : null}
-            {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
-            {view === 'workbench' ? <Workbench onExit={goHome} /> : null}
-          </main>
-        </div>
-      </ToastProvider>
+      <HelpProvider>
+        <ToastProvider>
+          <div className="shell">
+            <TitleBar
+              section={view === 'hub' ? undefined : moduleById(view).name}
+              onHome={view === 'hub' ? undefined : goHome}
+              busy={scanning}
+            />
+            <main className="shell__body">
+              {view === 'hub' ? <Hub onOpen={setView} /> : null}
+              {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
+              {view === 'workbench' ? <Workbench onExit={goHome} /> : null}
+            </main>
+          </div>
+        </ToastProvider>
+      </HelpProvider>
     </I18nProvider>
   )
 }

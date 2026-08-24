@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AuthoringTarget, ModEntry } from '@shared/types'
+import { Hint } from '@renderer/components/Hint'
 import { Icon, type IconName } from '@renderer/components/Icon'
 import { MenuProvider, useMenu } from '@renderer/components/Menu'
 import { Splitter } from '@renderer/components/Splitter'
@@ -139,6 +140,7 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
               </button>
             ))}
           </div>
+          <Hint title={t('module.workbench.tagline')} body={t('help.wb.tabs')} />
           <div className="toolbar__spacer" />
           <button
             className="btn"
@@ -151,9 +153,11 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
             <Icon name="folder-plus" size={13} />
             {t('wb.newMod')}
           </button>
+          <Hint title={t('wb.newMod')} body={t('help.wb.newMod')} />
           <button className="btn btn-icon" onClick={() => void refresh(true)} disabled={scanning} title={t('tb.rescanTitle')}>
             <Icon name="refresh" size={13} className={scanning ? 'spin' : undefined} />
           </button>
+          <Hint title={t('tb.rescan')} body={t('help.wb.rescan')} />
         </div>
       </div>
 
@@ -168,6 +172,8 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
                 <span className="pane__count-total"> / {formatCount(rows.length)}</span>
               )}
             </span>
+            <div className="pane__head-spacer" />
+            <Hint title={t('wb.paneMods')} body={t('help.wb.mods')} />
           </div>
           <div className="wbsearch">
             <div className="minisearch">
@@ -184,6 +190,7 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
                 </button>
               )}
             </div>
+            <Hint title={t('wb.searchPlaceholder')} body={t('help.wb.search')} />
           </div>
           <ModList rows={rows} selectedKey={selectedKey} onSelect={selectMod} query={query} />
         </section>

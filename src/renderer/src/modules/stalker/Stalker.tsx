@@ -9,6 +9,7 @@ import type {
   SortMode
 } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
+import { Hint } from '@renderer/components/Hint'
 import { MenuProvider } from '@renderer/components/Menu'
 import { Splitter } from '@renderer/components/Splitter'
 import { useToast } from '@renderer/components/Toast'
@@ -288,6 +289,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
                 )}
               </span>
               <div className="pane__head-spacer" />
+              <Hint title={t('pane.mods')} body={t('help.pane.mods')} />
               <button
                 className="btn btn-icon"
                 title={t('pane.collapseGroups')}

@@ -9,6 +9,7 @@ import type {
   ModWarning,
   ScanIssues
 } from '@shared/types'
+import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n, type TKey } from '@renderer/i18n'
@@ -66,6 +67,7 @@ export function InfoPanel({
           {t('ip.tabFile')}
         </button>
         <div className="pane__head-spacer" />
+        <Hint title={t('ip.tabMod')} body={t('help.pane.info')} />
         {mod && (
           <button
             className="btn btn-icon"

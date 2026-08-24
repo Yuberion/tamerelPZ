@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModEntry, ModInfoDraft } from '@shared/types'
+import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n } from '@renderer/i18n'
@@ -131,6 +132,7 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
       title={t('wb.info.title')}
       lede={draft.file}
       icon="edit"
+      help={t('help.wb.info.panel')}
       actions={
         <>
           <div className="wbseg">
@@ -147,6 +149,7 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
               {t('wb.info.raw')}
             </button>
           </div>
+          <Hint title={t('wb.info.form')} body={t('help.wb.info.mode')} />
           <button className="btn" disabled={!dirty || busy} onClick={load} title={t('wb.info.revertTitle')}>
             <Icon name="rotate" size={13} />
             {t('wb.info.revert')}
@@ -183,16 +186,71 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
       {mode === 'form' ? (
         <>
           <Group title={t('wb.info.form')} cols>
-            <TextField label={t('wb.sc.name')} value={draft.name} onChange={(v) => patch({ name: v })} disabled={!writable} />
-            <TextField label={t('wb.sc.modId')} value={draft.id} mono onChange={(v) => patch({ id: v })} disabled={!writable} />
-            <TextField label={t('wb.sc.author')} value={draft.authors} onChange={(v) => patch({ authors: v })} disabled={!writable} />
-            <TextField label={t('wb.sc.modVersion')} value={draft.modVersion} mono onChange={(v) => patch({ modVersion: v })} disabled={!writable} />
-            <TextField label={t('wb.sc.pzVersion')} value={draft.pzVersion} mono onChange={(v) => patch({ pzVersion: v })} disabled={!writable} />
-            <TextField label={t('wb.sc.url')} value={draft.url} mono onChange={(v) => patch({ url: v })} disabled={!writable} />
-            <TextField label="poster" value={draft.poster} mono onChange={(v) => patch({ poster: v })} disabled={!writable} />
-            <TextField label="icon" value={draft.icon} mono onChange={(v) => patch({ icon: v })} disabled={!writable} />
+            <TextField
+              label={t('wb.sc.name')}
+              help={t('help.wb.sc.name')}
+              value={draft.name}
+              onChange={(v) => patch({ name: v })}
+              disabled={!writable}
+            />
+            <TextField
+              label={t('wb.sc.modId')}
+              help={t('help.wb.info.id')}
+              value={draft.id}
+              mono
+              onChange={(v) => patch({ id: v })}
+              disabled={!writable}
+            />
+            <TextField
+              label={t('wb.sc.author')}
+              help={t('help.wb.sc.author')}
+              value={draft.authors}
+              onChange={(v) => patch({ authors: v })}
+              disabled={!writable}
+            />
+            <TextField
+              label={t('wb.sc.modVersion')}
+              help={t('help.wb.sc.modVersion')}
+              value={draft.modVersion}
+              mono
+              onChange={(v) => patch({ modVersion: v })}
+              disabled={!writable}
+            />
+            <TextField
+              label={t('wb.sc.pzVersion')}
+              help={t('help.wb.sc.pzVersion')}
+              value={draft.pzVersion}
+              mono
+              onChange={(v) => patch({ pzVersion: v })}
+              disabled={!writable}
+            />
+            <TextField
+              label={t('wb.sc.url')}
+              help={t('help.wb.sc.url')}
+              value={draft.url}
+              mono
+              onChange={(v) => patch({ url: v })}
+              disabled={!writable}
+            />
+            <TextField
+              label="poster"
+              help={t('help.wb.info.poster')}
+              value={draft.poster}
+              mono
+              onChange={(v) => patch({ poster: v })}
+              disabled={!writable}
+            />
+            <TextField
+              label="icon"
+              help={t('help.wb.info.icon')}
+              value={draft.icon}
+              mono
+              onChange={(v) => patch({ icon: v })}
+              disabled={!writable}
+            />
             <TextAreaField
               label={t('wb.sc.description')}
+              help={t('help.wb.sc.description')}
               value={draft.description}
               onChange={(v) => patch({ description: v })}
               rows={3}
@@ -203,6 +261,8 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
           <Group title={t('wb.sc.requires')}>
             <ListField
               label={t('wb.sc.requires')}
+              hint={t('wb.sc.requiresHint')}
+              help={t('help.wb.sc.requires')}
               values={draft.requires}
               onChange={(requires) => patch({ requires })}
               addLabel={t('wb.info.addRequire')}
@@ -214,6 +274,7 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
           <Group title={t('wb.sc.tags')}>
             <ListField
               label={t('wb.sc.tags')}
+              help={t('help.wb.sc.tags')}
               values={draft.tags}
               onChange={(tags) => patch({ tags })}
               addLabel={t('wb.info.addTag')}
@@ -223,7 +284,11 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
           </Group>
 
           {draft.extra.length > 0 && (
-            <Group title={t('wb.info.extra')} hint={t('wb.info.extraHint')}>
+            <Group
+              title={t('wb.info.extra')}
+              hint={t('wb.info.extraHint')}
+              help={t('help.wb.info.extra')}
+            >
               {draft.extra.map((e, i) => (
                 <Readout key={`${e.key}-${i}`} label={e.key} value={e.value} />
               ))}
@@ -231,11 +296,17 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
           )}
 
           <Group title="">
-            <CheckField label={t('wb.info.backup')} checked={backup} onChange={setBackup} disabled={!writable} />
+            <CheckField
+              label={t('wb.info.backup')}
+              help={t('help.wb.info.backup')}
+              checked={backup}
+              onChange={setBackup}
+              disabled={!writable}
+            />
           </Group>
         </>
       ) : (
-        <Group title={t('wb.info.raw')} hint={t('wb.info.rawHint')}>
+        <Group title={t('wb.info.raw')} hint={t('wb.info.rawHint')} help={t('help.wb.info.raw')}>
           <div className="wbraw">
             <textarea
               className="wbraw__input mono"
@@ -256,7 +327,13 @@ export function InfoTool({ mod, writable }: InfoToolProps) {
               )}
             </pre>
           </div>
-          <CheckField label={t('wb.info.backup')} checked={backup} onChange={setBackup} disabled={!writable} />
+          <CheckField
+            label={t('wb.info.backup')}
+            help={t('help.wb.info.backup')}
+            checked={backup}
+            onChange={setBackup}
+            disabled={!writable}
+          />
         </Group>
       )}
     </Panel>
