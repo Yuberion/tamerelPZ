@@ -375,12 +375,23 @@ export type PackMode = 'workshop' | 'zip'
 /** Which build sub-folders reach the output. */
 export type PackBuilds = 'all' | 'b41' | 'b42'
 
+/**
+ * Workshop visibility, spelled the way the in-game uploader reads it back.
+ *
+ * These four tokens are the ones PZ maps onto the Steam API values — `public`
+ * 0, `friendsOnly` 1, `private` 2, `unlisted` 3. The uploader matches the
+ * string verbatim, so a near-miss like `friends` does not fail loudly: it
+ * misses the match and the item is published with the default visibility.
+ */
+export type PackVisibility = 'public' | 'friendsOnly' | 'private' | 'unlisted'
+
 /** Fields written into `workshop.txt` for the in-game uploader. */
 export interface PackWorkshopMeta {
   title: string
+  /** Free text. Newlines survive as separate `description=` lines. */
   description: string
   tags: string[]
-  visibility: 'public' | 'friends' | 'private'
+  visibility: PackVisibility
   /** Existing Workshop item id; blank creates a new item. */
   id: string
 }

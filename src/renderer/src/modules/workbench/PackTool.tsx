@@ -4,7 +4,8 @@ import type {
   PackBuilds,
   PackMode,
   PackOptions,
-  PackResult
+  PackResult,
+  PackVisibility
 } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
@@ -33,10 +34,11 @@ const BUILD_OPTIONS: Array<{ value: PackBuilds; labelKey: TKey }> = [
   { value: 'b42', labelKey: 'wb.pack.buildsB42' }
 ]
 
-const VISIBILITY: Array<{ value: 'public' | 'friends' | 'private'; labelKey: TKey }> = [
+const VISIBILITY: Array<{ value: PackVisibility; labelKey: TKey }> = [
   { value: 'public', labelKey: 'wb.pack.visPublic' },
-  { value: 'friends', labelKey: 'wb.pack.visFriends' },
-  { value: 'private', labelKey: 'wb.pack.visPrivate' }
+  { value: 'friendsOnly', labelKey: 'wb.pack.visFriends' },
+  { value: 'private', labelKey: 'wb.pack.visPrivate' },
+  { value: 'unlisted', labelKey: 'wb.pack.visUnlisted' }
 ]
 
 /** Default project/archive name derived from the mod folder. */
@@ -63,7 +65,7 @@ export function PackTool({ mod }: PackToolProps) {
   const [title, setTitle] = useState(mod.name)
   const [description, setDescription] = useState(mod.description ?? '')
   const [tags, setTags] = useState((mod.tags ?? []).join(';'))
-  const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>('public')
+  const [visibility, setVisibility] = useState<PackVisibility>('public')
   const [workshopId, setWorkshopId] = useState(mod.workshopId ?? '')
 
   const [busy, setBusy] = useState(false)

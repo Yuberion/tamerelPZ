@@ -114,7 +114,9 @@ async function collect(root: string): Promise<Collected> {
       if (inTextures) out.textures.add(entry.name.toLowerCase())
       if (ext === 'lua') out.lua.push(abs)
       else if (ext === 'txt' && inScripts) out.scripts.push(abs)
-      if (ext === 'txt' && translateMatch) out.translate.push(abs)
+      // B41 translations are `.txt`, B42 moved them to `.json`, and a mod can
+      // ship both at once while it supports two builds.
+      if (translateMatch && (ext === 'txt' || ext === 'json')) out.translate.push(abs)
     }
   }
 
@@ -132,6 +134,17 @@ const KNOWN_INFO_KEYS = new Set([
   'requires', 'tags', 'category', 'pack', 'tiledef', 'mappath', 'mapfolder',
   'excludetranslations'
 ])
+
+/**
+ * Keys where a repeat really does lose data.
+ *
+ * Most of `mod.info` is list-shaped: the loader appends every `description=`
+ * into one string and treats `poster`, `require`, `pack` and `tiledef` as
+ * collections, so mods repeat them deliberately — a bilingual mod with one
+ * `description=` per language is correct, not a mistake. `name` and `id` are
+ * the only keys read as a single value, where a second line is dead weight.
+ */
+const SINGLE_INFO_KEYS = ['name', 'id'] as const
 
 async function checkModInfo(
   root: string,
@@ -173,7 +186,10 @@ async function checkModInfo(
     }
   }
 
-  for (const key of ['name', 'id', 'description', 'poster'] as const) {
+  // Only `name` and `id` are genuinely single-valued. `description` lines are
+  // concatenated, and `poster`, `require`, `pack` and `tiledef` are list keys
+  // that mods repeat on purpose — reporting those was a false positive.
+  for (const key of SINGLE_INFO_KEYS) {
     const n = fields[key]?.length ?? 0
     if (n > 1) {
       add({
@@ -199,16 +215,22 @@ async function checkModInfo(
   }
 
   const infoDir = join(infoFile, '..')
-  const poster = first(fields, 'poster')
-  if (!poster) {
+  // `poster` is a list key, so check every entry rather than just the first —
+  // a mod that ships two posters can be missing only the second one.
+  const posters = all(fields, 'poster').map((v) => v.trim()).filter(Boolean)
+  if (posters.length === 0) {
     add({ rule: 'modinfo.no-poster', severity: 'info', file: infoFile })
-  } else if (!(await fileExists(join(infoDir, poster))) && !(await fileExists(join(root, poster)))) {
-    add({
-      rule: 'modinfo.poster-missing',
-      severity: 'error',
-      file: infoFile,
-      params: { file: poster }
-    })
+  } else {
+    for (const poster of posters) {
+      if (await fileExists(join(infoDir, poster))) continue
+      if (await fileExists(join(root, poster))) continue
+      add({
+        rule: 'modinfo.poster-missing',
+        severity: 'error',
+        file: infoFile,
+        params: { file: poster }
+      })
+    }
   }
 
   const icon = first(fields, 'icon')
@@ -608,26 +630,88 @@ function checkScript(
 
 /* -------------------------------------------------------------- translate -- */
 
-/** Language folders PZ ships translations for. */
+/**
+ * Language folders the game ships translations for.
+ *
+ * Taken from `media/lua/shared/Translate` in Build 42, plus the older codes
+ * (`CZ`, `DK`, `PH`, `TW`) that B41 mods still use. Listing a retired code
+ * only costs a missed note; omitting a live one produces a false finding.
+ */
 const KNOWN_LANGS = new Set([
-  'AR', 'CA', 'CH', 'CN', 'CS', 'CZ', 'DA', 'DE', 'DK', 'EN', 'ES', 'FI', 'FR',
-  'HU', 'ID', 'IT', 'JP', 'KO', 'NL', 'NO', 'PH', 'PL', 'PT', 'PTBR', 'RO',
-  'RU', 'TH', 'TR', 'TW', 'UA'
+  'AR', 'CA', 'CH', 'CN', 'CS', 'CZ', 'DA', 'DE', 'DK', 'EN', 'ES', 'ES_CL',
+  'ES_MX', 'FI', 'FR', 'HU', 'ID', 'IT', 'JP', 'KO', 'NL', 'NO', 'PH', 'PL',
+  'PT', 'PTBR', 'RO', 'RU', 'STREW', 'TH', 'TR', 'TW', 'UA'
 ])
 
-function checkTranslate(
-  raw: string,
+/** The language code a translation file sits under, e.g. `EN`. */
+function langOf(file: string): string {
+  const parts = file.split(sep)
+  return parts[parts.length - 2] ?? ''
+}
+
+/** 1-based line of a character offset, for locating a JSON syntax error. */
+function lineAt(text: string, position: number): number {
+  let line = 1
+  const stop = Math.min(position, text.length)
+  for (let i = 0; i < stop; i++) if (text[i] === '\n') line++
+  return line
+}
+
+/**
+ * Build 42 translations: a flat JSON object of `"Prefix.Key": "Text"`.
+ *
+ * B42 replaced the Lua-table `.txt` files with JSON — the stock `Translate/EN`
+ * folder is now `ItemName.json`, `Recipes.json` and friends, with only
+ * `IG_UI_EN.txt` and `UI_EN.txt` left in the old form. The game still loads
+ * both, so the two checkers coexist rather than replace each other.
+ */
+function checkTranslateJson(
+  text: string,
   file: string,
   add: (issue: ValidationIssue) => void
 ): void {
-  const parts = file.split(sep)
-  const langDir = parts[parts.length - 2] ?? ''
-  const upper = langDir.toUpperCase()
-  if (!KNOWN_LANGS.has(upper)) {
-    add({ rule: 'translate.unknown-language', severity: 'info', file, params: { dir: langDir } })
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch (err) {
+    // The engine's own wording is English-only prose, so only the position it
+    // reports is carried over — the rule id supplies the localised message.
+    const at = /position (\d+)/.exec(err instanceof Error ? err.message : '')?.[1]
+    add({
+      rule: 'translate.json-invalid',
+      severity: 'error',
+      file,
+      line: at ? lineAt(text, Number(at)) : undefined
+    })
+    return
   }
 
-  const text = stripBom(raw)
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    add({ rule: 'translate.json-not-object', severity: 'error', file })
+    return
+  }
+
+  // Every entry has to be a plain string; a nested object or a number means
+  // the file was written against the wrong shape and those keys never resolve.
+  const bad = Object.entries(parsed as Record<string, unknown>)
+    .filter(([, value]) => typeof value !== 'string')
+    .map(([key]) => key)
+  if (bad.length > 0) {
+    add({
+      rule: 'translate.json-non-string',
+      severity: 'warn',
+      file,
+      params: { key: bad[0] ?? '', n: bad.length }
+    })
+  }
+}
+
+/** Build 41 translations: a Lua table named after its language folder. */
+function checkTranslateTxt(
+  text: string,
+  file: string,
+  add: (issue: ValidationIssue) => void
+): void {
   let depth = 0
   for (const ch of text) {
     if (ch === '{') depth++
@@ -643,6 +727,7 @@ function checkTranslate(
   const table = header?.[1]
   if (table) {
     const suffix = table.slice(table.lastIndexOf('_') + 1).toUpperCase()
+    const upper = langOf(file).toUpperCase()
     if (table.includes('_') && suffix !== upper) {
       add({
         rule: 'translate.header-mismatch',
@@ -652,6 +737,27 @@ function checkTranslate(
       })
     }
   }
+}
+
+/** Routes a translation file to the checker for its format. */
+function checkTranslate(
+  raw: string,
+  file: string,
+  add: (issue: ValidationIssue) => void
+): void {
+  const langDir = langOf(file)
+  if (!KNOWN_LANGS.has(langDir.toUpperCase())) {
+    add({ rule: 'translate.unknown-language', severity: 'info', file, params: { dir: langDir } })
+  }
+
+  const text = stripBom(raw)
+  if (!text.trim()) {
+    add({ rule: 'translate.empty', severity: 'info', file })
+    return
+  }
+
+  if (extOf(file) === 'json') checkTranslateJson(text, file, add)
+  else checkTranslateTxt(text, file, add)
 }
 
 /* ------------------------------------------------------------------ entry -- */

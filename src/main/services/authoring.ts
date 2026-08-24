@@ -13,6 +13,7 @@ import type {
   AuthoringTarget,
   ModInfoDraft,
   ModInfoExtra,
+  PackWorkshopMeta,
   ScaffoldFolder,
   ScaffoldOptions,
   ScaffoldResult,
@@ -326,7 +327,7 @@ export async function scaffoldMod(
     }
 
     if (opts.examples) {
-      await writeExamples(opts, modId, name, buildRoot, relBuild, writeFile)
+      await writeExamples(opts, modId, name, buildRoot, relBuild, build, writeFile)
     }
 
     if (opts.poster) {
@@ -356,6 +357,18 @@ export async function scaffoldMod(
 /** 512x256 placeholder so `poster=poster.png` resolves from the first launch. */
 const POSTER = solidPng(512, 256, [22, 26, 31])
 
+/**
+ * Does this build sub-folder hold Build 42 content?
+ *
+ * Only `''` (a root-level B41 layout) and a `41*` folder are B41; `common` and
+ * any `42*` branch are read by B42, which matters because the two builds do
+ * not share a translation file format.
+ */
+function isB42Build(build: string): boolean {
+  const lower = build.toLowerCase()
+  return lower === 'common' || lower.startsWith('42')
+}
+
 type WriteFn = (abs: string, rel: string, data: Buffer | string) => Promise<void>
 
 /** Starter files that actually run, rather than empty folders. */
@@ -365,6 +378,7 @@ async function writeExamples(
   name: string,
   buildRoot: string,
   relBuild: string,
+  build: string,
   writeFile: WriteFn
 ): Promise<void> {
   const has = (f: ScaffoldFolder): boolean => opts.folders.includes(f)
@@ -444,15 +458,26 @@ async function writeExamples(
   }
 
   if (has('translate')) {
-    await emit(
-      ['lua', 'shared', 'Translate', 'EN', 'ItemName_EN.txt'],
-      [
-        'ItemName_EN = {',
-        `    ItemName_Base.${modId}_Example = "${name} Example",`,
-        '}',
-        ''
-      ].join('\n')
-    )
+    // B42 reads a flat JSON object keyed `<Module>.<Item>`, with the table name
+    // carried by the file name. B41 reads a Lua table whose name must end in
+    // the language code. Handing either build the other's format loads nothing,
+    // so the starter file follows the build folder it sits in.
+    if (isB42Build(build)) {
+      await emit(
+        ['lua', 'shared', 'Translate', 'EN', 'ItemName.json'],
+        `${JSON.stringify({ [`Base.${modId}_Example`]: `${name} Example` }, null, 4)}\n`
+      )
+    } else {
+      await emit(
+        ['lua', 'shared', 'Translate', 'EN', 'ItemName_EN.txt'],
+        [
+          'ItemName_EN = {',
+          `    ItemName_Base.${modId}_Example = "${name} Example",`,
+          '}',
+          ''
+        ].join('\n')
+      )
+    }
   }
 }
 
@@ -460,20 +485,22 @@ async function writeExamples(
  * `workshop.txt` as the in-game uploader writes it.
  *
  * Order and casing matter: the uploader reads the file back with a plain
- * key match, and an unexpected key makes it fall back to defaults.
+ * key match, and an unexpected key makes it fall back to defaults. That also
+ * applies to `visibility`, whose tokens are fixed by `PackVisibility`.
+ *
+ * `description` is deliberately emitted as one line per source line rather
+ * than an escaped single line. The reader concatenates every `description=`
+ * it finds with newlines between them — it does not unescape anything — so a
+ * literal `\n` would end up visible on the Workshop page. The game's own
+ * `ModTemplate\workshop.txt` uses the multi-line form, blank lines included.
  */
-export function workshopTxt(meta: {
-  title: string
-  description: string
-  tags: string[]
-  visibility: 'public' | 'friends' | 'private'
-  id: string
-}): string {
+export function workshopTxt(meta: PackWorkshopMeta): string {
+  const description = meta.description.replace(/\r\n?/g, '\n').split('\n')
   return [
     'version=1',
     `id=${oneLine(meta.id)}`,
     `title=${oneLine(meta.title)}`,
-    `description=${meta.description.replace(/\r?\n/g, '\\n')}`,
+    ...description.map((line) => `description=${line}`),
     `tags=${meta.tags.map(oneLine).filter(Boolean).join(';')}`,
     `visibility=${meta.visibility}`,
     ''

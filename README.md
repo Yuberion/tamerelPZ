@@ -48,12 +48,14 @@ Four tools over a virtualised list of the mods you can actually edit (mods outsi
 
 | Tool | What it does |
 |---|---|
-| **Scaffold** | Creates a mod folder from scratch: `mod.info` per build, `media` sub-trees you tick, optional runnable starter files (lua entry points, an example item script, a translation stub) and a generated placeholder `poster.png`. Build 41 / Build 42 / both layouts. Refuses to touch an existing folder. |
+| **Scaffold** | Creates a mod folder from scratch: `mod.info` per build, `media` sub-trees you tick, optional runnable starter files (lua entry points, an example item script, a translation stub in the format its build expects) and a generated placeholder `poster.png`. Build 41 / Build 42 / both layouts. Refuses to touch an existing folder. |
 | **mod.info** | Field editor and raw text editor over the same file, switchable without losing unsaved edits. Atomic writes, optional rolling `mod.info.bak`, `Ctrl+S`. |
-| **Validate** | ~30 static checks across `mod.info`, Lua, `media/scripts` and translations, graded error / warning / note. Findings carry a stable rule id and are localised in the renderer. |
+| **Validate** | 38 static checks across `mod.info`, Lua, `media/scripts` and translations, graded error / warning / note. Findings carry a stable rule id and are localised in the renderer. |
 | **Pack** | Stages the `Contents/mods/…` + `workshop.txt` + `preview.png` layout the in-game uploader expects, or writes a single `.zip`. Build filtering and exclude patterns; version control, editor state, backups and logs are always skipped. |
 
 The validator's Lua scanner runs a real lexer over strings, long strings (`[==[ … ]==]`) and both comment forms before checking bracket and block balance, so `end` inside a string or a `)` inside a comment does not produce a finding. Rules that could fire on legitimate content are warnings, never errors.
+
+Translations are checked in both of the game's formats: the Build 41 Lua table (`ItemName_EN.txt`, whose table name must match its language folder) and the Build 42 flat JSON object (`ItemName.json`). A mod supporting both builds can ship both, and each file is checked against the format its extension implies.
 
 ### Write model
 
@@ -207,7 +209,7 @@ Everything below is hand-rolled — the project has **no runtime dependencies at
 - **Frameless titlebar** — `frame: false` plus a React `TitleBar` with `-webkit-app-region` drag zones; native menu removed.
 - **Image dimensions without decoding** — PNG/GIF/BMP/JPEG headers parsed from the first ≤64KB.
 - **Scan safety limits** — `walkStats` caps at 250,000 entries and depth 32 and reports `truncated`; symlinks and junctions are skipped everywhere to avoid infinite recursion; text reads cap at 256KB (64KB for `mod.info`), rendering caps at 1200 lines.
-- **B42 awareness** — version sub-folder discovery (`common`, `41.x`, `42.x`), weight-based selection of the canonical `mod.info`, and normalisation of B42 `<workshopId>/<ModId>` ids so duplicate and dependency checks line up.
+- **B42 awareness** — version sub-folder discovery (`common`, `41.x`, `42.x`), weight-based selection of the canonical `mod.info`, normalisation of B42 `<workshopId>/<ModId>` ids so duplicate and dependency checks line up, and both the B41 Lua-table and B42 JSON translation formats.
 
 ### Tech stack
 

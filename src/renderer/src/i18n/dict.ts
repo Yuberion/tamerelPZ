@@ -415,6 +415,12 @@ export const EN = {
   'wbrule.translate.brace-unbalanced': 'Braces out of balance by {delta}',
   'wbrule.translate.header-mismatch':
     'Table name ends in _{found} but the folder is {expected} — every entry is discarded',
+  'wbrule.translate.empty': 'Translation file is empty',
+  'wbrule.translate.json-invalid': 'Not valid JSON — the game loads no entry from this file',
+  'wbrule.translate.json-not-object':
+    'JSON translations must be one object of key/text pairs',
+  'wbrule.translate.json-non-string':
+    '{key} is not a text value ({n} in total) — those keys never resolve',
 
   // ---- pack ---------------------------------------------------------------
   'wb.pack.title': 'Pack for upload',
@@ -447,6 +453,7 @@ export const EN = {
   'wb.pack.visPublic': 'Public',
   'wb.pack.visFriends': 'Friends only',
   'wb.pack.visPrivate': 'Private',
+  'wb.pack.visUnlisted': 'Unlisted',
   'wb.pack.metaId': 'Workshop id',
   'wb.pack.metaIdHint': 'Leave blank to publish a new item',
   'wb.pack.preview': 'Copy the poster as preview.png',
@@ -854,6 +861,12 @@ export const RU: Record<TKey, string> = {
   'wbrule.translate.brace-unbalanced': 'Фигурные скобки не сбалансированы на {delta}',
   'wbrule.translate.header-mismatch':
     'Имя таблицы оканчивается на _{found}, но папка — {expected}: все записи будут отброшены',
+  'wbrule.translate.empty': 'Файл перевода пуст',
+  'wbrule.translate.json-invalid': 'Некорректный JSON — игра не загрузит ни одной записи',
+  'wbrule.translate.json-not-object':
+    'JSON-перевод должен быть одним объектом из пар «ключ — текст»',
+  'wbrule.translate.json-non-string':
+    '{key} — не текстовое значение (всего {n}): такие ключи не будут найдены',
 
   // ---- упаковка -----------------------------------------------------------
   'wb.pack.title': 'Упаковка для загрузки',
@@ -886,6 +899,7 @@ export const RU: Record<TKey, string> = {
   'wb.pack.visPublic': 'Публичный',
   'wb.pack.visFriends': 'Только друзья',
   'wb.pack.visPrivate': 'Приватный',
+  'wb.pack.visUnlisted': 'Скрытый из поиска',
   'wb.pack.metaId': 'Id в Workshop',
   'wb.pack.metaIdHint': 'Оставьте пустым, чтобы опубликовать новый item',
   'wb.pack.preview': 'Скопировать обложку как preview.png',
