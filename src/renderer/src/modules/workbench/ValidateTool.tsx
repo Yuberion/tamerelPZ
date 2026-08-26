@@ -5,12 +5,12 @@ import type {
   ValidationReport,
   ValidationSeverity
 } from '@shared/types'
+import { Alert, Panel } from '@renderer/components/Form'
 import { Hint } from '@renderer/components/Hint'
 import { Icon, type IconName } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { hasKey, useI18n, type TKey } from '@renderer/i18n'
 import { copyText, formatBytes, formatCount, formatDuration } from '@renderer/lib/format'
-import { Alert, Panel } from './Form'
 
 interface ValidateToolProps {
   mod: ModEntry

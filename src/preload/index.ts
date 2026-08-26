@@ -3,6 +3,10 @@ import type { PzApi, ScanRequest } from '../shared/api'
 import { IPC } from '../shared/ipc'
 import type {
   AppSettings,
+  BatchPackRequest,
+  ConvertOptions,
+  ConvertProgress,
+  LoadoutApplyOptions,
   PackOptions,
   ScaffoldOptions,
   ScanProgress,
@@ -59,7 +63,34 @@ const api: PzApi = {
     validate: (modPath: string, opts: ValidateOptions = {}) =>
       ipcRenderer.invoke(IPC.wbValidate, modPath, opts),
     pack: (opts: PackOptions) => ipcRenderer.invoke(IPC.wbPack, opts),
+    shove: (req: BatchPackRequest) => ipcRenderer.invoke(IPC.wbShove, req),
+    shoveCancel: () => ipcRenderer.invoke(IPC.wbShoveCancel),
     onProgress: (cb) => subscribe<WorkbenchProgress>(IPC.wbProgress, cb)
+  },
+  loadout: {
+    files: () => ipcRenderer.invoke(IPC.loFiles),
+    apply: (opts: LoadoutApplyOptions) => ipcRenderer.invoke(IPC.loApply, opts)
+  },
+  logs: {
+    list: () => ipcRenderer.invoke(IPC.logList),
+    read: (id: string) => ipcRenderer.invoke(IPC.logRead, id)
+  },
+  tools: {
+    pick: () => ipcRenderer.invoke(IPC.toolsPick),
+    inspect: (paths: string[]) => ipcRenderer.invoke(IPC.toolsInspect, paths),
+    pickOutput: () => ipcRenderer.invoke(IPC.toolsPickOutput),
+    convert: (opts: ConvertOptions) => ipcRenderer.invoke(IPC.toolsConvert, opts),
+    cancel: () => ipcRenderer.invoke(IPC.toolsCancel),
+    onProgress: (cb) => subscribe<ConvertProgress>(IPC.toolsProgress, cb),
+    reveal: (path: string) => ipcRenderer.invoke(IPC.toolsReveal, path)
+  },
+  npp: {
+    status: () => ipcRenderer.invoke(IPC.nppStatus),
+    locate: () => ipcRenderer.invoke(IPC.nppLocate),
+    install: () => ipcRenderer.invoke(IPC.nppInstall),
+    preview: () => ipcRenderer.invoke(IPC.nppPreview),
+    open: (path: string, line?: number) => ipcRenderer.invoke(IPC.nppOpen, path, line),
+    reveal: (target: 'exe' | 'udl') => ipcRenderer.invoke(IPC.nppReveal, target)
   }
 }
 

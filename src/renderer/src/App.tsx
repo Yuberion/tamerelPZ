@@ -5,7 +5,10 @@ import { TitleBar } from './components/TitleBar'
 import { ToastProvider } from './components/Toast'
 import { Hub } from './hub/Hub'
 import { moduleById, type ModuleId } from './hub/modules'
+import { Ledger } from './modules/ledger/Ledger'
+import { Loadout } from './modules/loadout/Loadout'
 import { Stalker } from './modules/stalker/Stalker'
+import { Tools } from './modules/tools/Tools'
 import { Workbench } from './modules/workbench/Workbench'
 import { useAppStore } from './state/store'
 
@@ -47,7 +50,10 @@ export default function App() {
             <main className="shell__body">
               {view === 'hub' ? <Hub onOpen={setView} /> : null}
               {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
+              {view === 'loadout' ? <Loadout onExit={goHome} /> : null}
               {view === 'workbench' ? <Workbench onExit={goHome} /> : null}
+              {view === 'tools' ? <Tools onExit={goHome} /> : null}
+              {view === 'ledger' ? <Ledger onExit={goHome} /> : null}
             </main>
           </div>
         </ToastProvider>

@@ -150,7 +150,7 @@ async function collectFiles(
 }
 
 /** Where packs land when the caller does not say. */
-async function defaultOutputDir(settings: AppSettings): Promise<string> {
+export async function defaultOutputDir(settings: AppSettings): Promise<string> {
   const zomboid = await detectZomboidDir(settings)
   if (!zomboid) throw new Error('Zomboid user directory not found — set an output folder')
   return join(zomboid, 'Workshop')

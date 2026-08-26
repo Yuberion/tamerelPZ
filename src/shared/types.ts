@@ -203,6 +203,18 @@ export interface AppSettings {
   groupMode: GroupMode
   lastModKey?: string
   lastSourceFilter?: string
+  /** Named load orders saved from the Loadout module, newest first. */
+  loadoutProfiles: LoadoutProfile[]
+  /**
+   * Output container for the Tools converter.
+   *
+   * Only ever written by `tools:pick-output`, i.e. by a path the user chose in a
+   * native dialog. The renderer may select it but can never supply it, which is
+   * what lets the convert handler write outside the mod roots at all.
+   */
+  toolsOutputDir?: string
+  /** Notepad++ install directory, when detection needs a manual answer. */
+  nppPathOverride?: string
 }
 
 export type SortMode = 'name' | 'name-desc' | 'type' | 'recent' | 'id' | 'source'
@@ -425,10 +437,355 @@ export interface PackResult {
 }
 
 export interface WorkbenchProgress {
-  task: 'validate' | 'pack'
+  task: 'validate' | 'pack' | 'batch-pack'
   phase: 'collect' | 'read' | 'write' | 'done'
   done: number
   total: number
   /** Current file name. Data, not prose — the renderer localises `phase`. */
   label: string
+  // Present when the event is part of a batch (shove) run, so the renderer can
+  // draw a two-level progress bar. The wrapper uses task 'batch-pack'; inner
+  // pack/validate phases carry the same fields tagged on by the service.
+  itemIndex?: number
+  itemCount?: number
+  itemLabel?: string
 }
+
+/* --------------------------------------------------------------- batch ---- */
+
+/** One mod the shove pipeline will attempt to pack. */
+export interface BatchPackItem {
+  /** Mod root to pack. */
+  modPath: string
+  /** Derived display name for reports (folder name). */
+  label: string
+}
+
+/** How strictly each item is validated before it is packed. */
+export type BatchValidationPolicy = 'none' | 'warn' | 'strict'
+
+export interface BatchPackRequest {
+  items: BatchPackItem[]
+  mode: PackMode
+  builds: PackBuilds
+  /** Output container; defaults to `<Zomboid>\Workshop`. */
+  outputDir?: string
+  exclude: string[]
+  preview: boolean
+  /** Optional shared Workshop metadata template. */
+  workshop?: PackWorkshopMeta
+  validation: BatchValidationPolicy
+  knownIds?: string[]
+}
+
+export type BatchItemStatus =
+  | 'ok'
+  | 'error'
+  | 'skip'
+  | 'cancel'
+
+export interface BatchPackItemResult {
+  modPath: string
+  label: string
+  status: BatchItemStatus
+  /** Present when status === 'ok'. */
+  output?: string
+  result?: PackResult
+  reason?:
+    | 'collision'
+    | 'validation-error'
+    | 'validation-warn'
+    | 'pack-failed'
+    | 'cancelled'
+  /** Stable code or short data; the renderer localises what it can. */
+  message?: string
+}
+
+export interface BatchPackResult {
+  mode: PackMode
+  outputDir: string
+  startedAt: number
+  durationMs: number
+  cancelled: boolean
+  ok: number
+  errors: number
+  skipped: number
+  items: BatchPackItemResult[]
+}
+
+/* =========================================================================
+   Loadout (module 02) — load order & profiles
+   ========================================================================= */
+
+export type LoadoutKind = 'client' | 'server'
+
+/**
+ * One mod-list config the Loadout module can read and write.
+ *
+ * `client` is Build 42's `Zomboid\mods\default.txt` — a `VERSION` line plus
+ * `mods { }` and `maps { }` blocks, one bare token per line. `server` is a flat
+ * `Zomboid\Server\<name>.ini` where the interesting keys are semicolon
+ * separated `Mods=` (mod.info text ids) and `WorkshopItems=` (numeric Steam
+ * ids). Every list keeps its on-disk order, because that order *is* the data.
+ */
+export interface LoadoutFile {
+  /** Stable selector for `loadout.apply`: `client` or `server:<base name>`. */
+  id: string
+  kind: LoadoutKind
+  path: string
+  exists: boolean
+  /** Config base name without `.ini`; absent for the client target. */
+  serverName?: string
+  /** Mod ids in load order. */
+  mods: string[]
+  /** Client only: the `maps { }` block, in load order. */
+  maps: string[]
+  /** Server only: numeric Workshop item ids from `WorkshopItems=`. */
+  workshopItems: string[]
+}
+
+export interface LoadoutApplyOptions {
+  /** `LoadoutFile.id` of the config to write. */
+  targetId: string
+  mods: string[]
+  /** Client only; ignored for server targets. */
+  maps: string[]
+  /** Server only; ignored for the client target. */
+  workshopItems: string[]
+  /** Keep the previous file as `<name>.bak` before overwriting. */
+  backup: boolean
+}
+
+export interface LoadoutApplyResult {
+  path: string
+  bytes: number
+  /** Present when a backup copy was requested and there was a file to back up. */
+  backupPath?: string
+  durationMs: number
+}
+
+/**
+ * A named snapshot of one config's lists.
+ *
+ * Profiles live in `settings.json`, never in the game's own files: saving one
+ * changes nothing the game reads, and applying one only fills the editor. `kind`
+ * records where the snapshot came from, because `maps` is meaningless to a
+ * server and `workshopItems` is meaningless to the client.
+ */
+export interface LoadoutProfile {
+  id: string
+  name: string
+  kind: LoadoutKind
+  mods: string[]
+  maps: string[]
+  workshopItems: string[]
+  savedAt: number
+}
+
+/* =========================================================================
+   Ledger (module 09) — log reader
+   ========================================================================= */
+
+/**
+ * Where one log came from.
+ *
+ * `console` is the single live `Zomboid\console.txt` the running game appends to;
+ * `log` is one archived file from `Zomboid\Logs`, which the game rotates per
+ * launch and names after the moment it was opened.
+ */
+export type LogKind = 'console' | 'log'
+
+/** One log file the Ledger module may read. */
+export interface LogSource {
+  /**
+   * Opaque selector for `logs.read` — `console` or `log:<file name>`.
+   *
+   * The renderer never sends a path. Main owns the mapping from id to path, the
+   * same contract Loadout uses for its config targets.
+   */
+  id: string
+  kind: LogKind
+  /** File name for the UI: `console.txt`, or the archived file's own name. */
+  name: string
+  /** Absolute path. Display and `shell:*` only — never sent back as a selector. */
+  path: string
+  exists: boolean
+  size: number
+  mtime: number
+}
+
+/** The tail of one log, as read for display. */
+export interface LogReadResult {
+  id: string
+  path: string
+  /** Text of the tail, at most `LOG_TAIL_MAX` bytes worth. */
+  text: string
+  /** Full size on disk, which may be far larger than `text`. */
+  size: number
+  mtime: number
+  /** True when the head of the file was skipped and only the tail is shown. */
+  truncated: boolean
+}
+
+/* =========================================================================
+   Tools (module 07) — FBX forge & the Notepad++ bridge
+   ========================================================================= */
+
+/**
+ * How the forge will treat one input.
+ *
+ * `mesh` is a real geometry conversion: the source is parsed into vertices and
+ * polygons and re-emitted as an FBX mesh. `image` builds a unit quad and hangs
+ * the picture on it as a material, which is the only meaningful mesh a texture
+ * can become. `transcode` re-encodes an FBX that is already an FBX — binary in,
+ * ASCII out. `capsule` is the honest fallback for everything else — a named null
+ * with the source's metadata as custom properties, optionally carrying the
+ * original bytes as embedded media, so the file survives the trip without the
+ * forge pretending to have understood it.
+ */
+export type ForgeKind = 'mesh' | 'image' | 'transcode' | 'capsule'
+
+/**
+ * FBX container encoding.
+ *
+ * `binary` is FBX 7.4 binary and the default: Blender's importer rejects ASCII
+ * FBX outright. `ascii` is readable, diffable and what the Autodesk toolchain
+ * and Unity accept, so it stays available for inspection.
+ */
+export type FbxEncoding = 'binary' | 'ascii'
+
+/** Where a converted file lands. */
+export type ForgeOutputMode = 'beside' | 'custom'
+
+/** One file queued for conversion, already classified by main. */
+export interface ForgeInput {
+  path: string
+  name: string
+  ext: string
+  size: number
+  mtime: number
+  kind: ForgeKind
+  /**
+   * Importer that claimed the file (`obj`, `stl`, `x`, `png`, …) or `raw` when
+   * nothing did. Display text; the renderer prints it verbatim.
+   */
+  format: string
+  /**
+   * False when the extension is known but this build cannot read that flavour of
+   * it — binary DirectX `.x`, for one. Such an input converts as a capsule.
+   */
+  supported: boolean
+  /** Stable note code the renderer localises, e.g. `binaryX`. */
+  note?: string
+}
+
+export interface ConvertOptions {
+  /** Inputs to convert. Every path must be user-picked or inside a mod root. */
+  inputs: string[]
+  outputMode: ForgeOutputMode
+  encoding: FbxEncoding
+  /** Uniform scale applied to every vertex. */
+  scale: number
+  /** Rotate Z-up source data a quarter turn onto FBX's Y-up axis. */
+  yUp: boolean
+  /** Generate polygon normals when the source carries none. */
+  rebuildNormals: boolean
+  /** Merge vertices that land on the same point (STL and friends need it). */
+  weld: boolean
+  /** Embed the original bytes for `image` and `capsule` inputs. */
+  embed: boolean
+  /** Re-read every file that was written and check its node structure. */
+  verify: boolean
+  /** Overwrite an existing `.fbx` instead of skipping the input. */
+  overwrite: boolean
+}
+
+export type ForgeItemStatus = 'ok' | 'error' | 'skip'
+
+export interface ConvertItemResult {
+  input: string
+  name: string
+  status: ForgeItemStatus
+  kind?: ForgeKind
+  format?: string
+  /** Absolute path of the `.fbx` that was written. */
+  output?: string
+  bytes?: number
+  vertices?: number
+  polygons?: number
+  materials?: number
+  /** True when the written file was re-parsed and matched what was intended. */
+  verified?: boolean
+  durationMs: number
+  /**
+   * Stable failure/skip code the renderer localises (`exists`, `empty`,
+   * `unreadable`, …). Anything unrecognised is printed verbatim.
+   */
+  message?: string
+}
+
+export interface ConvertResult {
+  startedAt: number
+  durationMs: number
+  cancelled: boolean
+  ok: number
+  errors: number
+  skipped: number
+  items: ConvertItemResult[]
+}
+
+export interface ConvertProgress {
+  phase: 'read' | 'build' | 'write' | 'verify' | 'done'
+  index: number
+  total: number
+  name: string
+}
+
+/** One file of the Project Zomboid syntax pack for Notepad++. */
+export interface NppPackFile {
+  /** File name inside `userDefineLangs`. */
+  name: string
+  /** Absolute destination path. */
+  path: string
+  /** Human label for the UI (the language name Notepad++ will show). */
+  label: string
+  installed: boolean
+  /** False when an older revision of the pack is on disk. */
+  current: boolean
+  bytes: number
+}
+
+export interface NppStatus {
+  installed: boolean
+  /** Absolute `notepad++.exe`. */
+  exePath?: string
+  /** Version string from the executable's folder, when it could be read. */
+  version?: string
+  /** `%APPDATA%\Notepad++`, or the install dir for a portable copy. */
+  configDir?: string
+  /** `<configDir>\userDefineLangs`, where the pack is installed. */
+  udlDir?: string
+  /** True when the exe sits next to its own config (portable layout). */
+  portable: boolean
+  /** How the exe was found: registry, a known folder, or the user's override. */
+  source?: 'registry' | 'known' | 'override'
+  /** Revision of the pack this build ships. */
+  packVersion: string
+  /** Revision found on disk, when any part of the pack is installed. */
+  installedVersion?: string
+  files: NppPackFile[]
+}
+
+export interface NppInstallResult {
+  udlDir: string
+  written: string[]
+  bytes: number
+}
+
+/** A pack file rendered for on-screen inspection before it is installed. */
+export interface NppPackPreview {
+  name: string
+  label: string
+  text: string
+}
+

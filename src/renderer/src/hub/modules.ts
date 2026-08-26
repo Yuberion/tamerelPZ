@@ -8,7 +8,7 @@ export type ModuleId =
   | 'workbench'
   | 'triage'
   | 'cartograph'
-  | 'bunker'
+  | 'tools'
   | 'outpost'
   | 'ledger'
 
@@ -24,7 +24,7 @@ export interface ModuleDef {
   status: 'live' | 'sealed'
 }
 
-/** The nine hub tiles. STALKER and WORKBENCH are wired up in this build. */
+/** The nine hub tiles. STALKER, LOADOUT, WORKBENCH, TOOLS and LEDGER are wired up in this build. */
 export const MODULES: ModuleDef[] = [
   {
     id: 'stalker',
@@ -42,7 +42,7 @@ export const MODULES: ModuleDef[] = [
     taglineKey: 'module.loadout.tagline',
     descKey: 'module.loadout.desc',
     icon: 'list',
-    status: 'sealed'
+    status: 'live'
   },
   {
     id: 'signal',
@@ -81,13 +81,13 @@ export const MODULES: ModuleDef[] = [
     status: 'sealed'
   },
   {
-    id: 'bunker',
+    id: 'tools',
     code: '07',
-    name: 'Bunker',
-    taglineKey: 'module.bunker.tagline',
-    descKey: 'module.bunker.desc',
-    icon: 'archive',
-    status: 'sealed'
+    name: 'Tools',
+    taglineKey: 'module.tools.tagline',
+    descKey: 'module.tools.desc',
+    icon: 'hammer',
+    status: 'live'
   },
   {
     id: 'outpost',
@@ -105,7 +105,7 @@ export const MODULES: ModuleDef[] = [
     taglineKey: 'module.ledger.tagline',
     descKey: 'module.ledger.desc',
     icon: 'book',
-    status: 'sealed'
+    status: 'live'
   }
 ]
 

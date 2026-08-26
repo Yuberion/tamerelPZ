@@ -1,0 +1,255 @@
+/* ============================= ledger layout ============================= */
+
+.ledger {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--void);
+}
+
+.ledger__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* The source picker holds file names, so it needs more room than a filter. */
+.ledpick {
+  min-width: 230px;
+  max-width: 340px;
+}
+
+.lednotice {
+  flex: 0 0 auto;
+  padding: 8px 9px 0;
+}
+
+/* ---------------- level chips ---------------- */
+
+/* Muted chips stay legible: the count is the point even when the level is off. */
+.ledchip {
+  opacity: 0.5;
+}
+.ledchip.is-on {
+  opacity: 1;
+}
+.ledchip--error.is-on {
+  color: #c99183;
+  border-color: #58302a;
+  background: #1d1513;
+}
+.ledchip--warn.is-on {
+  color: #c2ab74;
+  border-color: #55492a;
+  background: #1b1813;
+}
+.ledchip--info.is-on {
+  color: var(--bone);
+}
+.ledchip--debug.is-on {
+  color: var(--ash);
+}
+
+/* ---------------- entry rows ---------------- */
+
+.ledrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 0 8px 0 7px;
+  color: var(--ash);
+  text-align: left;
+  border-bottom: 1px solid #171b20;
+}
+.ledrow:hover {
+  background: #1d232a;
+  color: var(--bone);
+}
+.ledrow.is-selected {
+  background: linear-gradient(90deg, #2a2118, #1f242b 70%);
+  color: #ecdfcd;
+  box-shadow: inset 0 0 0 1px #a8613a26;
+}
+
+.ledrow__lvl {
+  flex: 0 0 auto;
+  color: var(--ash-faint);
+}
+.ledrow--error .ledrow__lvl {
+  color: #b8776a;
+}
+.ledrow--warn .ledrow__lvl {
+  color: var(--ember);
+}
+.ledrow--info .ledrow__lvl {
+  color: #55606b;
+}
+.ledrow--debug .ledrow__lvl {
+  color: #3c434c;
+}
+
+.ledrow__line {
+  flex: 0 0 46px;
+  text-align: right;
+  font-size: 9.5px;
+  color: var(--ash-faint);
+}
+.ledrow__cat {
+  flex: 0 0 62px;
+  font-size: 9.5px;
+  color: var(--ash-faint);
+}
+.ledrow__head {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.ledrow--error .ledrow__head {
+  color: #d1a094;
+}
+.ledrow--debug .ledrow__head {
+  color: var(--ash-dim);
+}
+.ledrow__head mark {
+  background: #4a3a1e;
+  color: #f0d9a8;
+  border-radius: 1px;
+}
+
+/* ---------------- pills ---------------- */
+
+.ledpill {
+  flex: 0 0 auto;
+  max-width: 150px;
+  padding: 1px 6px;
+  border: 1px solid var(--edge-hot);
+  border-radius: 8px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 9px;
+  color: var(--ash-dim);
+  white-space: nowrap;
+}
+.ledpill--stack {
+  border-color: #3a4450;
+  color: #7f8f9c;
+  letter-spacing: 0;
+}
+.ledpill--mod {
+  border-color: #4a3524;
+  background: #1b1713;
+  color: #b18f6b;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.ledpill--tail {
+  border-color: #55492a;
+  background: #1b1813;
+  color: #c2ab74;
+}
+
+/* ---------------- detail pane ---------------- */
+
+.leddetail {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 9px 10px 14px;
+}
+
+.leddetail__meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.leddetail__unlinked {
+  max-width: none;
+  text-align: left;
+}
+
+/* Call site PZ blamed; useful, but never the headline. */
+.ledorigin {
+  min-width: 0;
+  font-size: 10px;
+  color: var(--steel);
+}
+
+.ledlvl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 7px;
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 9.5px;
+  color: var(--ash-dim);
+}
+.ledlvl--error {
+  color: #c99183;
+  border-color: #58302a;
+  background: #1d1513;
+}
+.ledlvl--warn {
+  color: #c2ab74;
+  border-color: #55492a;
+  background: #1b1813;
+}
+
+/* A trace is the one thing in this app worth selecting and pasting elsewhere. */
+.ledtrace {
+  margin: 0;
+  padding: 8px 9px;
+  max-height: 46vh;
+  overflow: auto;
+  background: var(--void);
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bone);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ---------------- linked mod ---------------- */
+
+.ledmod {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 9px;
+  background: #171b21;
+  border: 1px solid var(--edge);
+  border-left: 2px solid var(--rust-dim);
+  border-radius: var(--radius);
+}
+.ledmod__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ledmod__name {
+  font-size: 12px;
+  color: var(--bone);
+}
+.ledmod__path {
+  font-size: 10px;
+  color: var(--ash-faint);
+}
+.ledmod__actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}

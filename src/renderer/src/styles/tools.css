@@ -1,0 +1,251 @@
+/* ============================== tools layout ============================== */
+
+.tools {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--void);
+}
+
+.tools__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* The tool panels are `position: absolute; inset: 0`, so this pane has to be
+   their containing block — the same requirement `.workbench__main` has. Without
+   it they resolve against `.tools` and paint over the toolbar and the statusbar. */
+.tools__main {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Tools has no `is-ok` counterpart in the shared palette; the other two exist. */
+.is-ok {
+  color: #7f9a63;
+}
+
+/* ---------------- queue & result rows ---------------- */
+
+.tlqueue {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  background: #14171b;
+  overflow: hidden;
+}
+
+.tlqueue__foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 2px 0;
+  font-size: 10px;
+  color: var(--ash-faint);
+}
+
+.tlrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 3px 6px 3px 8px;
+  border-bottom: 1px solid #171b20;
+  color: var(--ash);
+}
+.tlrow:last-child {
+  border-bottom: none;
+}
+.tlrow:hover {
+  background: #1c2128;
+  color: var(--bone);
+}
+
+.tlrow__kind {
+  flex: 0 0 auto;
+  color: var(--steel);
+}
+.tlrow--ok .tlrow__kind {
+  color: #7f9a63;
+}
+.tlrow--error .tlrow__kind {
+  color: #b8776a;
+}
+.tlrow--skip .tlrow__kind {
+  color: var(--ember);
+}
+.tlrow.is-warn-row .tlrow__kind {
+  color: var(--ember);
+}
+
+.tlrow__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--bone);
+}
+
+.tlrow__kindlabel {
+  flex: 0 0 auto;
+  font-size: 9px;
+}
+
+.tlrow__format,
+.tlrow__stats,
+.tlrow__size {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--ash-faint);
+  white-space: nowrap;
+}
+.tlrow__size {
+  min-width: 64px;
+  text-align: right;
+}
+
+.tlrow__msg {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 10.5px;
+  color: #b39a5c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tlrow--error .tlrow__msg {
+  color: #c99183;
+}
+
+.tlrow .btn-icon {
+  flex: 0 0 auto;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 4px;
+  opacity: 0.55;
+}
+.tlrow .btn-icon:hover:not(:disabled) {
+  opacity: 1;
+}
+
+/* ---------------- pills ---------------- */
+
+.tlpill {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--edge-hot);
+  border-radius: 8px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 9px;
+  color: var(--ash-dim);
+  white-space: nowrap;
+}
+.tlpill--ok {
+  border-color: #3f5233;
+  background: #161b14;
+  color: #8fa872;
+}
+.tlpill--warn {
+  border-color: #55492a;
+  background: #1b1813;
+  color: #c2ab74;
+}
+
+/* ---------------- empty state ---------------- */
+
+.tlempty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 10px;
+  border: 1px dashed var(--edge);
+  border-radius: var(--radius);
+  color: var(--ash-faint);
+  text-align: center;
+}
+.tlempty .stencil {
+  font-size: 13px;
+  color: var(--ash);
+}
+
+/* ---------------- progress & summary ---------------- */
+
+.tlprogress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border: 1px solid var(--edge);
+  border-left: 2px solid var(--rust-dim);
+  border-radius: var(--radius);
+  background: #171b21;
+  font-size: 10.5px;
+  color: var(--ash);
+}
+.tlprogress__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--bone);
+}
+.tlprogress__count {
+  flex: 0 0 auto;
+  color: var(--ash-faint);
+}
+
+.tlsummary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.tlok {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: #8fa872;
+}
+
+.tlnote {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ash-dim);
+}
+
+/* ---------------- notepad++ pack ---------------- */
+
+.tlpack {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  background: #14171b;
+  overflow: hidden;
+}
+
+/* The generated UDL, shown before it is written. Selectable on purpose. */
+.tlxml {
+  margin: 0;
+  padding: 8px 9px;
+  max-height: 40vh;
+  overflow: auto;
+  background: var(--void);
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ash);
+  white-space: pre;
+  user-select: text;
+}

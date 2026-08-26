@@ -4,6 +4,8 @@ import type { CSSProperties } from 'react'
 const PATHS = {
   grid: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M4 14h6v6H4z', 'M14 14h6v6h-6z'],
   'arrow-left': ['M14 5l-7 7 7 7'],
+  'arrow-up': ['M12 19.5V5', 'M5.6 11.4 12 5l6.4 6.4'],
+  'arrow-down': ['M12 4.5V19', 'M5.6 12.6 12 19l6.4-6.4'],
   search: ['M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13z', 'M15.4 15.4 21 21'],
   refresh: ['M20 12a8 8 0 1 1-2.7-6', 'M20.5 3.5V9h-5.2'],
   'chevron-right': ['M9.5 5.5l6.5 6.5-6.5 6.5'],

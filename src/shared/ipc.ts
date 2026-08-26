@@ -32,7 +32,34 @@ export const IPC = {
   wbWriteInfo: 'wb:write-info',
   wbValidate: 'wb:validate',
   wbPack: 'wb:pack',
-  wbProgress: 'wb:progress'
+  wbShove: 'wb:shove',
+  wbShoveCancel: 'wb:shove-cancel',
+  wbProgress: 'wb:progress',
+
+  /* Loadout — writes mod lists into the game's own config files. */
+  loFiles: 'lo:files',
+  loApply: 'lo:apply',
+
+  /* Ledger — read-only log reader; main resolves the paths itself. */
+  logList: 'log:list',
+  logRead: 'log:read',
+
+  /* Tools — the FBX forge. Inputs are user-picked; the output dir lives in settings. */
+  toolsPick: 'tools:pick',
+  toolsInspect: 'tools:inspect',
+  toolsPickOutput: 'tools:pick-output',
+  toolsConvert: 'tools:convert',
+  toolsCancel: 'tools:convert-cancel',
+  toolsProgress: 'tools:progress',
+  toolsReveal: 'tools:reveal',
+
+  /* Tools — the Notepad++ bridge. No channel here accepts an exe path. */
+  nppStatus: 'npp:status',
+  nppLocate: 'npp:locate',
+  nppInstall: 'npp:install',
+  nppPreview: 'npp:preview',
+  nppOpen: 'npp:open',
+  nppReveal: 'npp:reveal'
 } as const
 
 /** Custom protocol used to render local images inside the renderer. */

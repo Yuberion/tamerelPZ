@@ -7,7 +7,8 @@ const DEFAULTS: AppSettings = {
   disabledSources: [],
   customSources: [],
   sortMode: 'name' as SortMode,
-  groupMode: 'type' as GroupMode
+  groupMode: 'type' as GroupMode,
+  loadoutProfiles: []
 }
 
 let cache: AppSettings | undefined
@@ -25,7 +26,8 @@ export async function getSettings(): Promise<AppSettings> {
       ...DEFAULTS,
       ...parsed,
       disabledSources: parsed.disabledSources ?? [],
-      customSources: parsed.customSources ?? []
+      customSources: parsed.customSources ?? [],
+      loadoutProfiles: parsed.loadoutProfiles ?? []
     }
   } catch {
     cache = { ...DEFAULTS }

@@ -2,10 +2,24 @@ import type {
   AppInfo,
   AppSettings,
   AuthoringTarget,
+  BatchPackRequest,
+  BatchPackResult,
+  ConvertOptions,
+  ConvertProgress,
+  ConvertResult,
   FilePreview,
+  ForgeInput,
   FsNode,
+  LoadoutApplyOptions,
+  LoadoutApplyResult,
+  LoadoutFile,
+  LogReadResult,
+  LogSource,
   ModInfoDraft,
   ModStats,
+  NppInstallResult,
+  NppPackPreview,
+  NppStatus,
   PackOptions,
   PackResult,
   PathsReport,
@@ -75,6 +89,80 @@ export interface PzApi {
     writeInfo(req: WriteModInfoRequest): Promise<WriteModInfoResult>
     validate(modPath: string, opts?: ValidateOptions): Promise<ValidationReport>
     pack(opts: PackOptions): Promise<PackResult>
+    /** Pack many mods in one run with a shared set of options. */
+    shove(req: BatchPackRequest): Promise<BatchPackResult>
+    shoveCancel(): Promise<void>
     onProgress(cb: (p: WorkbenchProgress) => void): () => void
+  }
+  /**
+   * Load order & profiles. Reads the game's own mod-list configs and writes
+   * them back; the write goes through the same guarded paths as Workbench.
+   */
+  loadout: {
+    /** Every config the module can edit (client default.txt + server inis). */
+    files(): Promise<LoadoutFile[]>
+    apply(opts: LoadoutApplyOptions): Promise<LoadoutApplyResult>
+  }
+  /**
+   * Crash logs and console output. Read-only: there is no write counterpart, and
+   * like Loadout no call here accepts a renderer path — the renderer sends an
+   * opaque source id and main resolves it under the detected Zomboid user dir.
+   */
+  logs: {
+    /** console.txt plus every Logs\*.txt, freshest first. */
+    list(): Promise<LogSource[]>
+    /** Read the tail of one source by its opaque id. */
+    read(id: string): Promise<LogReadResult>
+  }
+  /**
+   * The FBX forge.
+   *
+   * Conversion reads files the user picked in a native dialog (or files that are
+   * already inside a mod root) and writes `.fbx` beside them or into the output
+   * container recorded in settings. The renderer never supplies the output path:
+   * `pickOutput` is the only way it changes, and it changes in main.
+   */
+  tools: {
+    /** Native file dialog. The chosen paths become convertible for this session. */
+    pick(): Promise<ForgeInput[]>
+    /** Classify paths the renderer already knows about (files inside mod roots). */
+    inspect(paths: string[]): Promise<ForgeInput[]>
+    /** Native folder dialog for the output container; persists into settings. */
+    pickOutput(): Promise<string | undefined>
+    convert(opts: ConvertOptions): Promise<ConvertResult>
+    cancel(): Promise<void>
+    onProgress(cb: (p: ConvertProgress) => void): () => void
+    /**
+     * Show a converted file in Explorer, or open the output folder.
+     *
+     * Separate from `shell.reveal` because the forge writes outside the mod
+     * roots the shared guard covers; this one accepts a path the user picked (or
+     * a folder they picked) and nothing else.
+     */
+    reveal(path: string): Promise<void>
+  }
+  /**
+   * Notepad++, tuned for Project Zomboid.
+   *
+   * `install` writes the syntax pack into `%APPDATA%\Notepad++\userDefineLangs`,
+   * a path main derives on its own — nothing here takes a destination, and
+   * nothing here takes an executable path either.
+   */
+  npp: {
+    status(): Promise<NppStatus>
+    /** Ask the user where Notepad++ lives, then re-probe. */
+    locate(): Promise<NppStatus>
+    install(): Promise<NppInstallResult>
+    /** The pack's XML as it would be written, for inspection before installing. */
+    preview(): Promise<NppPackPreview[]>
+    /** Open one file in Notepad++, optionally at a line. */
+    open(path: string, line?: number): Promise<void>
+    /**
+     * Reveal the executable, or open the folder the pack installs into.
+     *
+     * Asked for by name rather than by path: both live outside every mod root,
+     * so main resolves them itself instead of taking a path from the renderer.
+     */
+    reveal(target: 'exe' | 'udl'): Promise<void>
   }
 }

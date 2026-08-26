@@ -5,6 +5,10 @@ import { IPC } from '../shared/ipc'
 import type {
   AppInfo,
   AppSettings,
+  BatchPackRequest,
+  ConvertOptions,
+  ConvertProgress,
+  LoadoutApplyOptions,
   PackOptions,
   ScaffoldOptions,
   ScanProgress,
@@ -13,12 +17,30 @@ import type {
   WriteModInfoRequest
 } from '../shared/types'
 import { listAuthoringTargets, readModInfoDraft, scaffoldMod, writeModInfo } from './services/authoring'
+import {
+  assertForgePath,
+  convertFiles,
+  inspectInputs,
+  rememberPickedDir,
+  rememberPickedFiles
+} from './services/convert'
 import { assertPathAllowed, invalidateGuard } from './services/guard'
-import { buildTree, exists, listDir, readPreview, walkStats } from './services/fsx'
+import { applyLoadout, listLoadoutFiles } from './services/loadout'
+import { buildTree, exists, isDir, listDir, readPreview, walkStats } from './services/fsx'
+import { listLogSources, readLog } from './services/logs'
+import {
+  installNppPack,
+  looksLikeNpp,
+  nppPathFor,
+  nppStatus,
+  openInNpp,
+  previewNppPack
+} from './services/npp'
 import { packMod } from './services/pack'
 import { detectPaths } from './services/paths'
 import { scanMods, type ScanOptions } from './services/scanner'
 import { getSettings, setSettings } from './services/settings'
+import { shovelMods } from './services/shovel'
 import { validateMod } from './services/validate'
 
 /**
@@ -41,6 +63,23 @@ const EXECUTABLE_EXTS = new Set([
 function senderWindow(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
 }
+
+/**
+ * Cancellation flag owned by the shove handler closure. A run clears it on
+ * start; `wbShoveCancel` flips it and the service checks it between items.
+ */
+let shoveCancelled = false
+
+/** Same contract for the FBX forge, which walks its queue one file at a time. */
+let convertCancelled = false
+
+/** File dialog filters for the forge: what it can actually read, then everything. */
+const FORGE_FILTERS: Electron.FileFilter[] = [
+  { name: 'Meshes (obj, stl, ply, x, dae, gltf, glb)', extensions: ['obj', 'stl', 'ply', 'x', 'dae', 'gltf', 'glb'] },
+  { name: 'Images (png, jpg, bmp, tga, dds)', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'tga', 'dds', 'webp'] },
+  { name: 'FBX', extensions: ['fbx'] },
+  { name: 'All files', extensions: ['*'] }
+]
 
 export function registerIpc(): void {
   ipcMain.handle(IPC.appInfo, (): AppInfo => {
@@ -207,5 +246,159 @@ export function registerIpc(): void {
     const result = await packMod(settings, opts, onProgress)
     invalidateGuard()
     return result
+  })
+
+  ipcMain.handle(IPC.wbShove, async (e, req: BatchPackRequest) => {
+    const settings = await getSettings()
+    const sender = e.sender
+    let last = 0
+    shoveCancelled = false
+    const onProgress = (p: WorkbenchProgress): void => {
+      const now = Date.now()
+      if (p.phase === 'done' || now - last > 60) {
+        last = now
+        if (!sender.isDestroyed()) sender.send(IPC.wbProgress, p)
+      }
+    }
+    const result = await shovelMods({
+      request: req,
+      settings,
+      onProgress,
+      isCancelled: () => shoveCancelled
+    })
+    invalidateGuard()
+    return result
+  })
+
+  ipcMain.handle(IPC.wbShoveCancel, async () => {
+    shoveCancelled = true
+  })
+
+  // --- Loadout (module 02): reads and writes the game's own mod lists -------
+
+  ipcMain.handle(IPC.loFiles, async () => listLoadoutFiles(await getSettings()))
+
+  ipcMain.handle(IPC.loApply, async (_e, opts: LoadoutApplyOptions) => {
+    // applyLoadout validates the target name itself; the write roots are the
+    // Zomboid user dir's config files, which no other handler may touch.
+    const result = await applyLoadout(await getSettings(), opts)
+    invalidateGuard()
+    return result
+  })
+
+  // --- Ledger (module 09): read-only log reader -----------------------------
+  // No guard call and no invalidateGuard: readLog builds the path itself from
+  // the detected user dir, and nothing here writes.
+
+  ipcMain.handle(IPC.logList, async () => listLogSources(await getSettings()))
+
+  ipcMain.handle(IPC.logRead, async (_e, id: string) => readLog(await getSettings(), id))
+
+  // --- Tools (module 07): the FBX forge --------------------------------------
+  // The dialog handlers are the only way a path outside the mod roots enters the
+  // forge, which is what makes the writes defensible: `convert.ts` accepts an
+  // input only if it was picked here or already lives inside a scanned mod.
+
+  ipcMain.handle(IPC.toolsPick, async (e) => {
+    const win = senderWindow(e)
+    const options: Electron.OpenDialogOptions = {
+      title: 'Pick files to convert to FBX',
+      properties: ['openFile', 'multiSelections'],
+      filters: FORGE_FILTERS
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+    if (result.canceled || result.filePaths.length === 0) return []
+    rememberPickedFiles(result.filePaths)
+    return inspectInputs(result.filePaths)
+  })
+
+  ipcMain.handle(IPC.toolsInspect, async (_e, paths: string[]) => inspectInputs(paths))
+
+  ipcMain.handle(IPC.toolsPickOutput, async (e) => {
+    const win = senderWindow(e)
+    const options: Electron.OpenDialogOptions = {
+      title: 'Pick the folder converted files are written to',
+      properties: ['openDirectory', 'createDirectory']
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+    const picked = result.canceled ? undefined : result.filePaths[0]
+    if (!picked) return undefined
+    // Persisted so the choice survives a restart; consented so it is writable.
+    rememberPickedDir(picked)
+    await setSettings({ toolsOutputDir: picked })
+    return picked
+  })
+
+  ipcMain.handle(IPC.toolsConvert, async (e, opts: ConvertOptions) => {
+    const settings = await getSettings()
+    const sender = e.sender
+    let last = 0
+    convertCancelled = false
+    const onProgress = (p: ConvertProgress): void => {
+      const now = Date.now()
+      if (p.phase === 'done' || now - last > 60) {
+        last = now
+        if (!sender.isDestroyed()) sender.send(IPC.toolsProgress, p)
+      }
+    }
+    const result = await convertFiles(settings, opts, onProgress, () => convertCancelled)
+    // A new .fbx may have landed inside a mod folder the guard has cached.
+    invalidateGuard()
+    return result
+  })
+
+  ipcMain.handle(IPC.toolsCancel, async () => {
+    convertCancelled = true
+  })
+
+  ipcMain.handle(IPC.toolsReveal, async (_e, path: string) => {
+    // Not `shell:open`: the forge writes outside the read allowlist, and this
+    // gate is the picked-path rule instead. A directory opens, a file is
+    // revealed with the item selected — and neither is ever executed.
+    const target = await assertForgePath(await getSettings(), path)
+    if (await isDir(target)) await shell.openPath(target)
+    else shell.showItemInFolder(target)
+  })
+
+  // --- Tools (module 07): the Notepad++ bridge -------------------------------
+  // No channel here takes an executable path or a destination: `npp.ts` derives
+  // both, so this cannot become a way around the `shell:open` .exe refusal.
+
+  ipcMain.handle(IPC.nppStatus, async () => nppStatus(await getSettings()))
+
+  ipcMain.handle(IPC.nppLocate, async (e) => {
+    const win = senderWindow(e)
+    const options: Electron.OpenDialogOptions = {
+      title: 'Pick the Notepad++ install folder',
+      properties: ['openDirectory']
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+    const picked = result.canceled ? undefined : result.filePaths[0]
+    if (picked && (await looksLikeNpp(picked))) {
+      await setSettings({ nppPathOverride: picked })
+    }
+    return nppStatus(await getSettings())
+  })
+
+  ipcMain.handle(IPC.nppInstall, async () => installNppPack(await getSettings()))
+
+  ipcMain.handle(IPC.nppPreview, () => previewNppPack())
+
+  ipcMain.handle(IPC.nppOpen, async (_e, path: string, line?: number) => {
+    // Reading is guarded exactly like `shell:open`; only the launcher differs.
+    const target = await assertPathAllowed(path)
+    await openInNpp(await getSettings(), target, line)
+  })
+
+  ipcMain.handle(IPC.nppReveal, async (_e, target: 'exe' | 'udl') => {
+    const path = await nppPathFor(await getSettings(), target)
+    if (target === 'udl') await shell.openPath(path)
+    else shell.showItemInFolder(path)
   })
 }

@@ -13,19 +13,21 @@ import { useAppStore } from '@renderer/state/store'
 import { InfoTool } from './InfoTool'
 import { PackTool } from './PackTool'
 import { ScaffoldTool } from './ScaffoldTool'
+import { ShoveTool } from './ShoveTool'
 import { ValidateTool } from './ValidateTool'
 import { useEditableMods, type EditableMod } from './useEditableMods'
 
 const LS_LEFT = 'pz.workbench.leftWidth'
 const ROW_H = 30
 
-type Tab = 'scaffold' | 'info' | 'validate' | 'pack'
+type Tab = 'scaffold' | 'info' | 'validate' | 'pack' | 'shove'
 
 const TABS: Array<{ id: Tab; labelKey: TKey; icon: IconName }> = [
   { id: 'scaffold', labelKey: 'wb.tabScaffold', icon: 'folder-plus' },
   { id: 'info', labelKey: 'wb.tabInfo', icon: 'edit' },
   { id: 'validate', labelKey: 'wb.tabValidate', icon: 'flask' },
-  { id: 'pack', labelKey: 'wb.tabPack', icon: 'package' }
+  { id: 'pack', labelKey: 'wb.tabPack', icon: 'package' },
+  { id: 'shove', labelKey: 'wb.tabShove', icon: 'layers' }
 ]
 
 function readWidth(fallback: number): number {
@@ -115,8 +117,9 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [refresh])
 
-  // The mod.info / validate / pack tools all need a selected mod.
-  const needsMod = tab !== 'scaffold'
+  // The mod.info / validate / pack tools all need a selected mod; batch pack
+  // (shove) drives off the whole scanned set instead.
+  const needsMod = tab !== 'scaffold' && tab !== 'shove'
   const showPicker = needsMod && !selected
 
   return (
@@ -203,6 +206,7 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
           {tab === 'info' && selected && <InfoTool mod={selected} writable={selectedWritable} />}
           {tab === 'validate' && selected && <ValidateTool mod={selected} knownIds={knownIds} />}
           {tab === 'pack' && selected && <PackTool mod={selected} />}
+          {tab === 'shove' && <ShoveTool mods={mods} targets={targets} knownIds={knownIds} />}
         </section>
       </div>
     </div>

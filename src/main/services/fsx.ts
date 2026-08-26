@@ -99,6 +99,41 @@ export function stripBom(s: string): string {
   return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s
 }
 
+/**
+ * Read the last `maxBytes` of a file.
+ *
+ * The counterpart to `readTextSafe`, which reads the *head*. Logs grow at the
+ * end, so a head read of a multi-megabyte `console.txt` shows the oldest lines
+ * and never the crash that was just written. The first line of the window is
+ * dropped when the head was skipped, because a byte offset lands mid-line and a
+ * half line is worse than no line.
+ */
+export async function readTailSafe(
+  p: string,
+  maxBytes = 1024 * 1024
+): Promise<{ text: string; size: number; mtime: number; truncated: boolean } | undefined> {
+  try {
+    const handle = await fs.open(p, 'r')
+    try {
+      const st = await handle.stat()
+      const len = Math.min(st.size, maxBytes)
+      const start = st.size - len
+      const buf = Buffer.alloc(len)
+      if (len > 0) await handle.read(buf, 0, len, start)
+      let text = stripBom(buf.toString('utf8'))
+      if (start > 0) {
+        const nl = text.indexOf('\n')
+        text = nl >= 0 ? text.slice(nl + 1) : ''
+      }
+      return { text, size: st.size, mtime: st.mtimeMs, truncated: start > 0 }
+    } finally {
+      await handle.close()
+    }
+  } catch {
+    return undefined
+  }
+}
+
 export function extOf(name: string): string {
   const e = extname(name)
   return e ? e.slice(1).toLowerCase() : ''

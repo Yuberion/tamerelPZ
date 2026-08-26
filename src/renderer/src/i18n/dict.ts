@@ -63,8 +63,9 @@ export const EN = {
   'module.cartograph.tagline': 'Map manager',
   'module.cartograph.desc':
     'Map cell overlaps, spawn regions and the map load order that actually works.',
-  'module.bunker.tagline': 'Backups & vault',
-  'module.bunker.desc': 'Snapshot mods and saves before an update wipes a 300 hour run.',
+  'module.tools.tagline': 'Converters & editors',
+  'module.tools.desc':
+    'Convert any file into .fbx, and teach Notepad++ to read Project Zomboid scripts.',
   'module.outpost.tagline': 'Server & collections',
   'module.outpost.desc':
     'Generate server ini mod lines, Workshop id lists and shareable collections.',
@@ -612,11 +613,464 @@ export const EN = {
   'wb.pack.uploadHint':
     'Launch Project Zomboid and use Workshop → Create/Update to publish the staged project.',
 
+  // ---- workbench: batch pack (shove) ---------------------------------------
+  'help.wb.shove.panel':
+    'Packs several mods in one run with a single shared set of options. Every mod still passes through the normal collector and writer, and a failure in one never stops the rest.',
+  'help.wb.shove.selection':
+    'Tick the mods to pack. The filter only narrows the list — it does not change what is already selected.',
+  'help.wb.shove.validation':
+    'Runs each selected mod through the validator before packing. Off by default; "Block errors" stops mods that fail validation, "Block errors & warnings" also stops mods that only warn.',
+  'help.wb.shove.outputDir':
+    'One shared output folder for the whole run. Left empty it goes to Workshop in your Zomboid user folder, which is where the in-game uploader looks for projects.',
+  'help.wb.shove.meta':
+    'A single workshop.txt template shared by every staged project. Per-mod overrides are a follow-up; for now each mod gets the same title, tags and visibility.',
+  'wb.tabShove': 'Batch pack',
+  'wb.shove.title': 'Batch pack',
+  'wb.shove.lede':
+    'Pack many mods at once with one set of options. Per-mod results are triaged so a single failure never wastes the run.',
+  'wb.shove.selection': 'Selection',
+  'wb.shove.selectionHint': 'Pick which mods to shove out the door.',
+  'wb.shove.selectAll': 'Select all',
+  'wb.shove.selectNone': 'Clear',
+  'wb.shove.selectWritable': 'Only writable',
+  'wb.shove.searchPlaceholder': 'Filter mods…',
+  'wb.shove.noSelection': 'No mods selected — choose at least one to run.',
+  'wb.shove.noMods': 'No mods match this filter.',
+  'wb.shove.selectedCount': '{n} selected',
+  'wb.shove.options': 'Options',
+  'wb.shove.outputDir': 'Output folder',
+  'wb.shove.pickDir': 'Choose…',
+  'wb.shove.resetDir': 'Use the default',
+  'wb.shove.builds': 'Builds',
+  'wb.shove.buildsAll': 'Everything',
+  'wb.shove.buildsB41': 'Build 41 only',
+  'wb.shove.buildsB42': 'Build 42 only',
+  'wb.shove.exclude': 'Also exclude',
+  'wb.shove.excludeHint': 'One pattern per line. * is the only wildcard.',
+  'wb.shove.excludeDefault': 'Version control, editor state, backups and logs are always skipped.',
+  'wb.shove.preview': 'Copy each poster as preview.png',
+  'wb.shove.meta': 'Shared workshop.txt',
+  'wb.shove.metaTitle': 'Title',
+  'wb.shove.metaDescription': 'Description',
+  'wb.shove.metaTags': 'Tags',
+  'wb.shove.metaTagsHint': 'Semicolon separated, e.g. Build 42;Items',
+  'wb.shove.metaVisibility': 'Visibility',
+  'wb.shove.visPublic': 'Public',
+  'wb.shove.visFriends': 'Friends only',
+  'wb.shove.visPrivate': 'Private',
+  'wb.shove.visUnlisted': 'Unlisted',
+  'wb.shove.metaId': 'Workshop id',
+  'wb.shove.metaIdHint': 'Leave blank to publish a new item',
+  'wb.shove.validation': 'Validation gate',
+  'wb.shove.valNone': 'Off',
+  'wb.shove.valWarn': 'Block errors',
+  'wb.shove.valStrict': 'Block errors & warnings',
+  'wb.shove.run': 'Shove {n}',
+  'wb.shove.running': 'Packing…',
+  'wb.shove.cancel': 'Cancel',
+  'wb.shove.cancelling': 'Stopping…',
+  'wb.shove.progressOverall': 'Mod {i} of {n}',
+  'wb.shove.noZomboid': 'Zomboid user folder not found — choose an output folder',
+  'wb.shove.resultTitle': 'Results',
+  'wb.shove.resultSummary': '{ok} packed · {errors} failed · {skipped} skipped',
+  'wb.shove.resultOutputDir': 'Output folder',
+  'wb.shove.revealAll': 'Reveal all outputs',
+  'wb.shove.revealDir': 'Reveal output dir',
+  'wb.shove.reveal': 'Reveal',
+  'wb.shove.emptyState': 'Run a batch to see per-mod results here.',
+  'wb.shove.cancelledNotice': 'Cancelled — everything produced so far is kept.',
+  'wb.shove.colMod': 'Mod',
+  'wb.shove.colStatus': 'Status',
+  'wb.shove.colReason': 'Reason',
+  'wb.shove.colOutput': 'Output',
+  'wb.shove.status.ok': 'Packed',
+  'wb.shove.status.error': 'Failed',
+  'wb.shove.status.skip': 'Skipped',
+  'wb.shove.status.cancel': 'Cancelled',
+  'wbshove.collision': 'Collides with an earlier output name',
+  'wbshove.validation-error': 'Failed validation',
+  'wbshove.validation-warn': 'Blocked by strict validation',
+  'wbshove.pack-failed': 'Packing failed',
+  'wbshove.cancelled': 'Cancelled before it was packed',
+
   // ---- progress phases ----------------------------------------------------
   'wb.phase.collect': 'Collecting files',
   'wb.phase.read': 'Reading',
   'wb.phase.write': 'Writing',
-  'wb.phase.done': 'Done'
+  'wb.phase.done': 'Done',
+
+  // =========================================================================
+  // Loadout (module 02) — load order & profiles
+  // =========================================================================
+
+  // ---- loadout: inline help -----------------------------------------------
+  'help.lo.config':
+    'Which mod list is being edited. default.txt is what the client loads on launch; every .ini is one server config. Edits are kept per config, so switching between them to compare never throws work away — only Revert, or a successful write, does.',
+  'help.lo.available':
+    'Everything that could be added to the list, taken from the last drive scan. Entries already in the list stay visible but greyed out, so the pane does not reshuffle under the cursor while you build an order.',
+  'help.lo.order':
+    'The list exactly as the game reads it, top to bottom. Drag a row, use the arrows, or Alt+Up / Alt+Down. Order is not cosmetic: a mod that overrides another has to load after it, and so does a mod that requires it.',
+  'help.lo.apply':
+    'Writes the lists into the config file (Ctrl+S). The client list is rebuilt whole; a server ini keeps every other key and only its Mods= and WorkshopItems= lines change. With Backup on, the previous file is kept beside it as .bak.',
+  'help.lo.profiles':
+    'Named snapshots of a list, stored in the suite settings. Saving one changes nothing the game reads, and loading one only fills the editor — nothing reaches disk until you press Apply. Mod ids move between client and server configs; map names and Workshop ids only load back into the same kind of config.',
+
+  // ---- loadout: toolbar ---------------------------------------------------
+  'lo.config': 'Config',
+  'lo.targetClient': 'default.txt',
+  'lo.backup': 'Backup',
+  'lo.backupTitle': 'Keep the previous file beside it as .bak',
+  'lo.revert': 'Revert',
+  'lo.revertTitle': 'Drop the unsaved edits for this config',
+  'lo.apply': 'Apply',
+  'lo.applyTitle': 'Write the lists into the config (Ctrl+S)',
+  'lo.reloadTitle': 'Re-read every config from disk (F5) — unsaved edits are dropped',
+  'lo.dirty': 'Unsaved',
+  'lo.inSync': 'In sync',
+
+  // ---- loadout: panes -----------------------------------------------------
+  'lo.paneAvailable': 'Available',
+  'lo.paneOrder': 'Load order',
+  'lo.tabMods': 'Mods',
+  'lo.tabMaps': 'Maps',
+  'lo.tabWorkshop': 'Workshop ids',
+  'lo.searchPlaceholder': 'Filter…',
+  'lo.addAll': 'Add {n}',
+  'lo.addAllTitle': 'Append everything the filter shows that is not already listed',
+  'lo.noCandidates': 'Nothing to add',
+  'lo.noCandidatesHint': 'Rescan the drive, or clear the filter.',
+  'lo.noMaps': 'No map folders found',
+  'lo.noMapsHint': 'Map names are folders under media/maps inside a map mod. Type one below if the mod lives elsewhere.',
+  'lo.emptyList': 'Empty list',
+  'lo.emptyListHint': 'Add entries from the left, or type one below.',
+
+  // ---- loadout: list actions ----------------------------------------------
+  'lo.manual.mods': 'mod id',
+  'lo.manual.maps': 'map folder name',
+  'lo.manual.workshop': 'workshop id',
+  'lo.manualAdd': 'Add',
+  'lo.manualAddTitle': 'Append this entry exactly as typed (Enter)',
+  'lo.sortRequires': 'Fix order',
+  'lo.sortRequiresTitle': 'Reorder so every mod loads after the mods it requires',
+  'lo.fill': 'Fill from mods',
+  'lo.fillTitle': 'Add the Workshop id of every listed mod that came from the Workshop',
+  'lo.dedupe': 'Dedupe',
+  'lo.dedupeTitle': 'Keep only the first of each repeated entry',
+  'lo.prune': 'Drop missing',
+  'lo.pruneTitle': 'Remove entries no installed mod answers to',
+  'lo.clear': 'Clear',
+  'lo.clearTitle': 'Empty this list',
+
+  // ---- loadout: rows ------------------------------------------------------
+  'lo.moveUp': 'Move up (Alt+Up)',
+  'lo.moveDown': 'Move down (Alt+Down)',
+  'lo.moveTop': 'Move to top',
+  'lo.moveBottom': 'Move to bottom',
+  'lo.remove': 'Remove (Del)',
+  'lo.badgeMissing': 'Missing',
+  'lo.badgeDuplicate': 'Dupe',
+  'lo.statusMissing': 'No installed mod answers to this entry',
+  'lo.statusDuplicate': 'An earlier line in this list holds the same entry',
+
+  // ---- loadout: notices ---------------------------------------------------
+  'lo.noUserDir': 'Zomboid user folder not found',
+  'lo.noUserDirBody':
+    'Set zomboidDirOverride in settings.json and reload. Nothing can be read or written until then.',
+  'lo.willCreate': 'This file does not exist yet — Apply creates it',
+  'lo.kindClient': 'client',
+  'lo.kindServer': 'server',
+
+  // ---- loadout: profiles --------------------------------------------------
+  'lo.profiles': 'Profiles',
+  'lo.profilePlaceholder': 'Profile name',
+  'lo.profileSave': 'Save',
+  'lo.profileSaveTitle': 'Store the current lists under this name',
+  'lo.profileDelete': 'Delete profile',
+  'lo.profileNone': 'Nothing saved yet',
+  'lo.profileNeedsName': 'Name the profile first.',
+  'lo.profileMeta': '{kind} · {mods} mods · {date}',
+
+  // ---- loadout: toasts ----------------------------------------------------
+  'lo.addedToast': '{n} added',
+  'lo.sortedToast': 'Reordered to satisfy requires',
+  'lo.sortedNoneToast': 'Already in dependency order',
+  'lo.fillNoneToast': 'Every listed Workshop mod already has its id',
+  'lo.filledToast': '{n} Workshop ids added',
+  'lo.appliedToast': 'Written · {bytes}',
+  'lo.appliedBackupToast': 'Written · {bytes} · backup kept',
+  'lo.profileSavedToast': 'Profile "{name}" saved',
+  'lo.profileLoadedToast': 'Profile "{name}" loaded — press Apply to write it',
+
+  // ---- loadout: status bar ------------------------------------------------
+  'lo.sbMissing': '{n} missing',
+  'lo.sbDuplicates': '{n} duplicate',
+  'lo.sbWritten': 'wrote {bytes}',
+  'lo.sbBackup': 'backup',
+
+  // =========================================================================
+  // Tools (module 07) — FBX forge & the Notepad++ bridge
+  // =========================================================================
+
+  // ---- tools: inline help -------------------------------------------------
+  'help.tl.tabs':
+    'Two tools that share a toolbar and nothing else. The forge converts files into FBX; the Notepad++ page teaches that editor to read the two file formats Project Zomboid invented for itself. A queue you build in the forge survives switching to the other tab and back.',
+  'help.tl.forge':
+    'Writes FBX 7.4 with no external converter involved — the mesh readers and both container writers are part of this app. Mesh formats become real geometry: vertices, polygons, per-corner normals and UVs, one material per source material. An image becomes a correctly proportioned quad with the picture embedded. Anything else becomes a capsule: a named null carrying the file\u2019s metadata and, if you let it, the original bytes. No geometry is ever invented.',
+  'help.tl.queue':
+    'Files are added through a native file dialog, and that is not just a convenience: the dialog is how a path outside your mod folders becomes readable at all. Nothing else in this app may hand the forge a path, which is what keeps a converter from doubling as a way to read the rest of your drive.',
+  'help.tl.output':
+    'Binary FBX is the default because Blender\u2019s importer refuses ASCII outright — an ASCII file will simply not open there. ASCII stays available because it is readable, diffable, and what the Autodesk tools and Unity accept. Scale multiplies every vertex; FBX\u2019s own unit is the centimetre, so a model authored in metres wants 100.',
+  'help.tl.encoding':
+    'Binary is FBX 7.4 binary with zlib-packed vertex arrays: smaller files, and the only flavour Blender reads. ASCII writes the same document as text you can open in an editor and diff against another export — useful when a model imports wrong and you need to see what was actually written.',
+  'help.tl.scale':
+    'A uniform multiplier applied to positions before writing. FBX measures in centimetres, so a mesh authored in metres needs 100 and one authored in inches needs 2.54. Getting it wrong does not corrupt anything: the model just arrives the wrong size.',
+  'help.tl.dest':
+    'Beside the source writes into the file\u2019s own folder. That is refused for anything inside the game install or Steam\u2019s Workshop cache — those are read-only in this app by design, because the game replaces one on update and Steam silently reverts the other. Pick a folder instead, and it is remembered.',
+  'help.tl.geometry':
+    'Corrections applied on the way in. Z-up matters for CAD and Blender exports; the flag is ignored for formats that state their own axis, such as Collada. Welding is only useful for triangle-soup formats — STL repeats every shared corner, so a cube arrives as 36 vertices instead of 8. Rebuilding normals gives flat shading from polygon winding, which is honest: the source said nothing about smoothing.',
+  'help.tl.formats':
+    'DirectX .x is here because it is the format Project Zomboid ships its own models in — text .x converts, and the binary and compressed flavours are refused rather than guessed at. glTF and Collada arrive with a scene graph, so node transforms are composed and baked into the vertices instead of being dropped, which is what otherwise piles every part of a model at the origin.',
+  'help.tl.npp':
+    'Notepad++ is found through the registry, then the folders its installers use, then whatever you point it at. The syntax pack is written into Notepad++\u2019s own userDefineLangs folder, which it reads file by file since 7.6 — so nothing it ships is overwritten, nothing needs administrator rights, and deleting the two files undoes all of it.',
+  'help.tl.nppEditor':
+    'The executable is never sent from this window: it is resolved here in the app\u2019s privileged half. That matters because opening a .exe is otherwise refused outright — a mod folder can contain one, and a click should not run it.',
+  'help.tl.pack':
+    'Two User Defined Languages. Notepad++ loads them on its next start and lists them at the bottom of the Language menu; files matching the extension are recognised automatically. The version marker inside each file is how this page knows whether what is installed is still current.',
+  'help.tl.covers':
+    'PZ\u2019s script files and mod.info are real formats with real grammars that no editor knows about, so Notepad++ opens them as plain text. That is why a missing comma three hundred lines up costs twenty minutes. Brace folding, coloured keywords and comment awareness turn that hunt into a glance.',
+
+  // ---- tools: tabs & shell ------------------------------------------------
+  'tl.tabForge': 'FBX forge',
+  'tl.tabNpp': 'Notepad++',
+  'tl.sbEncoding': 'encoding {v}',
+  'tl.sbScale': 'scale {v}',
+  'tl.sbLastRun': 'last run {ok} ok / {bad} failed',
+  'tl.sbPack': 'pack {v} · {size}',
+
+  // ---- tools: forge panel -------------------------------------------------
+  'tl.forgeTitle': 'Any file → .fbx',
+  'tl.forgeLede': 'Own FBX writer, no external converter. Meshes convert; everything else is carried.',
+  'tl.add': 'Add files',
+  'tl.addTitle': 'Pick files to convert',
+  'tl.clear': 'Clear',
+  'tl.clearTitle': 'Empty the queue',
+  'tl.convert': 'Convert',
+  'tl.convertTitle': 'Write an .fbx for every file in the queue',
+  'tl.cancel': 'Stop',
+  'tl.cancelTitle': 'Stop after the file being written',
+  'tl.remove': 'Remove from the queue',
+
+  // ---- tools: queue -------------------------------------------------------
+  'tl.queue': 'Queue',
+  'tl.queueHint': 'Each file becomes one .fbx. Nothing is written until you press Convert.',
+  'tl.queueEmpty': 'Nothing queued',
+  'tl.queueEmptyHint': 'Add files — meshes, textures, or anything at all.',
+  'tl.geometryCount': '{n} with real geometry',
+  'tl.kind.mesh': 'mesh',
+  'tl.kind.image': 'image',
+  'tl.kind.transcode': 're-encode',
+  'tl.kind.capsule': 'capsule',
+  'tl.note.binaryX': 'binary .x',
+  'tl.note.compressedX': 'compressed .x',
+  'tl.note.asciiFbx': 'ascii fbx',
+  'tl.note.tooLarge': 'too large',
+  'tl.note.truncated': 'truncated',
+
+  // ---- tools: output ------------------------------------------------------
+  'tl.output': 'Output',
+  'tl.encoding': 'Encoding',
+  'tl.encodingHint': 'Blender only reads binary.',
+  'tl.encBinary': 'Binary — FBX 7.4',
+  'tl.encAscii': 'ASCII — readable text',
+  'tl.scale': 'Scale',
+  'tl.scaleHint': 'FBX unit is the centimetre: metres → 100, inches → 2.54.',
+  'tl.dest': 'Destination',
+  'tl.destBeside': 'Beside the source',
+  'tl.destBesideHint': 'same folder as the input',
+  'tl.destCustom': 'Chosen folder',
+  'tl.pickFolder': 'Pick output folder',
+  'tl.openOutput': 'Open the output folder',
+  'tl.noFolder': 'no folder picked',
+  'tl.noFolderBody': 'Pick an output folder, or switch back to writing beside the source.',
+
+  // ---- tools: geometry ----------------------------------------------------
+  'tl.geometry': 'Geometry',
+  'tl.zUp': 'Source is Z-up',
+  'tl.zUpHint': 'Rotate onto FBX\u2019s Y-up. Ignored when the file states its own axis.',
+  'tl.normals': 'Rebuild missing normals',
+  'tl.normalsHint': 'Flat normals from polygon winding when the source has none.',
+  'tl.weld': 'Weld duplicate vertices',
+  'tl.weldHint': 'Merge points that land on the same spot. STL always welds regardless.',
+  'tl.embed': 'Embed the source bytes',
+  'tl.embedHint': 'Textures and capsules carry the original file inside the .fbx.',
+  'tl.verify': 'Verify after writing',
+  'tl.verifyHint': 'Re-read the file and check the geometry survived. Binary only.',
+  'tl.overwrite': 'Overwrite existing files',
+  'tl.overwriteHint': 'Off means an existing .fbx is left alone and the input is skipped.',
+
+  // ---- tools: formats -----------------------------------------------------
+  'tl.formats': 'What converts',
+  'tl.fmtMesh': 'Geometry',
+  'tl.fmtImage': 'Textures',
+  'tl.fmtOther': 'Everything else',
+  'tl.fmtOtherValue': 'carried as a capsule — metadata plus the original bytes, no invented mesh',
+  'tl.formatsNote': 'Binary and compressed DirectX .x are refused rather than guessed at.',
+
+  // ---- tools: progress & results ------------------------------------------
+  'tl.phase.read': 'reading',
+  'tl.phase.build': 'building',
+  'tl.phase.write': 'writing',
+  'tl.phase.verify': 'verifying',
+  'tl.phase.done': 'done',
+  'tl.results': 'Results',
+  'tl.sumOk': '{n} written',
+  'tl.sumSkipped': '{n} skipped',
+  'tl.sumErrors': '{n} failed',
+  'tl.cancelled': 'Stopped early — the rest of the queue was not touched.',
+  'tl.rowStats': '{v} verts · {p} polys',
+  'tl.verified': 'verified',
+  'tl.verifiedTitle': 'Re-read after writing; the geometry matched what was intended.',
+  'tl.reveal': 'Show the result in Explorer',
+  'tl.copyPath': 'Copy path',
+  'tl.pathCopied': 'Path copied',
+  'tl.copyFailed': 'Clipboard unavailable',
+
+  // ---- tools: forge messages ----------------------------------------------
+  'tl.msg.exists': 'already exists — enable overwrite',
+  'tl.msg.tooLarge': 'larger than the 256 MB read limit',
+  'tl.msg.empty': 'the file is empty',
+  'tl.msg.noGeometry': 'no readable geometry inside',
+  'tl.msg.notConsented': 'not a picked file — add it through the dialog',
+  'tl.msg.readOnlyTarget': 'that folder is read-only in this app — pick an output folder',
+  'tl.msg.noOutputDir': 'no output folder picked yet',
+  'tl.msg.sameFile': 'that would overwrite the source file',
+  'tl.msg.sameFormat': 'already binary FBX — pick ASCII to re-encode it',
+  'tl.msg.asciiFbx': 'ASCII FBX cannot be read back by this build',
+  'tl.msg.binaryX': 'binary DirectX .x is not supported',
+  'tl.msg.compressedX': 'compressed DirectX .x is not supported',
+  'tl.msg.verifyFailed': 'written, but the check on re-reading it failed',
+  'tl.msg.unknownFormat': 'no importer for this format',
+
+  // ---- tools: notepad++ ---------------------------------------------------
+  'tl.nppTitle': 'Notepad++ for Project Zomboid',
+  'tl.nppLede': 'Syntax highlighting and folding for media/scripts and mod.info.',
+  'tl.locate': 'Locate',
+  'tl.locateTitle': 'Point at the Notepad++ folder yourself',
+  'tl.install': 'Install pack',
+  'tl.update': 'Update pack',
+  'tl.reinstall': 'Reinstall pack',
+  'tl.installTitle': 'Write the syntax pack into Notepad++\u2019s userDefineLangs folder',
+  'tl.installedToast': 'Pack installed — {n} files, {bytes}',
+  'tl.nppRefresh': 'Probe again',
+  'tl.nppEditor': 'Editor',
+  'tl.nppFound': 'Notepad++ found',
+  'tl.nppMissing': 'Notepad++ not found',
+  'tl.nppMissingBody':
+    'The pack can still be installed — Notepad++ reads it from %APPDATA% on its next start. Use Locate if you keep a portable copy.',
+  'tl.nppExe': 'Executable',
+  'tl.nppVersion': 'Version',
+  'tl.nppUnknownVersion': 'not reported',
+  'tl.nppSource': 'Found via',
+  'tl.nppSrc.registry': 'registry',
+  'tl.nppSrc.known': 'a known install folder',
+  'tl.nppSrc.override': 'your own choice',
+  'tl.nppLayout': 'Layout',
+  'tl.nppPortable': 'portable — config next to the exe',
+  'tl.nppStandard': 'installed — config in %APPDATA%',
+  'tl.nppReveal': 'Reveal exe',
+  'tl.nppUdl': 'Install folder',
+  'tl.revealUdl': 'Open folder',
+  'tl.showXml': 'Show XML',
+  'tl.hideXml': 'Hide XML',
+  'tl.nppAfterInstall': 'Restart Notepad++ afterwards — it reads these files once, on start.',
+
+  // ---- tools: pack --------------------------------------------------------
+  'tl.packTitle': 'Syntax pack',
+  'tl.packHint': 'Two User Defined Languages. Deleting the files undoes everything.',
+  'tl.packCurrent': 'current',
+  'tl.packStale': 'outdated',
+  'tl.packAbsent': 'not installed',
+  'tl.packVersion': 'Pack in this build',
+  'tl.packInstalledVersion': 'Pack on disk',
+  'tl.packCovers': 'What it covers',
+  'tl.coversScript': 'media/scripts/*.txt — item, recipe and vehicle blocks, brace folding, B41 + B42 keywords',
+  'tl.coversModInfo': 'mod.info — known keys, # comments, build folder names',
+  'tl.nppLangHint': 'After restarting: Language → PZ Script / PZ ModInfo, or just open a matching file.',
+
+  // =========================================================================
+  // Ledger (module 09) — crash logs & console output
+  // =========================================================================
+
+  // ---- ledger: inline help ------------------------------------------------
+  'help.led.source':
+    'Which log is on screen. console.txt is the live file the running game appends to, so re-reading it mid-session shows what just happened; everything under Logs is one file per launch, kept by the game, so yesterday\u2019s crash is still readable. Only the tail of a file is loaded — these grow to megabytes and the end is the part that matters.',
+  'help.led.levels':
+    'Filters by severity, with the count each level actually has in this log. PZ files most Lua failures at LOG level, so an entry whose text names an exception, a traceback or a nil value is counted as an error whatever prefix it was written with — that is usually the line worth reading first.',
+  'help.led.detail':
+    'The selected entry in full: its leading line plus every continuation line folded into it, which is how a forty-frame Java trace stays one row in the list. When a mod could be identified — from PZ\u2019s own MOD: tag, a path through a mod folder, or a known mod id inside the trace — it is shown here with a way to open it.',
+
+  // ---- ledger: toolbar ----------------------------------------------------
+  'led.source': 'Log',
+  'led.console': 'console.txt — current session',
+  'led.archive': 'Logs archive',
+  'led.noLogs': 'No logs found',
+  'led.reveal': 'Reveal',
+  'led.revealTitle': 'Show this log in Explorer',
+  'led.open': 'Open',
+  'led.openTitle': 'Open this log with the default text editor',
+  'led.copyPath': 'Copy the full path of this log',
+  'led.reloadTitle': 'Re-read this log from disk (F5)',
+
+  // ---- ledger: filters ----------------------------------------------------
+  'led.levels': 'Levels',
+  'led.levelToggle': 'Show or hide this level',
+  'led.lvl.error': 'Errors',
+  'led.lvl.warn': 'Warnings',
+  'led.lvl.info': 'Log',
+  'led.lvl.debug': 'Debug',
+  'led.firstError': 'First error',
+  'led.firstErrorTitle': 'Jump to the first error — clears the search and unmutes errors',
+  'led.searchPlaceholder': 'Search entries and traces…',
+
+  // ---- ledger: panes ------------------------------------------------------
+  'led.paneLog': 'Entries',
+  'led.paneDetail': 'Detail',
+  'led.truncated': 'tail only',
+  'led.truncatedTitle': 'This file is larger than the read window, so its oldest lines are not shown.',
+  'led.noSelection': 'Nothing selected',
+  'led.noSelectionHint': 'Pick an entry on the left to read its full trace.',
+  'led.empty': 'This log is empty',
+  'led.emptyHint': 'The game writes it on launch. Play a session, then reload.',
+  'led.noMatches': 'Nothing matches',
+  'led.noMatchesHint': 'Clear the search, or switch a level back on.',
+
+  // ---- ledger: notices ----------------------------------------------------
+  'led.noUserDir': 'Zomboid user folder not found',
+  'led.noUserDirBody':
+    'Set zomboidDirOverride in settings.json and reload. There is nothing to read until then.',
+  'led.missing': 'This log does not exist yet',
+  'led.missingHint': 'It appears the first time the game writes to it.',
+
+  // ---- ledger: detail -----------------------------------------------------
+  'led.line': 'line {n}',
+  'led.copyEntry': 'Copy',
+  'led.copyEntryTitle': 'Copy this entry with its whole trace',
+  'led.revealMod': 'Reveal mod',
+  'led.revealModTitle': 'Show this mod folder in Explorer',
+  'led.copyModId': 'Copy id',
+  'led.copyModIdTitle': 'Copy the mod id, for a load order or a bug report',
+  'led.unlinked': 'No installed mod could be traced from this entry.',
+
+  // ---- ledger: toasts -----------------------------------------------------
+  'led.pathCopied': 'Path copied',
+  'led.entryCopied': 'Entry copied',
+  'led.modIdCopied': 'Mod id copied',
+  'led.copyFailed': 'Clipboard unavailable',
+
+  // ---- ledger: status bar -------------------------------------------------
+  'led.sbErrors': '{n} errors',
+  'led.sbWarns': '{n} warnings',
+  'led.sbUpdated': 'updated {date}'
 } as const
 
 export type TKey = keyof typeof EN
@@ -668,8 +1122,9 @@ export const RU: Record<TKey, string> = {
   'module.cartograph.tagline': 'Менеджер карт',
   'module.cartograph.desc':
     'Пересечения ячеек карт, зоны спавна и порядок загрузки карт, который действительно работает.',
-  'module.bunker.tagline': 'Резервные копии и хранилище',
-  'module.bunker.desc': 'Снимки модов и сохранений, пока обновление не стёрло 300 часов игры.',
+  'module.tools.tagline': 'Конвертеры и редакторы',
+  'module.tools.desc':
+    'Конвертирует любой файл в .fbx и учит Notepad++ читать скрипты Project Zomboid.',
   'module.outpost.tagline': 'Сервер и коллекции',
   'module.outpost.desc':
     'Сгенерировать строки модов для server ini, списки id Workshop и коллекции для обмена.',
@@ -1192,11 +1647,454 @@ export const RU: Record<TKey, string> = {
   'wb.pack.uploadHint':
     'Запустите Project Zomboid и через Workshop → Create/Update опубликуйте подготовленный проект.',
 
+  // ---- пакетная упаковка (shove) -------------------------------------------
+  'help.wb.shove.panel':
+    'Упаковывает несколько модов за один запуск с общим набором настроек. Каждый мод по-прежнему проходит обычные сборщик и запись, а сбой одного не останавливает остальных.',
+  'help.wb.shove.selection':
+    'Отметьте моды для упаковки. Фильтр лишь сужает список — на уже выбранное он не влияет.',
+  'help.wb.shove.validation':
+    'Проверяет каждый выбранный мод валидатором перед упаковкой. По умолчанию выключено; «Блокировать ошибки» останавливает моды, не прошедшие проверку, «Блокировать ошибки и предупреждения» — также и те, что лишь предупреждают.',
+  'help.wb.shove.outputDir':
+    'Общий каталог вывода для всего запуска. Если пусто — в каталог Workshop внутри пользовательской папки Zomboid, где внутриигровой загрузчик и ищет проекты.',
+  'help.wb.shove.meta':
+    'Единый шаблон workshop.txt для всех проектов. Индивидуальные поля на мод — в планах; пока каждый мод получает одинаковые заголовок, теги и видимость.',
+  'wb.tabShove': 'Пакетно',
+  'wb.shove.title': 'Пакетная упаковка',
+  'wb.shove.lede':
+    'Упаковка многих модов разом с одним набором настроек. Результаты по каждому моду распределяются по статусам, так что одна ошибка не испортит весь запуск.',
+  'wb.shove.selection': 'Выбор',
+  'wb.shove.selectionHint': 'Отметьте моды, которые нужно отправить наружу.',
+  'wb.shove.selectAll': 'Выбрать все',
+  'wb.shove.selectNone': 'Сбросить',
+  'wb.shove.selectWritable': 'Только редактируемые',
+  'wb.shove.searchPlaceholder': 'Фильтр модов…',
+  'wb.shove.noSelection': 'Моды не выбраны — отметьте хотя бы один.',
+  'wb.shove.noMods': 'Ни один мод не подходит под фильтр.',
+  'wb.shove.selectedCount': 'Выбрано: {n}',
+  'wb.shove.options': 'Параметры',
+  'wb.shove.outputDir': 'Каталог вывода',
+  'wb.shove.pickDir': 'Выбрать…',
+  'wb.shove.resetDir': 'По умолчанию',
+  'wb.shove.builds': 'Сборки',
+  'wb.shove.buildsAll': 'Всё',
+  'wb.shove.buildsB41': 'Только Build 41',
+  'wb.shove.buildsB42': 'Только Build 42',
+  'wb.shove.exclude': 'Также исключить',
+  'wb.shove.excludeHint': 'По одному шаблону в строке. Подстановка только через *.',
+  'wb.shove.excludeDefault': 'Системы контроля версий, состояние редактора, бэкапы и логи пропускаются всегда.',
+  'wb.shove.preview': 'Копировать каждую обложку как preview.png',
+  'wb.shove.meta': 'Общий workshop.txt',
+  'wb.shove.metaTitle': 'Заголовок',
+  'wb.shove.metaDescription': 'Описание',
+  'wb.shove.metaTags': 'Теги',
+  'wb.shove.metaTagsHint': 'Через точку с запятой, напр. Build 42;Items',
+  'wb.shove.metaVisibility': 'Видимость',
+  'wb.shove.visPublic': 'Публичный',
+  'wb.shove.visFriends': 'Только друзья',
+  'wb.shove.visPrivate': 'Приватный',
+  'wb.shove.visUnlisted': 'Скрытый из поиска',
+  'wb.shove.metaId': 'Id в Workshop',
+  'wb.shove.metaIdHint': 'Оставьте пустым, чтобы опубликовать новый item',
+  'wb.shove.validation': 'Гейт проверки',
+  'wb.shove.valNone': 'Выкл',
+  'wb.shove.valWarn': 'Блокировать ошибки',
+  'wb.shove.valStrict': 'Ошибки и предупреждения',
+  'wb.shove.run': 'Отправить {n}',
+  'wb.shove.running': 'Упаковка…',
+  'wb.shove.cancel': 'Отмена',
+  'wb.shove.cancelling': 'Остановка…',
+  'wb.shove.progressOverall': 'Мод {i} из {n}',
+  'wb.shove.noZomboid': 'Каталог пользователя Zomboid не найден — выберите каталог вывода',
+  'wb.shove.resultTitle': 'Результаты',
+  'wb.shove.resultSummary': 'Упаковано {ok} · Ошибок {errors} · Пропущено {skipped}',
+  'wb.shove.resultOutputDir': 'Каталог вывода',
+  'wb.shove.revealAll': 'Показать все результаты',
+  'wb.shove.revealDir': 'Показать каталог вывода',
+  'wb.shove.reveal': 'Показать',
+  'wb.shove.emptyState': 'Запустите пакет, чтобы увидеть результаты по каждому моду.',
+  'wb.shove.cancelledNotice': 'Отменено — всё созданное к этому моменту сохранено.',
+  'wb.shove.colMod': 'Мод',
+  'wb.shove.colStatus': 'Статус',
+  'wb.shove.colReason': 'Причина',
+  'wb.shove.colOutput': 'Результат',
+  'wb.shove.status.ok': 'Упакован',
+  'wb.shove.status.error': 'Ошибка',
+  'wb.shove.status.skip': 'Пропущен',
+  'wb.shove.status.cancel': 'Отменён',
+  'wbshove.collision': 'Конфликт имени с более ранним выводом',
+  'wbshove.validation-error': 'Не прошёл проверку',
+  'wbshove.validation-warn': 'Заблокирован строгой проверкой',
+  'wbshove.pack-failed': 'Сбой упаковки',
+  'wbshove.cancelled': 'Отменён до упаковки',
+
   // ---- фазы прогресса -----------------------------------------------------
   'wb.phase.collect': 'Сбор файлов',
   'wb.phase.read': 'Чтение',
   'wb.phase.write': 'Запись',
-  'wb.phase.done': 'Готово'
+  'wb.phase.done': 'Готово',
+
+  // ---- loadout: встроенные подсказки ---------------------------------------
+  'help.lo.config':
+    'Какой список правится. default.txt — список модов, который клиент читает при запуске; каждый .ini — конфиг одного сервера. Правки хранятся отдельно по каждому конфигу, поэтому переключение между ними для сравнения ничего не теряет — сбрасывает только «Откатить» или успешная запись.',
+  'help.lo.available':
+    'Всё, что можно добавить в список, по данным последнего сканирования диска. Уже добавленное остаётся видимым, но приглушённым, чтобы панель не перестраивалась под курсором, пока вы собираете порядок.',
+  'help.lo.order':
+    'Список ровно в том виде, в каком его читает игра — сверху вниз. Тяните строку, жмите стрелки или Alt+Вверх / Alt+Вниз. Порядок не косметика: мод, который переопределяет другой, обязан грузиться после него, и то же верно для мода, который его требует.',
+  'help.lo.apply':
+    'Записывает списки в файл конфига (Ctrl+S). Клиентский список пересобирается целиком; в серверном .ini сохраняются все остальные ключи, меняются только строки Mods= и WorkshopItems=. При включённом «Бэкапе» прежний файл остаётся рядом с расширением .bak.',
+  'help.lo.profiles':
+    'Именованные снимки списка, хранятся в настройках приложения. Сохранение ничего не меняет в файлах игры, а загрузка лишь заполняет редактор — на диск ничего не попадает до нажатия «Применить». Id модов переносятся между клиентским и серверным конфигами; названия карт и id Workshop загружаются только в конфиг того же типа.',
+
+  // ---- loadout: панель инструментов ----------------------------------------
+  'lo.config': 'Конфиг',
+  'lo.targetClient': 'default.txt',
+  'lo.backup': 'Бэкап',
+  'lo.backupTitle': 'Сохранить прежний файл рядом с расширением .bak',
+  'lo.revert': 'Откатить',
+  'lo.revertTitle': 'Отбросить несохранённые правки этого конфига',
+  'lo.apply': 'Применить',
+  'lo.applyTitle': 'Записать списки в конфиг (Ctrl+S)',
+  'lo.reloadTitle': 'Перечитать все конфиги с диска (F5) — несохранённые правки будут отброшены',
+  'lo.dirty': 'Не сохранено',
+  'lo.inSync': 'Совпадает с файлом',
+
+  // ---- loadout: панели ----------------------------------------------------
+  'lo.paneAvailable': 'Доступные',
+  'lo.paneOrder': 'Порядок загрузки',
+  'lo.tabMods': 'Моды',
+  'lo.tabMaps': 'Карты',
+  'lo.tabWorkshop': 'Id Workshop',
+  'lo.searchPlaceholder': 'Фильтр…',
+  'lo.addAll': 'Добавить {n}',
+  'lo.addAllTitle': 'Дописать всё, что показывает фильтр и чего ещё нет в списке',
+  'lo.noCandidates': 'Добавить нечего',
+  'lo.noCandidatesHint': 'Пересканируйте диск или очистите фильтр.',
+  'lo.noMaps': 'Папки карт не найдены',
+  'lo.noMapsHint':
+    'Названия карт — это папки внутри media/maps у мода с картой. Если мод лежит в другом месте, впишите название ниже.',
+  'lo.emptyList': 'Список пуст',
+  'lo.emptyListHint': 'Добавьте записи слева или впишите их ниже.',
+
+  // ---- loadout: действия над списком ---------------------------------------
+  'lo.manual.mods': 'id мода',
+  'lo.manual.maps': 'имя папки карты',
+  'lo.manual.workshop': 'id workshop',
+  'lo.manualAdd': 'Добавить',
+  'lo.manualAddTitle': 'Дописать запись ровно как введено (Enter)',
+  'lo.sortRequires': 'Починить порядок',
+  'lo.sortRequiresTitle': 'Переставить так, чтобы каждый мод грузился после тех, что он требует',
+  'lo.fill': 'Взять из модов',
+  'lo.fillTitle': 'Добавить id Workshop для каждого мода из списка, пришедшего из Workshop',
+  'lo.dedupe': 'Убрать дубли',
+  'lo.dedupeTitle': 'Оставить только первое вхождение каждой записи',
+  'lo.prune': 'Убрать битые',
+  'lo.pruneTitle': 'Удалить записи, которым не соответствует ни один установленный мод',
+  'lo.clear': 'Очистить',
+  'lo.clearTitle': 'Опустошить список',
+
+  // ---- loadout: строки ----------------------------------------------------
+  'lo.moveUp': 'Выше (Alt+Вверх)',
+  'lo.moveDown': 'Ниже (Alt+Вниз)',
+  'lo.moveTop': 'В начало',
+  'lo.moveBottom': 'В конец',
+  'lo.remove': 'Удалить (Del)',
+  'lo.badgeMissing': 'Нет',
+  'lo.badgeDuplicate': 'Дубль',
+  'lo.statusMissing': 'Ни один установленный мод не соответствует этой записи',
+  'lo.statusDuplicate': 'Такая же запись уже есть выше в этом списке',
+
+  // ---- loadout: сообщения -------------------------------------------------
+  'lo.noUserDir': 'Каталог пользователя Zomboid не найден',
+  'lo.noUserDirBody':
+    'Укажите zomboidDirOverride в settings.json и перечитайте конфиги. До этого читать и писать нечего.',
+  'lo.willCreate': 'Файла пока нет — «Применить» его создаст',
+  'lo.kindClient': 'клиент',
+  'lo.kindServer': 'сервер',
+
+  // ---- loadout: профили ---------------------------------------------------
+  'lo.profiles': 'Профили',
+  'lo.profilePlaceholder': 'Название профиля',
+  'lo.profileSave': 'Сохранить',
+  'lo.profileSaveTitle': 'Сохранить текущие списки под этим названием',
+  'lo.profileDelete': 'Удалить профиль',
+  'lo.profileNone': 'Пока ничего не сохранено',
+  'lo.profileNeedsName': 'Сначала введите название профиля.',
+  'lo.profileMeta': '{kind} · модов: {mods} · {date}',
+
+  // ---- loadout: всплывающие сообщения -------------------------------------
+  'lo.addedToast': 'Добавлено: {n}',
+  'lo.sortedToast': 'Порядок пересобран по требованиям',
+  'lo.sortedNoneToast': 'Порядок уже соответствует зависимостям',
+  'lo.fillNoneToast': 'У всех модов Workshop из списка id уже есть',
+  'lo.filledToast': 'Добавлено id Workshop: {n}',
+  'lo.appliedToast': 'Записано · {bytes}',
+  'lo.appliedBackupToast': 'Записано · {bytes} · бэкап сохранён',
+  'lo.profileSavedToast': 'Профиль «{name}» сохранён',
+  'lo.profileLoadedToast': 'Профиль «{name}» загружен — нажмите «Применить», чтобы записать',
+
+  // ---- loadout: строка состояния ------------------------------------------
+  'lo.sbMissing': 'битых: {n}',
+  'lo.sbDuplicates': 'дублей: {n}',
+  'lo.sbWritten': 'записано {bytes}',
+  'lo.sbBackup': 'бэкап',
+
+  // ---- tools: встроенные подсказки ------------------------------------------
+  'help.tl.tabs':
+    'Два инструмента, у которых общего только панель сверху. Кузница конвертирует файлы в FBX; страница Notepad++ учит этот редактор читать два формата, которые Project Zomboid придумал для себя. Собранная очередь не теряется при переключении вкладок.',
+  'help.tl.forge':
+    'Пишет FBX 7.4 без единого внешнего конвертера — и чтение мешей, и оба формата контейнера являются частью приложения. Меш-форматы становятся настоящей геометрией: вершины, полигоны, нормали и UV на каждый угол, по материалу на исходный материал. Картинка становится плоскостью с правильными пропорциями и вложенным изображением. Всё остальное становится капсулой: именованный null с метаданными файла и, если разрешить, исходными байтами. Геометрия никогда не выдумывается.',
+  'help.tl.queue':
+    'Файлы добавляются через системный диалог, и это не для удобства: именно диалог делает путь вне ваших папок с модами читаемым. Больше ничто в приложении не может передать кузнице путь — иначе конвертер заодно стал бы способом читать весь диск.',
+  'help.tl.output':
+    'Бинарный FBX выбран по умолчанию, потому что импортёр Blender отказывается от ASCII напрямую — такой файл там просто не откроется. ASCII остаётся, потому что он читаемый, его можно сравнить через diff, и его принимают инструменты Autodesk и Unity. Масштаб умножает каждую вершину; собственная единица FBX — сантиметр, поэтому модели в метрах нужен 100.',
+  'help.tl.encoding':
+    'Бинарный — это FBX 7.4 с массивами вершин, упакованными zlib: файлы меньше, и только этот вариант читает Blender. ASCII пишет тот же документ текстом, который можно открыть в редакторе и сравнить с другим экспортом — полезно, когда модель импортируется криво и надо увидеть, что записалось на самом деле.',
+  'help.tl.scale':
+    'Единый множитель для позиций перед записью. FBX измеряет в сантиметрах, поэтому мешу в метрах нужен 100, а в дюймах — 2.54. Ошибка ничего не портит: модель просто окажется не того размера.',
+  'help.tl.dest':
+    'Рядом с исходником — значит в его собственную папку. Для всего внутри установки игры и кэша Workshop это запрещено: в этом приложении они только для чтения, потому что первую игра заменяет при обновлении, а вторую Steam молча откатывает. Тогда выберите папку — она запомнится.',
+  'help.tl.geometry':
+    'Правки на входе. Z-вверх важен для экспорта из CAD и Blender; для форматов, которые сами объявляют ось (например Collada), флаг игнорируется. Сварка нужна только форматам-«супу из треугольников»: STL повторяет каждый общий угол, поэтому куб приезжает как 36 вершин вместо 8. Пересчёт нормалей даёт плоское затенение по обходу полигона — это честно: об сглаживании исходник ничего не сказал.',
+  'help.tl.formats':
+    'DirectX .x здесь потому, что именно в этом формате Project Zomboid поставляет свои модели — текстовый .x конвертируется, а бинарный и сжатый варианты отклоняются, а не угадываются. glTF и Collada приходят со графом сцены, поэтому трансформации узлов перемножаются и запекаются в вершины, а не выбрасываются — иначе все части модели свалятся в начало координат.',
+  'help.tl.npp':
+    'Notepad++ ищется в реестре, затем в папках его установщиков, затем там, куда укажете вы. Пакет синтаксиса пишется в собственную папку userDefineLangs, которую Notepad++ читает по файлам начиная с 7.6 — так ничего из штатного не перезаписывается, права администратора не нужны, а удаление двух файлов отменяет всё.',
+  'help.tl.nppEditor':
+    'Путь к исполняемому файлу никогда не приходит из этого окна: он определяется здесь, в привилегированной половине приложения. Это важно, потому что открывать .exe иначе запрещено — в папке мода он вполне может лежать, и клик не должен его запускать.',
+  'help.tl.pack':
+    'Два User Defined Language. Notepad++ подхватит их при следующем запуске и покажет в конце меню «Синтаксис»; файлы с подходящим расширением распознаются сами. Метка версии внутри каждого файла — то, по чему эта страница понимает, актуально ли установленное.',
+  'help.tl.covers':
+    'Скрипты PZ и mod.info — настоящие форматы со своей грамматикой, о которой не знает ни один редактор, поэтому Notepad++ открывает их как обычный текст. Из-за этого пропущенная запятая тремя сотнями строк выше стоит двадцати минут. Свёртка по скобкам, цветные ключевые слова и понимание комментариев превращают эти поиски во взгляд.',
+
+  // ---- tools: вкладки и оболочка --------------------------------------------
+  'tl.tabForge': 'Кузница FBX',
+  'tl.tabNpp': 'Notepad++',
+  'tl.sbEncoding': 'формат {v}',
+  'tl.sbScale': 'масштаб {v}',
+  'tl.sbLastRun': 'последний прогон: {ok} ок / {bad} с ошибкой',
+  'tl.sbPack': 'пакет {v} · {size}',
+
+  // ---- tools: панель кузницы ------------------------------------------------
+  'tl.forgeTitle': 'Любой файл → .fbx',
+  'tl.forgeLede': 'Свой писатель FBX, без внешних конвертеров. Меши конвертируются, остальное переносится.',
+  'tl.add': 'Добавить файлы',
+  'tl.addTitle': 'Выбрать файлы для конвертации',
+  'tl.clear': 'Очистить',
+  'tl.clearTitle': 'Опустошить очередь',
+  'tl.convert': 'Конвертировать',
+  'tl.convertTitle': 'Записать .fbx для каждого файла в очереди',
+  'tl.cancel': 'Стоп',
+  'tl.cancelTitle': 'Остановиться после текущего файла',
+  'tl.remove': 'Убрать из очереди',
+
+  // ---- tools: очередь -------------------------------------------------------
+  'tl.queue': 'Очередь',
+  'tl.queueHint': 'Каждый файл станет одним .fbx. До кнопки «Конвертировать» ничего не пишется.',
+  'tl.queueEmpty': 'Очередь пуста',
+  'tl.queueEmptyHint': 'Добавьте файлы — меши, текстуры или вообще что угодно.',
+  'tl.geometryCount': 'с настоящей геометрией: {n}',
+  'tl.kind.mesh': 'меш',
+  'tl.kind.image': 'картинка',
+  'tl.kind.transcode': 'перекодировка',
+  'tl.kind.capsule': 'капсула',
+  'tl.note.binaryX': 'бинарный .x',
+  'tl.note.compressedX': 'сжатый .x',
+  'tl.note.asciiFbx': 'ascii fbx',
+  'tl.note.tooLarge': 'слишком большой',
+  'tl.note.truncated': 'обрезан',
+
+  // ---- tools: вывод ---------------------------------------------------------
+  'tl.output': 'Вывод',
+  'tl.encoding': 'Формат',
+  'tl.encodingHint': 'Blender читает только бинарный.',
+  'tl.encBinary': 'Бинарный — FBX 7.4',
+  'tl.encAscii': 'ASCII — читаемый текст',
+  'tl.scale': 'Масштаб',
+  'tl.scaleHint': 'Единица FBX — сантиметр: метры → 100, дюймы → 2.54.',
+  'tl.dest': 'Куда писать',
+  'tl.destBeside': 'Рядом с исходником',
+  'tl.destBesideHint': 'та же папка, что у входного файла',
+  'tl.destCustom': 'Выбранная папка',
+  'tl.pickFolder': 'Выбрать папку вывода',
+  'tl.openOutput': 'Открыть папку вывода',
+  'tl.noFolder': 'папка не выбрана',
+  'tl.noFolderBody': 'Выберите папку вывода или вернитесь к записи рядом с исходником.',
+
+  // ---- tools: геометрия -----------------------------------------------------
+  'tl.geometry': 'Геометрия',
+  'tl.zUp': 'В исходнике Z вверх',
+  'tl.zUpHint': 'Повернуть под Y-вверх у FBX. Игнорируется, если файл сам объявляет ось.',
+  'tl.normals': 'Достроить нормали',
+  'tl.normalsHint': 'Плоские нормали по обходу полигона, когда в исходнике их нет.',
+  'tl.weld': 'Сварить дубли вершин',
+  'tl.weldHint': 'Слить точки, попавшие в одно место. STL сваривается всегда.',
+  'tl.embed': 'Вкладывать исходные байты',
+  'tl.embedHint': 'Текстуры и капсулы несут исходный файл внутри .fbx.',
+  'tl.verify': 'Проверять после записи',
+  'tl.verifyHint': 'Перечитать файл и убедиться, что геометрия выжила. Только бинарный.',
+  'tl.overwrite': 'Перезаписывать существующие',
+  'tl.overwriteHint': 'Выключено — существующий .fbx не трогается, а вход пропускается.',
+
+  // ---- tools: форматы -------------------------------------------------------
+  'tl.formats': 'Что конвертируется',
+  'tl.fmtMesh': 'Геометрия',
+  'tl.fmtImage': 'Текстуры',
+  'tl.fmtOther': 'Всё остальное',
+  'tl.fmtOtherValue': 'переносится капсулой — метаданные и исходные байты, без выдуманного меша',
+  'tl.formatsNote': 'Бинарный и сжатый DirectX .x отклоняются, а не угадываются.',
+
+  // ---- tools: прогресс и результаты -----------------------------------------
+  'tl.phase.read': 'читаю',
+  'tl.phase.build': 'собираю',
+  'tl.phase.write': 'пишу',
+  'tl.phase.verify': 'проверяю',
+  'tl.phase.done': 'готово',
+  'tl.results': 'Результаты',
+  'tl.sumOk': 'записано: {n}',
+  'tl.sumSkipped': 'пропущено: {n}',
+  'tl.sumErrors': 'с ошибкой: {n}',
+  'tl.cancelled': 'Остановлено досрочно — остаток очереди не тронут.',
+  'tl.rowStats': 'вершин: {v} · полигонов: {p}',
+  'tl.verified': 'проверен',
+  'tl.verifiedTitle': 'Перечитан после записи; геометрия совпала с задуманной.',
+  'tl.reveal': 'Показать результат в проводнике',
+  'tl.copyPath': 'Копировать путь',
+  'tl.pathCopied': 'Путь скопирован',
+  'tl.copyFailed': 'Буфер обмена недоступен',
+
+  // ---- tools: сообщения кузницы ---------------------------------------------
+  'tl.msg.exists': 'уже существует — включите перезапись',
+  'tl.msg.tooLarge': 'больше предела чтения в 256 МБ',
+  'tl.msg.empty': 'файл пустой',
+  'tl.msg.noGeometry': 'внутри нет читаемой геометрии',
+  'tl.msg.notConsented': 'файл не выбран через диалог — добавьте его кнопкой',
+  'tl.msg.readOnlyTarget': 'эта папка в приложении только для чтения — выберите папку вывода',
+  'tl.msg.noOutputDir': 'папка вывода ещё не выбрана',
+  'tl.msg.sameFile': 'это перезаписало бы исходный файл',
+  'tl.msg.sameFormat': 'уже бинарный FBX — выберите ASCII, чтобы перекодировать',
+  'tl.msg.asciiFbx': 'ASCII FBX эта сборка обратно не читает',
+  'tl.msg.binaryX': 'бинарный DirectX .x не поддерживается',
+  'tl.msg.compressedX': 'сжатый DirectX .x не поддерживается',
+  'tl.msg.verifyFailed': 'записан, но проверка при перечитывании не прошла',
+  'tl.msg.unknownFormat': 'для этого формата нет читателя',
+
+  // ---- tools: notepad++ -----------------------------------------------------
+  'tl.nppTitle': 'Notepad++ под Project Zomboid',
+  'tl.nppLede': 'Подсветка и свёртка для media/scripts и mod.info.',
+  'tl.locate': 'Указать',
+  'tl.locateTitle': 'Самому указать папку Notepad++',
+  'tl.install': 'Установить пакет',
+  'tl.update': 'Обновить пакет',
+  'tl.reinstall': 'Переустановить пакет',
+  'tl.installTitle': 'Записать пакет синтаксиса в папку userDefineLangs у Notepad++',
+  'tl.installedToast': 'Пакет установлен — файлов: {n}, {bytes}',
+  'tl.nppRefresh': 'Проверить снова',
+  'tl.nppEditor': 'Редактор',
+  'tl.nppFound': 'Notepad++ найден',
+  'tl.nppMissing': 'Notepad++ не найден',
+  'tl.nppMissingBody':
+    'Пакет всё равно можно установить — Notepad++ прочитает его из %APPDATA% при следующем запуске. Если держите портативную копию, нажмите «Указать».',
+  'tl.nppExe': 'Исполняемый файл',
+  'tl.nppVersion': 'Версия',
+  'tl.nppUnknownVersion': 'не сообщается',
+  'tl.nppSource': 'Найден через',
+  'tl.nppSrc.registry': 'реестр',
+  'tl.nppSrc.known': 'известную папку установки',
+  'tl.nppSrc.override': 'ваш выбор',
+  'tl.nppLayout': 'Раскладка',
+  'tl.nppPortable': 'портативная — конфиг рядом с exe',
+  'tl.nppStandard': 'установлен — конфиг в %APPDATA%',
+  'tl.nppReveal': 'Показать exe',
+  'tl.nppUdl': 'Папка установки',
+  'tl.revealUdl': 'Открыть папку',
+  'tl.showXml': 'Показать XML',
+  'tl.hideXml': 'Скрыть XML',
+  'tl.nppAfterInstall': 'После этого перезапустите Notepad++ — он читает эти файлы один раз, при старте.',
+
+  // ---- tools: пакет ---------------------------------------------------------
+  'tl.packTitle': 'Пакет синтаксиса',
+  'tl.packHint': 'Два User Defined Language. Удаление файлов отменяет всё.',
+  'tl.packCurrent': 'актуален',
+  'tl.packStale': 'устарел',
+  'tl.packAbsent': 'не установлен',
+  'tl.packVersion': 'Пакет в этой сборке',
+  'tl.packInstalledVersion': 'Пакет на диске',
+  'tl.packCovers': 'Что покрывает',
+  'tl.coversScript':
+    'media/scripts/*.txt — блоки item, recipe и vehicle, свёртка по скобкам, ключевые слова B41 + B42',
+  'tl.coversModInfo': 'mod.info — известные ключи, комментарии #, имена папок сборок',
+  'tl.nppLangHint': 'После перезапуска: Синтаксис → PZ Script / PZ ModInfo, или просто откройте подходящий файл.',
+
+  // ---- ledger: встроенные подсказки -----------------------------------------
+  'help.led.source':
+    'Какой лог показан. console.txt — живой файл, в который дописывает запущенная игра, поэтому перечитывание прямо во время сессии показывает то, что только что произошло; всё внутри Logs — по одному файлу на запуск, игра их хранит, так что вчерашний краш тоже читается. Загружается только хвост файла: логи вырастают до мегабайтов, а важен именно конец.',
+  'help.led.levels':
+    'Фильтры по уровню, с реальным количеством записей каждого уровня в этом логе. Большинство ошибок Lua игра пишет уровнем LOG, поэтому запись, в тексте которой есть исключение, traceback или обращение к nil, считается ошибкой независимо от префикса — обычно именно её и нужно читать первой.',
+  'help.led.detail':
+    'Выбранная запись целиком: первая строка плюс все её продолжения, свёрнутые в неё же — благодаря этому трейс из сорока кадров занимает в списке одну строку. Если мод удалось определить (по собственной метке PZ «MOD:», по пути через папку мода или по известному id внутри трейса), он показан здесь вместе со способом его открыть.',
+
+  // ---- ledger: панель инструментов ------------------------------------------
+  'led.source': 'Лог',
+  'led.console': 'console.txt — текущая сессия',
+  'led.archive': 'Архив Logs',
+  'led.noLogs': 'Логи не найдены',
+  'led.reveal': 'Показать',
+  'led.revealTitle': 'Показать этот лог в проводнике',
+  'led.open': 'Открыть',
+  'led.openTitle': 'Открыть этот лог в текстовом редакторе по умолчанию',
+  'led.copyPath': 'Скопировать полный путь к этому логу',
+  'led.reloadTitle': 'Перечитать этот лог с диска (F5)',
+
+  // ---- ledger: фильтры ------------------------------------------------------
+  'led.levels': 'Уровни',
+  'led.levelToggle': 'Показать или скрыть этот уровень',
+  'led.lvl.error': 'Ошибки',
+  'led.lvl.warn': 'Предупреждения',
+  'led.lvl.info': 'Лог',
+  'led.lvl.debug': 'Отладка',
+  'led.firstError': 'Первая ошибка',
+  'led.firstErrorTitle': 'Перейти к первой ошибке — поиск сбрасывается, ошибки включаются',
+  'led.searchPlaceholder': 'Поиск по записям и трейсам…',
+
+  // ---- ledger: панели -------------------------------------------------------
+  'led.paneLog': 'Записи',
+  'led.paneDetail': 'Подробности',
+  'led.truncated': 'только хвост',
+  'led.truncatedTitle': 'Файл больше окна чтения, поэтому самые старые строки не показаны.',
+  'led.noSelection': 'Ничего не выбрано',
+  'led.noSelectionHint': 'Выберите запись слева, чтобы прочитать её трейс полностью.',
+  'led.empty': 'Этот лог пуст',
+  'led.emptyHint': 'Игра пишет его при запуске. Сыграйте сессию и перечитайте.',
+  'led.noMatches': 'Ничего не найдено',
+  'led.noMatchesHint': 'Очистите поиск или включите уровень обратно.',
+
+  // ---- ledger: сообщения ----------------------------------------------------
+  'led.noUserDir': 'Каталог пользователя Zomboid не найден',
+  'led.noUserDirBody':
+    'Укажите zomboidDirOverride в settings.json и перечитайте. До этого читать нечего.',
+  'led.missing': 'Этого лога пока нет',
+  'led.missingHint': 'Он появится, когда игра впервые в него запишет.',
+
+  // ---- ledger: подробности --------------------------------------------------
+  'led.line': 'строка {n}',
+  'led.copyEntry': 'Копировать',
+  'led.copyEntryTitle': 'Скопировать запись вместе со всем трейсом',
+  'led.revealMod': 'Показать мод',
+  'led.revealModTitle': 'Показать папку этого мода в проводнике',
+  'led.copyModId': 'Копировать id',
+  'led.copyModIdTitle': 'Скопировать id мода — для порядка загрузки или багрепорта',
+  'led.unlinked': 'По этой записи не удалось определить установленный мод.',
+
+  // ---- ledger: всплывающие сообщения ---------------------------------------
+  'led.pathCopied': 'Путь скопирован',
+  'led.entryCopied': 'Запись скопирована',
+  'led.modIdCopied': 'Id мода скопирован',
+  'led.copyFailed': 'Буфер обмена недоступен',
+
+  // ---- ledger: строка состояния --------------------------------------------
+  'led.sbErrors': 'ошибок: {n}',
+  'led.sbWarns': 'предупреждений: {n}',
+  'led.sbUpdated': 'обновлён {date}'
 }
 
 /**
@@ -1215,7 +2113,8 @@ export const EN_PLURALS = {
   brokenRequires: ['broken require', 'broken requires', 'broken requires'],
   entries: ['entry', 'entries', 'entries'],
   files: ['file', 'files', 'files'],
-  issues: ['issue', 'issues', 'issues']
+  issues: ['issue', 'issues', 'issues'],
+  lines: ['line', 'lines', 'lines']
 } as const
 
 export type PluralKey = keyof typeof EN_PLURALS
@@ -1229,5 +2128,6 @@ export const RU_PLURALS: Record<PluralKey, readonly [string, string, string]> = 
   brokenRequires: ['битая зависимость', 'битые зависимости', 'битых зависимостей'],
   entries: ['элемент', 'элемента', 'элементов'],
   files: ['файл', 'файла', 'файлов'],
-  issues: ['проблема', 'проблемы', 'проблем']
+  issues: ['проблема', 'проблемы', 'проблем'],
+  lines: ['строка', 'строки', 'строк']
 }

@@ -1,10 +1,5 @@
 import { useMemo, useState } from 'react'
 import type { AuthoringTarget, ScaffoldFolder, ScaffoldLayout, ScaffoldOptions } from '@shared/types'
-import { Icon } from '@renderer/components/Icon'
-import { useToast } from '@renderer/components/Toast'
-import { useI18n, type TKey } from '@renderer/i18n'
-import { sourceLabel } from '@renderer/lib/catmeta'
-import { formatCount } from '@renderer/lib/format'
 import {
   Alert,
   CheckField,
@@ -16,7 +11,12 @@ import {
   SelectField,
   TextAreaField,
   TextField
-} from './Form'
+} from '@renderer/components/Form'
+import { Icon } from '@renderer/components/Icon'
+import { useToast } from '@renderer/components/Toast'
+import { useI18n, type TKey } from '@renderer/i18n'
+import { sourceLabel } from '@renderer/lib/catmeta'
+import { formatCount } from '@renderer/lib/format'
 
 const FOLDER_OPTIONS: Array<{ id: ScaffoldFolder; labelKey: TKey }> = [
   { id: 'lua-client', labelKey: 'wb.sc.folderLuaClient' },

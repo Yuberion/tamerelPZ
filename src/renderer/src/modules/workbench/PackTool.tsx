@@ -7,12 +7,6 @@ import type {
   PackResult,
   PackVisibility
 } from '@shared/types'
-import { Hint } from '@renderer/components/Hint'
-import { Icon } from '@renderer/components/Icon'
-import { useToast } from '@renderer/components/Toast'
-import { useI18n, type TKey } from '@renderer/i18n'
-import { formatBytes, formatCount, formatDuration } from '@renderer/lib/format'
-import { useAppStore } from '@renderer/state/store'
 import {
   Alert,
   CheckField,
@@ -23,7 +17,13 @@ import {
   SelectField,
   TextAreaField,
   TextField
-} from './Form'
+} from '@renderer/components/Form'
+import { Hint } from '@renderer/components/Hint'
+import { Icon } from '@renderer/components/Icon'
+import { useToast } from '@renderer/components/Toast'
+import { useI18n, type TKey } from '@renderer/i18n'
+import { formatBytes, formatCount, formatDuration } from '@renderer/lib/format'
+import { useAppStore } from '@renderer/state/store'
 
 interface PackToolProps {
   mod: ModEntry

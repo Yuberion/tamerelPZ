@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModEntry, ModInfoDraft } from '@shared/types'
-import { Hint } from '@renderer/components/Hint'
-import { Icon } from '@renderer/components/Icon'
-import { useToast } from '@renderer/components/Toast'
-import { useI18n } from '@renderer/i18n'
-import { highlight } from '@renderer/lib/highlight'
-import { serializeDraft, parseDraft } from './serializeDraft'
 import {
   Alert,
   CheckField,
@@ -15,7 +9,13 @@ import {
   Readout,
   TextAreaField,
   TextField
-} from './Form'
+} from '@renderer/components/Form'
+import { Hint } from '@renderer/components/Hint'
+import { Icon } from '@renderer/components/Icon'
+import { useToast } from '@renderer/components/Toast'
+import { useI18n } from '@renderer/i18n'
+import { highlight } from '@renderer/lib/highlight'
+import { serializeDraft, parseDraft } from './serializeDraft'
 
 interface InfoToolProps {
   mod: ModEntry

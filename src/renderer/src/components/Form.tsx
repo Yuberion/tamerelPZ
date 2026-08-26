@@ -3,7 +3,7 @@ import { Hint } from '@renderer/components/Hint'
 import { Icon, type IconName } from '@renderer/components/Icon'
 
 /**
- * Form primitives shared by the four Workbench tools.
+ * Form primitives shared by the module tool panels.
  *
  * Deliberately thin wrappers over native controls: the suite has no component
  * library, and the panels only need consistent label/hint/invalid framing.
