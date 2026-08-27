@@ -97,7 +97,7 @@ Two tools that share a toolbar and nothing else.
 
 | Route | Inputs | What comes out |
 |---|---|---|
-| **Mesh** | `obj`, `stl` (ascii + binary), `ply` (ascii + binary LE), `x` (text), `dae`, `gltf`, `glb` | Real geometry: shared vertex pool, n-gons kept as n-gons, per-corner normals and UVs, one FBX material per source material |
+| **Mesh** | `obj`, `stl` (ascii + binary), `ply` (ascii + binary LE), `x` (text + binary), `dae`, `gltf`, `glb` | Real geometry: shared vertex pool, n-gons kept as n-gons, per-corner normals and UVs, one FBX material per source material |
 | **Image** | `png`, `jpg`, `bmp`, `gif`, `tga`, `dds` | A quad with the picture's aspect ratio, 100 units on its long side, the file embedded as media |
 | **Re-encode** | `fbx` (binary) | The same document as ASCII |
 | **Capsule** | anything else | A named null carrying name, size, mtime and SHA-256 as custom properties, plus the original bytes as embedded media. **No geometry is invented** |
@@ -105,11 +105,13 @@ Two tools that share a toolbar and nothing else.
 Details that matter in practice:
 
 - **Binary is the default** because Blender's importer rejects ASCII FBX outright. ASCII stays available — it is readable, diffable, and what the Autodesk tools and Unity accept.
-- **DirectX `.x` is here because Project Zomboid ships its own models in it.** Text `.x` converts, including `Frame` hierarchies: transforms are composed down the tree and baked into the vertices. Because DirectX is left-handed, geometry is mirrored on Z and every polygon rewound — otherwise every model arrives inside out. Binary and compressed `.x` are **refused rather than guessed at**.
+- **Embedding is a choice, but the reference is not.** With embedding on, the source bytes travel inside the `.fbx` (raw in binary, base64 in ASCII). With it off — or when the payload is over the 96 MB cap — the media node is still written and points at the file by path, so a texture still resolves and a capsule still knows where it came from.
+- **DirectX `.x` is here because Project Zomboid ships its own models in it**, and both flavours are read. The text one is brace-scanned; the binary one is a flat token stream of names, braces and typed number lists, where the float width comes from the header (`0032`/`0064`), GUIDs are 16 bytes of payload to skip rather than read, and `template` blocks declare the schema and must be discarded — get any of those wrong and you get a plausible-looking wrong mesh. Both collapse onto one block tree, so a single mesh reader serves them. `Frame` hierarchies are honoured: transforms are composed down the tree and baked into the vertices. Because DirectX is left-handed, geometry is mirrored on Z and every polygon rewound — otherwise every model arrives inside out. The **compressed** flavours (`tzip`, `bzip`) are refused: they wrap the token stream in MSZIP framing that `zlib` alone cannot walk.
 - **glTF and Collada node transforms are baked** the same way; a reader that ignores them piles every part of a model at the origin. Collada's `<up_axis>` is honoured, and a declared axis always beats the "source is Z-up" checkbox.
 - **STL always welds.** It repeats every shared corner, so a cube arrives as 36 vertices instead of 8; welding is keyed on a 1e-5 grid because exporters round.
 - **Verify after writing** re-parses the file that was just written with an independent reader and checks the mesh count, vertex data and polygon corners against what was intended. On by default for binary output — it is the difference between "the writer did not throw" and "the file parses and holds the geometry".
 - **Scale** is applied before writing; FBX's unit is the centimetre, so a model authored in metres wants `100`.
+- **Add folder** queues every convertible file under a directory, recursively — capped at 2000 files and depth 6, symlinks skipped. It collects only extensions the forge actually reads: adding a folder is a request to convert its models, not to wrap its readme in a capsule.
 
 **Notepad++ bridge** — installs two User Defined Languages so the editor can read the two formats PZ invented for itself:
 
@@ -285,8 +287,7 @@ Mod artwork and image previews load over a custom privileged scheme, `pzfile://f
 | `lo:apply` | Write one config's mod lists back (write-guarded) |
 | `log:list` | `console.txt` + every `Logs\*.txt`, freshest first |
 | `log:read` | Tail of one log by opaque id (read-only, max 1 MiB) |
-| `tools:pick` · `tools:pick-output` | Native dialogs; the only way a path outside the mod roots enters the forge |
-| `tools:inspect` | Classify paths the renderer already knows about (files inside mod roots) |
+| `tools:pick` · `tools:pick-folder` · `tools:pick-output` | Native dialogs; the only way a path outside the mod roots enters the forge |
 | `tools:convert` · `tools:convert-cancel` · `tools:progress` | Run the FBX forge; progress *(event)*, throttled to ~60ms |
 | `tools:reveal` | Reveal a converted file / open the output folder (picked-path rule, not the read guard) |
 | `npp:status` · `npp:locate` | Probe for Notepad++; ask the user where it lives |
@@ -304,7 +305,7 @@ Everything below is hand-rolled — the project has **no runtime dependencies at
 - **Icon set** (`components/Icon.tsx`) — ~70 inline 24×24 stroke SVGs.
 - **Zip / PNG writers** (`services/binfmt.ts`) — CRC32 table, local + central directory records and PNG chunk framing written by hand; DEFLATE borrowed from Node's builtin `zlib`. Already-compressed extensions are stored rather than re-deflated.
 - **FBX containers** (`services/fbxbin.ts`) — the record format (end offset, property list, 13-byte nested-list sentinel), all eleven property types, zlib-packed array properties, the 23-byte header magic and the footer, plus a reader used to verify what was just written. Object names are stored reversed in binary (`Torso\0\1Model`) and as `Model::Torso` in ASCII, which is why the node tree carries a name *pair* and lets each encoder spell it its own way.
-- **Mesh readers** (`services/mesh.ts`, `services/meshdcc.ts`) — OBJ, STL (ascii + binary), PLY (ascii + binary LE), text DirectX `.x`, Collada and glTF/GLB, all normalised to one model: shared position pool, n-gon polygons, attributes per polygon *corner* (the only layout that survives all six formats without an index table). Newell's method for n-gon normals, 1e-5 grid welding, and one flat-matrix convention that happens to be both DirectX's row-vector layout and glTF's column-vector layout, so both formats' matrices drop in untouched.
+- **Mesh readers** (`services/mesh.ts`, `services/meshdcc.ts`) — OBJ, STL (ascii + binary), PLY (ascii + binary LE), DirectX `.x` (text + binary token stream), Collada and glTF/GLB, all normalised to one model: shared position pool, n-gon polygons, attributes per polygon *corner* (the only layout that survives all six formats without an index table). Newell's method for n-gon normals, 1e-5 grid welding, and one flat-matrix convention that happens to be both DirectX's row-vector layout and glTF's column-vector layout, so both formats' matrices drop in untouched.
 - **`pLimit`** (`fsx.ts`, ~20 lines) — used at 48 (stat/listing), 32 (source enumeration) and 28 (mod analysis) so thousands of `stat` calls don't stampede.
 - **Frameless titlebar** — `frame: false` plus a React `TitleBar` with `-webkit-app-region` drag zones; native menu removed.
 - **Image dimensions without decoding** — PNG/GIF/BMP/JPEG headers parsed from the first ≤64KB; the forge adds DDS and TGA so a texture becomes a correctly proportioned quad.
@@ -399,7 +400,7 @@ The hub shows nine module tiles. **Five are live; four are sealed placeholders**
 - **Ledger's severity and mod attribution are heuristic.** Levels are raised from log text by pattern, and a mod is guessed from a name tag, a path or an id token; an unattributed entry means "no evidence", not "no mod involved".
 - **The validator is heuristic.** Its Lua and script scanners are hand-written lexers, not full parsers, tuned to avoid false errors; a clean report is not a guarantee the game will load the mod.
 - **The FBX forge writes geometry, not scenes.** No skeletons, no skin weights, no animation tracks, no cameras or lights — a converted mesh arrives with an identity transform and flat or source-supplied normals. Materials carry a name and a diffuse texture, not a shader graph.
-- **Binary and compressed DirectX `.x` are not read.** Some Project Zomboid models ship in the binary flavour; those convert as capsules rather than geometry. The ASCII→binary FBX direction is likewise missing, because reading ASCII FBX needs a parser this build does not have.
+- **Binary and compressed DirectX `.x`** — binary is read; the two compressed flavours (`tzip`, `bzip`) are not, because their MSZIP framing needs a chunk-boundary reader this build does not have. The ASCII→binary FBX direction is likewise missing, because reading ASCII FBX needs a parser this build does not have.
 - **A capsule is transport, not conversion.** For a file the forge cannot interpret it writes metadata and, optionally, the original bytes as embedded media. That is a valid FBX carrying your file; it is not a model, and nothing pretends otherwise.
 - **The Notepad++ pack is highlighting, not IntelliSense.** UDLs give colour, folding and comment awareness. Auto-completion lists live in Notepad++'s install directory, which needs administrator rights, so they are out of scope; the keyword lists are also a curated snapshot of B41/B42 script keys rather than an exhaustive one.
 - **Packing does not upload.** It stages the Workshop project layout; publishing is still done from inside Project Zomboid.

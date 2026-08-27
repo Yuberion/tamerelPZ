@@ -829,7 +829,7 @@ export const EN = {
   'help.tl.geometry':
     'Corrections applied on the way in. Z-up matters for CAD and Blender exports; the flag is ignored for formats that state their own axis, such as Collada. Welding is only useful for triangle-soup formats — STL repeats every shared corner, so a cube arrives as 36 vertices instead of 8. Rebuilding normals gives flat shading from polygon winding, which is honest: the source said nothing about smoothing.',
   'help.tl.formats':
-    'DirectX .x is here because it is the format Project Zomboid ships its own models in — text .x converts, and the binary and compressed flavours are refused rather than guessed at. glTF and Collada arrive with a scene graph, so node transforms are composed and baked into the vertices instead of being dropped, which is what otherwise piles every part of a model at the origin.',
+    'DirectX .x is here because it is the format Project Zomboid ships its own models in — both the text and the binary flavour are read, and the two compressed flavours are refused rather than guessed at. glTF and Collada arrive with a scene graph, so node transforms are composed and baked into the vertices instead of being dropped, which is what otherwise piles every part of a model at the origin.',
   'help.tl.npp':
     'Notepad++ is found through the registry, then the folders its installers use, then whatever you point it at. The syntax pack is written into Notepad++\u2019s own userDefineLangs folder, which it reads file by file since 7.6 — so nothing it ships is overwritten, nothing needs administrator rights, and deleting the two files undoes all of it.',
   'help.tl.nppEditor':
@@ -852,6 +852,10 @@ export const EN = {
   'tl.forgeLede': 'Own FBX writer, no external converter. Meshes convert; everything else is carried.',
   'tl.add': 'Add files',
   'tl.addTitle': 'Pick files to convert',
+  'tl.addFolder': 'Add folder',
+  'tl.addFolderTitle': 'Queue every convertible file under a folder, recursively',
+  'tl.folderAdded': '{n} queued from that folder',
+  'tl.folderEmpty': 'Nothing convertible in that folder',
   'tl.clear': 'Clear',
   'tl.clearTitle': 'Empty the queue',
   'tl.convert': 'Convert',
@@ -870,7 +874,6 @@ export const EN = {
   'tl.kind.image': 'image',
   'tl.kind.transcode': 're-encode',
   'tl.kind.capsule': 'capsule',
-  'tl.note.binaryX': 'binary .x',
   'tl.note.compressedX': 'compressed .x',
   'tl.note.asciiFbx': 'ascii fbx',
   'tl.note.tooLarge': 'too large',
@@ -902,7 +905,7 @@ export const EN = {
   'tl.weld': 'Weld duplicate vertices',
   'tl.weldHint': 'Merge points that land on the same spot. STL always welds regardless.',
   'tl.embed': 'Embed the source bytes',
-  'tl.embedHint': 'Textures and capsules carry the original file inside the .fbx.',
+  'tl.embedHint': 'On: textures and capsules carry the file inside. Off: it is referenced by path.',
   'tl.verify': 'Verify after writing',
   'tl.verifyHint': 'Re-read the file and check the geometry survived. Binary only.',
   'tl.overwrite': 'Overwrite existing files',
@@ -914,7 +917,7 @@ export const EN = {
   'tl.fmtImage': 'Textures',
   'tl.fmtOther': 'Everything else',
   'tl.fmtOtherValue': 'carried as a capsule — metadata plus the original bytes, no invented mesh',
-  'tl.formatsNote': 'Binary and compressed DirectX .x are refused rather than guessed at.',
+  'tl.formatsNote': 'Text and binary DirectX .x both read; the compressed flavours are refused.',
 
   // ---- tools: progress & results ------------------------------------------
   'tl.phase.read': 'reading',
@@ -946,8 +949,8 @@ export const EN = {
   'tl.msg.sameFile': 'that would overwrite the source file',
   'tl.msg.sameFormat': 'already binary FBX — pick ASCII to re-encode it',
   'tl.msg.asciiFbx': 'ASCII FBX cannot be read back by this build',
-  'tl.msg.binaryX': 'binary DirectX .x is not supported',
   'tl.msg.compressedX': 'compressed DirectX .x is not supported',
+  'tl.msg.truncated': 'the source file was cut short — converted what was readable',
   'tl.msg.verifyFailed': 'written, but the check on re-reading it failed',
   'tl.msg.unknownFormat': 'no importer for this format',
 
@@ -1856,7 +1859,7 @@ export const RU: Record<TKey, string> = {
   'help.tl.geometry':
     'Правки на входе. Z-вверх важен для экспорта из CAD и Blender; для форматов, которые сами объявляют ось (например Collada), флаг игнорируется. Сварка нужна только форматам-«супу из треугольников»: STL повторяет каждый общий угол, поэтому куб приезжает как 36 вершин вместо 8. Пересчёт нормалей даёт плоское затенение по обходу полигона — это честно: об сглаживании исходник ничего не сказал.',
   'help.tl.formats':
-    'DirectX .x здесь потому, что именно в этом формате Project Zomboid поставляет свои модели — текстовый .x конвертируется, а бинарный и сжатый варианты отклоняются, а не угадываются. glTF и Collada приходят со графом сцены, поэтому трансформации узлов перемножаются и запекаются в вершины, а не выбрасываются — иначе все части модели свалятся в начало координат.',
+    'DirectX .x здесь потому, что именно в этом формате Project Zomboid поставляет свои модели — читаются и текстовый, и бинарный варианты, а два сжатых отклоняются, а не угадываются. glTF и Collada приходят со графом сцены, поэтому трансформации узлов перемножаются и запекаются в вершины, а не выбрасываются — иначе все части модели свалятся в начало координат.',
   'help.tl.npp':
     'Notepad++ ищется в реестре, затем в папках его установщиков, затем там, куда укажете вы. Пакет синтаксиса пишется в собственную папку userDefineLangs, которую Notepad++ читает по файлам начиная с 7.6 — так ничего из штатного не перезаписывается, права администратора не нужны, а удаление двух файлов отменяет всё.',
   'help.tl.nppEditor':
@@ -1879,6 +1882,10 @@ export const RU: Record<TKey, string> = {
   'tl.forgeLede': 'Свой писатель FBX, без внешних конвертеров. Меши конвертируются, остальное переносится.',
   'tl.add': 'Добавить файлы',
   'tl.addTitle': 'Выбрать файлы для конвертации',
+  'tl.addFolder': 'Добавить папку',
+  'tl.addFolderTitle': 'Поставить в очередь все конвертируемые файлы из папки, включая вложенные',
+  'tl.folderAdded': 'Из папки добавлено: {n}',
+  'tl.folderEmpty': 'В этой папке нечего конвертировать',
   'tl.clear': 'Очистить',
   'tl.clearTitle': 'Опустошить очередь',
   'tl.convert': 'Конвертировать',
@@ -1897,7 +1904,6 @@ export const RU: Record<TKey, string> = {
   'tl.kind.image': 'картинка',
   'tl.kind.transcode': 'перекодировка',
   'tl.kind.capsule': 'капсула',
-  'tl.note.binaryX': 'бинарный .x',
   'tl.note.compressedX': 'сжатый .x',
   'tl.note.asciiFbx': 'ascii fbx',
   'tl.note.tooLarge': 'слишком большой',
@@ -1929,7 +1935,7 @@ export const RU: Record<TKey, string> = {
   'tl.weld': 'Сварить дубли вершин',
   'tl.weldHint': 'Слить точки, попавшие в одно место. STL сваривается всегда.',
   'tl.embed': 'Вкладывать исходные байты',
-  'tl.embedHint': 'Текстуры и капсулы несут исходный файл внутри .fbx.',
+  'tl.embedHint': 'Включено — файл едет внутри. Выключено — остаётся ссылка на него по пути.',
   'tl.verify': 'Проверять после записи',
   'tl.verifyHint': 'Перечитать файл и убедиться, что геометрия выжила. Только бинарный.',
   'tl.overwrite': 'Перезаписывать существующие',
@@ -1941,7 +1947,7 @@ export const RU: Record<TKey, string> = {
   'tl.fmtImage': 'Текстуры',
   'tl.fmtOther': 'Всё остальное',
   'tl.fmtOtherValue': 'переносится капсулой — метаданные и исходные байты, без выдуманного меша',
-  'tl.formatsNote': 'Бинарный и сжатый DirectX .x отклоняются, а не угадываются.',
+  'tl.formatsNote': 'Текстовый и бинарный DirectX .x читаются; сжатые варианты отклоняются.',
 
   // ---- tools: прогресс и результаты -----------------------------------------
   'tl.phase.read': 'читаю',
@@ -1973,8 +1979,8 @@ export const RU: Record<TKey, string> = {
   'tl.msg.sameFile': 'это перезаписало бы исходный файл',
   'tl.msg.sameFormat': 'уже бинарный FBX — выберите ASCII, чтобы перекодировать',
   'tl.msg.asciiFbx': 'ASCII FBX эта сборка обратно не читает',
-  'tl.msg.binaryX': 'бинарный DirectX .x не поддерживается',
   'tl.msg.compressedX': 'сжатый DirectX .x не поддерживается',
+  'tl.msg.truncated': 'исходный файл оборван — сконвертировано то, что читалось',
   'tl.msg.verifyFailed': 'записан, но проверка при перечитывании не прошла',
   'tl.msg.unknownFormat': 'для этого формата нет читателя',
 

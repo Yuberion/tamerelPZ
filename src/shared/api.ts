@@ -125,8 +125,8 @@ export interface PzApi {
   tools: {
     /** Native file dialog. The chosen paths become convertible for this session. */
     pick(): Promise<ForgeInput[]>
-    /** Classify paths the renderer already knows about (files inside mod roots). */
-    inspect(paths: string[]): Promise<ForgeInput[]>
+    /** Native folder dialog: every convertible file under it, recursively. */
+    pickFolder(): Promise<ForgeInput[]>
     /** Native folder dialog for the output container; persists into settings. */
     pickOutput(): Promise<string | undefined>
     convert(opts: ConvertOptions): Promise<ConvertResult>

@@ -43,7 +43,7 @@ import type {
 } from '../../shared/types'
 import { decodeFbxBinary, encodeFbxAscii } from './fbxbin'
 import { FBX_VERSION, verifyFbxBinary, writeFbx, type FbxMeshPart, type FbxScene } from './fbx'
-import { exists, extOf, isDir } from './fsx'
+import { exists, extOf, isDir, readdirSafe } from './fsx'
 import { isPathAllowed, isPathWritable } from './guard'
 import { applyGeometryPass, importObj, importPly, importStl, meshName, type MeshImport } from './mesh'
 import { importCollada, importDirectX, importGltf } from './meshdcc'
@@ -147,7 +147,7 @@ function classifyExt(ext: string): ForgeKind {
  * Describe one input without converting it.
  *
  * Cheap by design — a stat plus, for the formats where the extension lies, a
- * short header read. A `.x` file that turns out to be the binary flavour is
+ * short header read. A `.x` file that turns out to be a compressed flavour is
  * reported as unsupported *here*, so the queue shows it before anyone presses
  * convert.
  */
@@ -183,14 +183,17 @@ export async function inspectInputs(paths: string[]): Promise<ForgeInput[]> {
       input.supported = false
       input.note = 'tooLarge'
     } else if (ext === 'x') {
+      // `.x` comes in four flavours and the extension says nothing about which.
       const head = await readHead(path, 16)
       const flavour = head?.toString('latin1', 8, 12) ?? ''
       if (!head?.toString('latin1', 0, 4).startsWith('xof ')) {
         input.kind = 'capsule'
         input.format = 'raw'
+      } else if (flavour === 'bin ') {
+        input.format = 'x-binary'
       } else if (flavour !== 'txt ') {
         input.supported = false
-        input.note = flavour.startsWith('bin') ? 'binaryX' : 'compressedX'
+        input.note = 'compressedX'
       }
     } else if (ext === 'fbx') {
       const head = await readHead(path, 21)
@@ -219,6 +222,47 @@ async function readHead(path: string, bytes: number): Promise<Buffer | undefined
   } catch {
     return undefined
   }
+}
+
+/** Most files a folder pick will queue in one go. */
+const MAX_FOLDER_FILES = 2000
+const MAX_FOLDER_DEPTH = 6
+
+/**
+ * Every convertible file under `dir`, recursively.
+ *
+ * Only the extensions the forge actually *reads* are collected. Adding a folder
+ * is a request to convert its models, not to wrap its readme in an FBX capsule —
+ * and a capsule is always one file-pick away for anyone who wants one.
+ *
+ * Breadth-first with a depth and count cap, and symlinks are skipped, so pointing
+ * this at a drive root walks a bounded slice of it instead of never returning.
+ */
+export async function collectConvertible(dir: string): Promise<string[]> {
+  const out: string[] = []
+  let frontier: Array<{ path: string; depth: number }> = [{ path: dir, depth: 0 }]
+
+  while (frontier.length > 0 && out.length < MAX_FOLDER_FILES) {
+    const next: Array<{ path: string; depth: number }> = []
+    for (const entry of frontier) {
+      for (const child of await readdirSafe(entry.path)) {
+        if (child.isSymbolicLink()) continue
+        const path = join(entry.path, child.name)
+        if (child.isDirectory()) {
+          if (entry.depth + 1 < MAX_FOLDER_DEPTH) next.push({ path, depth: entry.depth + 1 })
+          continue
+        }
+        const ext = extOf(child.name)
+        if (MESH_EXTS.has(ext) || IMAGE_EXTS.has(ext) || ext === 'fbx') out.push(path)
+        if (out.length >= MAX_FOLDER_FILES) break
+      }
+      if (out.length >= MAX_FOLDER_FILES) break
+    }
+    frontier = next
+  }
+
+  out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+  return out
 }
 
 /* ---------------------------------------------------------------- image ---- */
@@ -343,6 +387,8 @@ interface ItemPlan {
   materials: number
   /** The source bytes, kept so a transcode does not read the file twice. */
   buf: Buffer
+  /** Importer caveat worth showing next to a *successful* row, e.g. `truncated`. */
+  note?: string
 }
 
 async function planItem(path: string, opts: ConvertOptions): Promise<ItemPlan> {
@@ -387,6 +433,7 @@ async function planItem(path: string, opts: ConvertOptions): Promise<ItemPlan> {
       kind,
       format: imported.format,
       buf,
+      note: imported.note,
       scene: { rootName: name, creator, meshes: parts, meta, unitScale: 1, sourcePath: path },
       vertices: parts.reduce((n, p) => n + p.positions.length / 3, 0),
       polygons: parts.reduce((n, p) => n + p.polygons.length, 0),
@@ -449,10 +496,16 @@ async function planItem(path: string, opts: ConvertOptions): Promise<ItemPlan> {
       meta,
       unitScale: 1,
       sourcePath: path,
-      media:
-        opts.embed && buf.length <= MAX_EMBED
-          ? { name, fileName: basename(path), absolutePath: path, data: buf }
-          : undefined
+      // The media node is written either way: with the bytes when embedding is
+      // on, and as a plain reference to the file when it is off or the payload is
+      // over the cap. Dropping it entirely would lose the last pointer back to
+      // the source, which is the one thing a capsule exists to keep.
+      media: {
+        name,
+        fileName: basename(path),
+        absolutePath: path,
+        data: opts.embed && buf.length <= MAX_EMBED ? buf : undefined
+      }
     },
     vertices: 0,
     polygons: 0,
@@ -513,6 +566,9 @@ async function convertOne(
       polygons: plan.polygons,
       materials: plan.materials,
       verified,
+      // A caveat, not a failure: the file was written, and the row says why it
+      // might not hold everything the source did.
+      message: plan.note,
       durationMs: Date.now() - startedAt
     }
   } catch (e) {

@@ -77,7 +77,7 @@ const api: PzApi = {
   },
   tools: {
     pick: () => ipcRenderer.invoke(IPC.toolsPick),
-    inspect: (paths: string[]) => ipcRenderer.invoke(IPC.toolsInspect, paths),
+    pickFolder: () => ipcRenderer.invoke(IPC.toolsPickFolder),
     pickOutput: () => ipcRenderer.invoke(IPC.toolsPickOutput),
     convert: (opts: ConvertOptions) => ipcRenderer.invoke(IPC.toolsConvert, opts),
     cancel: () => ipcRenderer.invoke(IPC.toolsCancel),

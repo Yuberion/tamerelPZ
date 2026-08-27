@@ -79,6 +79,20 @@ export function ForgeTool({ store }: { store: ForgeStore }) {
           </button>
           <button
             className="btn"
+            onClick={() => {
+              void store.addFolder().then((added) => {
+                if (added === 0) notify(t('tl.folderEmpty'), 'warn')
+                else notify(t('tl.folderAdded', { n: formatCount(added) }), 'ok')
+              })
+            }}
+            disabled={store.busy}
+            title={t('tl.addFolderTitle')}
+          >
+            <Icon name="folder-plus" size={13} />
+            {t('tl.addFolder')}
+          </button>
+          <button
+            className="btn"
             onClick={store.clear}
             disabled={store.inputs.length === 0 || store.busy}
             title={t('tl.clearTitle')}

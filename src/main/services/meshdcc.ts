@@ -85,23 +85,34 @@ function balanced(text: string, open: number): { body: string; end: number } {
   return { body: text.slice(open + 1), end: text.length }
 }
 
-interface XBlock {
+/**
+ * One `.x` block, independent of which flavour it was read from.
+ *
+ * Both front-ends produce this: the text scanner and the binary token reader.
+ * That is the whole point of the shape — `.x` data is *positional* (a count, then
+ * that many triples, then another count), so once the numbers of a block are in
+ * order and its nested blocks are separated out, the reader that turns them into
+ * a mesh does not care how they were spelled on disk.
+ */
+interface XNode {
   keyword: string
-  /** Optional instance name from `Mesh Torso {`. */
+  /** Instance name from `Mesh Torso {`, when the file gave one. */
   label: string
-  body: string
+  /** Own numeric data in order, with nested blocks excluded. */
+  numbers: number[]
+  children: XNode[]
 }
 
 /** Direct child blocks of `body`, in order. */
-function xChildren(body: string): XBlock[] {
-  const out: XBlock[] = []
+function textNodes(body: string): XNode[] {
+  const out: XNode[] = []
   let i = 0
   while (i < body.length) {
     const open = body.indexOf('{', i)
     if (open < 0) break
     const { body: inner, end } = balanced(body, open)
     const [keyword, label] = xHeader(body.slice(i, open))
-    out.push({ keyword, label, body: inner })
+    out.push({ keyword, label, numbers: numbersOf(xOwnData(inner)), children: textNodes(inner) })
     i = end
   }
   return out
@@ -145,15 +156,16 @@ function xOwnData(body: string): string {
   return out
 }
 
-/** Positional number reader: `.x` data blocks are pure ordered numerics. */
+function numbersOf(text: string): number[] {
+  const found = text.match(/-?\d+(?:\.\d*)?(?:[eE][-+]?\d+)?/g)
+  return found ? found.map(Number) : []
+}
+
+/** Positional cursor over one block's numbers. */
 class Numbers {
-  private readonly values: number[]
   private at = 0
 
-  constructor(text: string) {
-    const found = text.match(/-?\d+(?:\.\d*)?(?:[eE][-+]?\d+)?/g)
-    this.values = found ? found.map(Number) : []
-  }
+  constructor(private readonly values: number[]) {}
 
   get left(): number {
     return this.values.length - this.at
@@ -165,17 +177,165 @@ class Numbers {
   }
 }
 
-function xTransform(body: string): number[] {
-  const numbers = new Numbers(xOwnData(body))
+/** Text `.x`: strip comments and template declarations, then scan the braces. */
+function parseXText(source: string): XNode[] {
+  let text = source.replace(/\/\/[^\n]*/g, '').replace(/#[^\n]*/g, '')
+  for (;;) {
+    const match = /\btemplate\b[^{]*\{/.exec(text)
+    if (!match) break
+    const open = text.indexOf('{', match.index)
+    text = text.slice(0, match.index) + text.slice(balanced(text, open).end)
+  }
+  return textNodes(text)
+}
+
+/* ---------------------------------------------------------- binary .x ----- */
+
+/**
+ * Binary `.x` token ids, from the DirectX file format specification.
+ *
+ * Everything not listed is a bare separator (`;`, `,`, brackets) or a type
+ * keyword that only ever appears inside a template, and templates are skipped —
+ * so the default branch of the reader genuinely has nothing to do.
+ */
+const X_NAME = 1
+const X_STRING = 2
+const X_INTEGER = 3
+const X_GUID = 5
+const X_INTEGER_LIST = 6
+const X_FLOAT_LIST = 7
+const X_OBRACE = 10
+const X_CBRACE = 11
+const X_TEMPLATE = 31
+
+/**
+ * Binary `.x` — the flavour a good half of Project Zomboid's own models ship in.
+ *
+ * A flat token stream rather than a grammar: names, braces and *typed number
+ * lists*, which is why it collapses onto the same `XNode` tree as the text
+ * flavour instead of needing its own mesh reader. Three details are easy to get
+ * wrong and produce a plausible-looking wrong mesh:
+ *
+ *  - a GUID is 16 bytes of payload that must be skipped, not read as numbers;
+ *  - the float width comes from the *header* (`0032` / `0064`), not the token;
+ *  - `template` blocks declare the schema and contain their own braces, so their
+ *    contents have to be discarded rather than treated as data.
+ */
+function parseXBinary(buf: Buffer, floatBits: number): XNode[] {
+  const floatSize = floatBits === 64 ? 8 : 4
+  const roots: XNode[] = []
+  const stack: XNode[] = []
+  let pending: string[] = []
+  let templateDepth = 0
+  let templatePending = false
+  let at = 0
+
+  const current = (): XNode | undefined => stack[stack.length - 1]
+  /** Where numbers go: nowhere while inside a template or outside any block. */
+  const sink = (): XNode | undefined => (templateDepth > 0 ? undefined : current())
+
+  while (at + 2 <= buf.length) {
+    const token = buf.readUInt16LE(at)
+    at += 2
+
+    if (token === X_NAME) {
+      if (at + 4 > buf.length) break
+      const len = buf.readUInt32LE(at)
+      at += 4
+      const value = buf.toString('latin1', at, Math.min(at + len, buf.length))
+      at += len
+      if (templateDepth === 0 && !templatePending) pending.push(value)
+      continue
+    }
+
+    if (token === X_STRING) {
+      if (at + 4 > buf.length) break
+      const len = buf.readUInt32LE(at)
+      // The trailing separator token belongs to the record, not to the stream.
+      at += 4 + len + 2
+      continue
+    }
+
+    if (token === X_INTEGER) {
+      if (at + 4 > buf.length) break
+      sink()?.numbers.push(buf.readUInt32LE(at))
+      at += 4
+      continue
+    }
+
+    if (token === X_GUID) {
+      at += 16
+      continue
+    }
+
+    if (token === X_INTEGER_LIST || token === X_FLOAT_LIST) {
+      if (at + 4 > buf.length) break
+      const count = buf.readUInt32LE(at)
+      at += 4
+      const size = token === X_INTEGER_LIST ? 4 : floatSize
+      if (count < 0 || at + count * size > buf.length) break
+      const node = sink()
+      if (node) {
+        for (let i = 0; i < count; i++) {
+          const off = at + i * size
+          node.numbers.push(
+            token === X_INTEGER_LIST
+              ? buf.readUInt32LE(off)
+              : size === 8
+                ? buf.readDoubleLE(off)
+                : buf.readFloatLE(off)
+          )
+        }
+      }
+      at += count * size
+      continue
+    }
+
+    if (token === X_OBRACE) {
+      if (templatePending || templateDepth > 0) {
+        templateDepth++
+        templatePending = false
+        continue
+      }
+      // An anonymous block is a reference to a named object elsewhere in the
+      // file; it gets a node so brace depth stays honest, and is ignored later.
+      const node: XNode = { keyword: pending[0] ?? '', label: pending[1] ?? '', numbers: [], children: [] }
+      pending = []
+      const parent = current()
+      if (parent) parent.children.push(node)
+      else roots.push(node)
+      stack.push(node)
+      continue
+    }
+
+    if (token === X_CBRACE) {
+      if (templateDepth > 0) templateDepth--
+      else stack.pop()
+      pending = []
+      continue
+    }
+
+    if (token === X_TEMPLATE) {
+      templatePending = true
+      pending = []
+    }
+  }
+
+  return roots
+}
+
+/* ------------------------------------------------------------ .x meshes --- */
+
+function xTransform(node: XNode): number[] {
+  const numbers = new Numbers(node.numbers)
   const m: number[] = []
   for (let i = 0; i < 16; i++) m.push(numbers.next(IDENTITY[i]))
   return m
 }
 
-function parseXMesh(block: XBlock, index: number): RawMesh {
+function parseXMesh(block: XNode, index: number): RawMesh {
   const mesh = newMesh(block.label || `mesh_${index}`)
-  const own = new Numbers(xOwnData(block.body))
-  const children = xChildren(block.body)
+  const own = new Numbers(block.numbers)
 
   const vertexCount = Math.max(0, Math.trunc(own.next()))
   for (let i = 0; i < vertexCount; i++) {
@@ -189,9 +349,9 @@ function parseXMesh(block: XBlock, index: number): RawMesh {
     if (poly.length >= 3) mesh.polygons.push(poly)
   }
 
-  const normalsBlock = children.find((c) => c.keyword === 'MeshNormals')
+  const normalsBlock = block.children.find((c) => c.keyword === 'MeshNormals')
   if (normalsBlock) {
-    const numbers = new Numbers(xOwnData(normalsBlock.body))
+    const numbers = new Numbers(normalsBlock.numbers)
     const count = Math.max(0, Math.trunc(numbers.next()))
     const normals: number[] = []
     for (let i = 0; i < count; i++) normals.push(numbers.next(), numbers.next(), numbers.next())
@@ -206,9 +366,9 @@ function parseXMesh(block: XBlock, index: number): RawMesh {
     }
   }
 
-  const uvBlock = children.find((c) => c.keyword === 'MeshTextureCoords')
+  const uvBlock = block.children.find((c) => c.keyword === 'MeshTextureCoords')
   if (uvBlock) {
-    const numbers = new Numbers(xOwnData(uvBlock.body))
+    const numbers = new Numbers(uvBlock.numbers)
     const count = Math.max(0, Math.trunc(numbers.next()))
     const coords: number[] = []
     for (let i = 0; i < count; i++) coords.push(numbers.next(), numbers.next())
@@ -219,14 +379,14 @@ function parseXMesh(block: XBlock, index: number): RawMesh {
     }
   }
 
-  const materialBlock = children.find((c) => c.keyword === 'MeshMaterialList')
+  const materialBlock = block.children.find((c) => c.keyword === 'MeshMaterialList')
   if (materialBlock) {
-    const numbers = new Numbers(xOwnData(materialBlock.body))
+    const numbers = new Numbers(materialBlock.numbers)
     const materialCount = Math.max(0, Math.trunc(numbers.next()))
     const faceIndexes = Math.max(0, Math.trunc(numbers.next()))
     const perFace: number[] = []
     for (let i = 0; i < faceIndexes; i++) perFace.push(Math.max(0, Math.trunc(numbers.next())))
-    const named = xChildren(materialBlock.body).filter((c) => c.keyword === 'Material')
+    const named = materialBlock.children.filter((c) => c.keyword === 'Material')
     for (let i = 0; i < Math.max(materialCount, named.length); i++) {
       mesh.materials.push(named[i]?.label || `material_${i}`)
     }
@@ -239,7 +399,7 @@ function parseXMesh(block: XBlock, index: number): RawMesh {
 }
 
 /** Depth-first walk of Frame blocks, composing FrameTransformMatrix as it goes. */
-function walkXFrames(blocks: XBlock[], parent: number[], out: RawMesh[]): void {
+function walkXFrames(blocks: XNode[], parent: number[], out: RawMesh[]): void {
   for (const block of blocks) {
     if (block.keyword === 'Mesh') {
       const mesh = parseXMesh(block, out.length)
@@ -248,46 +408,42 @@ function walkXFrames(blocks: XBlock[], parent: number[], out: RawMesh[]): void {
       continue
     }
     if (block.keyword !== 'Frame') continue
-    const children = xChildren(block.body)
-    const local = children.find((c) => c.keyword === 'FrameTransformMatrix')
-    const world = local ? compose(xTransform(local.body), parent) : parent
-    walkXFrames(children, world, out)
+    const local = block.children.find((c) => c.keyword === 'FrameTransformMatrix')
+    const world = local ? compose(xTransform(local), parent) : parent
+    walkXFrames(block.children, world, out)
   }
 }
 
 /**
- * DirectX `.x`, text flavour — the format Project Zomboid ships its models in.
+ * DirectX `.x`, text and binary — the format Project Zomboid ships its models in.
  *
- * Binary and compressed `.x` are declined rather than guessed at: they are a
- * token stream with a completely different grammar, and half-decoding one
- * produces a mesh that looks plausible and is wrong.
+ * The compressed flavours (`tzip`, `bzip`) are declined rather than guessed at:
+ * they wrap the token stream in MSZIP blocks, and Node's `zlib` cannot read that
+ * framing without a chunk-boundary reader this build does not have.
  */
 export function importDirectX(buf: Buffer, name: string): MeshImport {
-  const raw = buf.toString('utf8').replace(/^\uFEFF/, '')
-  const header = raw.slice(0, 16)
+  // Strip a BOM at the byte level so both paths agree the header is 16 bytes.
+  const body = buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf ? buf.subarray(3) : buf
+  const header = body.toString('latin1', 0, Math.min(16, body.length))
   if (!header.startsWith('xof ')) throw new Error('not a DirectX .x file')
+
   const flavour = header.slice(8, 12)
-  if (flavour !== 'txt ') {
-    const kind = flavour.startsWith('bin') ? 'binaryX' : 'compressedX'
-    throw Object.assign(new Error(`unsupported .x flavour "${flavour.trim()}"`), { code: kind })
+  const floatBits = header.slice(12, 16) === '0064' ? 64 : 32
+  const binary = flavour === 'bin '
+  if (flavour !== 'txt ' && !binary) {
+    throw Object.assign(new Error(`unsupported .x flavour "${flavour.trim()}"`), { code: 'compressedX' })
   }
 
-  // The 16-byte header is dropped before anything else so comment stripping
-  // cannot shift it, then templates go: both they and comments contain braces.
-  let text = raw.slice(16).replace(/\/\/[^\n]*/g, '').replace(/#[^\n]*/g, '')
-  for (;;) {
-    const match = /\btemplate\b[^{]*\{/.exec(text)
-    if (!match) break
-    const open = text.indexOf('{', match.index)
-    text = text.slice(0, match.index) + text.slice(balanced(text, open).end)
-  }
+  const roots = binary
+    ? parseXBinary(body.subarray(16), floatBits)
+    : parseXText(body.toString('utf8').slice(16))
 
   const meshes: RawMesh[] = []
-  walkXFrames(xChildren(text), IDENTITY, meshes)
+  walkXFrames(roots, IDENTITY, meshes)
   if (meshes.length === 0) throw new Error('no Mesh block in .x file')
   if (meshes.length === 1 && meshes[0].name.startsWith('mesh_')) meshes[0].name = name
   // DirectX is left-handed; the pipeline mirrors and rewinds on the way out.
-  return { format: 'x', meshes, handed: 'left', upAxis: 'y' }
+  return { format: binary ? 'x-binary' : 'x', meshes, handed: 'left', upAxis: 'y' }
 }
 
 /* ========================================================== Collada ====== */

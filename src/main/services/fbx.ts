@@ -326,7 +326,14 @@ function textureNode(id: number, media: FbxMedia): FbxNode {
   ])
 }
 
-function videoNode(id: number, media: FbxMedia, embed: boolean): FbxNode {
+/**
+ * The media clip itself.
+ *
+ * `Content` appears only when the caller supplied bytes; without them the node is
+ * a reference and the importer resolves `Filename` from disk. Both are valid, and
+ * which one you get is the caller's "embed" decision, not this function's.
+ */
+function videoNode(id: number, media: FbxMedia): FbxNode {
   const children: FbxNode[] = [
     node('Type', [S('Clip')]),
     node('Properties70', [], [P('Path', 'KString', 'XRefUrl', '', S(media.absolutePath))]),
@@ -334,7 +341,7 @@ function videoNode(id: number, media: FbxMedia, embed: boolean): FbxNode {
     node('Filename', [S(media.absolutePath)]),
     node('RelativeFilename', [S(media.fileName)])
   ]
-  if (embed && media.data) children.push(node('Content', [R(media.data)]))
+  if (media.data) children.push(node('Content', [R(media.data)]))
   return node('Video', [L(id), N('Video', media.name), S('Clip')], children)
 }
 
@@ -386,7 +393,7 @@ export function buildFbxDocument(scene: FbxScene, encoding: FbxEncoding, now = n
     const textureId = ids.take()
     const videoId = ids.take()
     objects.push(textureNode(textureId, scene.media))
-    objects.push(videoNode(videoId, scene.media, encoding === 'binary' || Boolean(scene.media.data)))
+    objects.push(videoNode(videoId, scene.media))
     connect(videoId, textureId)
     for (const id of materialIds.values()) {
       connections.push(node('C', [S('OP'), L(textureId), L(id), S('DiffuseColor')]))

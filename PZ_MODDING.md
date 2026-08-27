@@ -329,7 +329,7 @@ Not yet covered (candidates):
 | **Signal** | Workshop sync = steamcmd `+workshop_download_item 108600 <id>` or reading `libraryfolders.vdf` caches; diff local vs subscribed |
 | **Triage** | Conflict doctor: intersect script item names across enabled mods (definition-order winners), duplicate Lua global overwrites (grep `function X:` across mods), texture path collisions |
 | **Cartograph** | Parse `media/maps/*/spawnmap.lua`, `*.lot`/cell bin, `tiledefinitions.text`; preview via tileset PNGs; integrate with tiledef= declared in mod.info |
-| **Tools** | *Live.* FBX forge writes FBX 7.4 (binary + ASCII) with no SDK: readers for OBJ/STL/PLY/text `.x`/Collada/glTF, textures as embedded quads, anything else as a metadata capsule. Notepad++ bridge installs UDLs for `media/scripts/*.txt` and `mod.info` into `userDefineLangs`. Remaining work: binary `.x` reader (PZ ships some models that way), ASCII→binary FBX, skeleton/animation tracks |
+| **Tools** | *Live.* FBX forge writes FBX 7.4 (binary + ASCII) with no SDK: readers for OBJ/STL/PLY/`.x` (text + binary)/Collada/glTF, textures as embedded quads, anything else as a metadata capsule. Notepad++ bridge installs UDLs for `media/scripts/*.txt` and `mod.info` into `userDefineLangs`. Remaining work: compressed `.x` (MSZIP framing), ASCII→binary FBX, skeleton/animation tracks |
 | **Outpost** | servertest.ini editor: `Mods=`, `WorkshopItems=`, map=, plus per-mod config conventions |
 | **Ledger** | Settings UI for `disabledSources`/`customSources`/overrides (already honoured by scanner, no UI yet — see README limitations) |
 

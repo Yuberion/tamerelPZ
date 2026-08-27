@@ -71,6 +71,8 @@ export interface ForgeStore {
   setOptions(patch: Partial<ForgeOptions>): void
   outputDir: string | undefined
   add(): Promise<void>
+  /** Queue every convertible file under a picked folder. Returns how many were new. */
+  addFolder(): Promise<number>
   remove(path: string): void
   clear(): void
   pickOutput(): Promise<void>
@@ -114,19 +116,38 @@ export function useForge(): ForgeStore {
     })
   }, [])
 
+  /** Append whatever is new, keyed case-insensitively: Windows paths are. */
+  const merge = useCallback((picked: ForgeInput[]): number => {
+    let added = 0
+    setInputs((prev) => {
+      const seen = new Set(prev.map((i) => i.path.toLowerCase()))
+      const fresh = picked.filter((i) => !seen.has(i.path.toLowerCase()))
+      added = fresh.length
+      return fresh.length > 0 ? [...prev, ...fresh] : prev
+    })
+    return added
+  }, [])
+
   const add = useCallback(async () => {
     try {
       const picked = await window.pz.tools.pick()
-      if (picked.length === 0) return
-      setInputs((prev) => {
-        const seen = new Set(prev.map((i) => i.path.toLowerCase()))
-        return [...prev, ...picked.filter((i) => !seen.has(i.path.toLowerCase()))]
-      })
+      if (picked.length > 0) merge(picked)
       setError(undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [])
+  }, [merge])
+
+  const addFolder = useCallback(async (): Promise<number> => {
+    try {
+      const picked = await window.pz.tools.pickFolder()
+      setError(undefined)
+      return picked.length === 0 ? 0 : merge(picked)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      return 0
+    }
+  }, [merge])
 
   const remove = useCallback((path: string) => {
     setInputs((prev) => prev.filter((i) => i.path !== path))
@@ -188,6 +209,7 @@ export function useForge(): ForgeStore {
       setOptions,
       outputDir,
       add,
+      addFolder,
       remove,
       clear,
       pickOutput,
@@ -205,6 +227,7 @@ export function useForge(): ForgeStore {
       setOptions,
       outputDir,
       add,
+      addFolder,
       remove,
       clear,
       pickOutput,

@@ -19,6 +19,7 @@ import type {
 import { listAuthoringTargets, readModInfoDraft, scaffoldMod, writeModInfo } from './services/authoring'
 import {
   assertForgePath,
+  collectConvertible,
   convertFiles,
   inspectInputs,
   rememberPickedDir,
@@ -314,7 +315,24 @@ export function registerIpc(): void {
     return inspectInputs(result.filePaths)
   })
 
-  ipcMain.handle(IPC.toolsInspect, async (_e, paths: string[]) => inspectInputs(paths))
+  ipcMain.handle(IPC.toolsPickFolder, async (e) => {
+    const win = senderWindow(e)
+    const options: Electron.OpenDialogOptions = {
+      title: 'Pick a folder of files to convert',
+      properties: ['openDirectory']
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+    const picked = result.canceled ? undefined : result.filePaths[0]
+    if (!picked) return []
+    // The folder itself is consented too, so "beside the source" can write there.
+    rememberPickedDir(picked)
+    const found = await collectConvertible(picked)
+    if (found.length === 0) return []
+    rememberPickedFiles(found)
+    return inspectInputs(found)
+  })
 
   ipcMain.handle(IPC.toolsPickOutput, async (e) => {
     const win = senderWindow(e)

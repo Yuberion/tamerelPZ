@@ -46,7 +46,7 @@ export const IPC = {
 
   /* Tools — the FBX forge. Inputs are user-picked; the output dir lives in settings. */
   toolsPick: 'tools:pick',
-  toolsInspect: 'tools:inspect',
+  toolsPickFolder: 'tools:pick-folder',
   toolsPickOutput: 'tools:pick-output',
   toolsConvert: 'tools:convert',
   toolsCancel: 'tools:convert-cancel',
