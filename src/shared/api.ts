@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   AppSettings,
+  AssimpStatus,
   AuthoringTarget,
   BatchPackRequest,
   BatchPackResult,
@@ -140,6 +141,16 @@ export interface PzApi {
      * a folder they picked) and nothing else.
      */
     reveal(path: string): Promise<void>
+    /**
+     * Whether the assimp command-line tool is present and usable.
+     *
+     * The renderer only ever reads this. The executable is resolved in main, and
+     * `assimpLocate` opens a dialog there and probes what comes back, so no path
+     * from this window can become something the forge will execute.
+     */
+    assimpStatus(): Promise<AssimpStatus>
+    /** Ask the user where assimp lives, probe it, then re-report. */
+    assimpLocate(): Promise<AssimpStatus>
   }
   /**
    * Notepad++, tuned for Project Zomboid.

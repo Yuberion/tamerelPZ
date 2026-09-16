@@ -213,6 +213,14 @@ export interface AppSettings {
    * what lets the convert handler write outside the mod roots at all.
    */
   toolsOutputDir?: string
+  /**
+   * Where the assimp command-line tool lives, when detection needs an answer.
+   *
+   * Only ever written by `tools:assimp-locate`, which probes the path before it
+   * accepts it. Like `nppPathOverride` this names an executable, so it is never
+   * taken from the renderer — see the header of `main/services/assimp.ts`.
+   */
+  assimpPath?: string
   /** Notepad++ install directory, when detection needs a manual answer. */
   nppPathOverride?: string
 }
@@ -657,6 +665,27 @@ export type FbxEncoding = 'binary' | 'ascii'
 /** Where a converted file lands. */
 export type ForgeOutputMode = 'beside' | 'custom'
 
+/**
+ * Which reader turns a source file into geometry.
+ *
+ * `builtin` is this app's own importers and nothing else — no subprocess, the
+ * behaviour the forge has always had. `assimp` hands the file to the assimp
+ * command-line tool, which reads roughly forty formats and understands the
+ * material libraries, texture references and scene graphs a hand-written parser
+ * gives up on. `auto` prefers assimp and falls back to the built-in reader when
+ * assimp is missing or refuses the file — which is not hypothetical: assimp
+ * rejects Project Zomboid's own animated `.x` files, and the built-in parser
+ * reads them.
+ *
+ * The FBX is written by this app either way. assimp is asked for binary FBX and
+ * the container is re-encoded here, so encoding, scale and the Z-up correction
+ * mean the same thing on both engines.
+ */
+export type ForgeEngine = 'auto' | 'assimp' | 'builtin'
+
+/** The reader that actually produced a result row. */
+export type ForgeEngineUsed = 'builtin' | 'assimp'
+
 /** One file queued for conversion, already classified by main. */
 export interface ForgeInput {
   path: string
@@ -684,6 +713,8 @@ export interface ConvertOptions {
   inputs: string[]
   outputMode: ForgeOutputMode
   encoding: FbxEncoding
+  /** Which reader to use for mesh inputs. */
+  engine: ForgeEngine
   /** Uniform scale applied to every vertex. */
   scale: number
   /** Rotate Z-up source data a quarter turn onto FBX's Y-up axis. */
@@ -708,6 +739,10 @@ export interface ConvertItemResult {
   status: ForgeItemStatus
   kind?: ForgeKind
   format?: string
+  /** Which reader produced this row. Absent for non-mesh routes. */
+  engine?: ForgeEngineUsed
+  /** True when assimp was tried first, refused the file, and `builtin` took it. */
+  fellBack?: boolean
   /** Absolute path of the `.fbx` that was written. */
   output?: string
   bytes?: number
@@ -739,6 +774,35 @@ export interface ConvertProgress {
   index: number
   total: number
   name: string
+}
+
+/**
+ * What the forge knows about the assimp command-line tool.
+ *
+ * `installed` means a file was found where assimp is expected. `ready` is the
+ * stronger claim: it answered `assimp version`, and it lists `fbx` among the
+ * formats it can export. The gap between the two is the interesting state — a
+ * stale override, or a build whose `assimp-vc143-mt.dll` is not beside it.
+ */
+export interface AssimpStatus {
+  installed: boolean
+  ready: boolean
+  /** Absolute path of the executable, when one was found. */
+  exePath?: string
+  dir?: string
+  /**
+   * How it was found: the user's own answer, a directory assimp installs into
+   * (including one shipped beside this app), or `PATH`.
+   */
+  source?: 'override' | 'known' | 'path'
+  /** Version string from `assimp version`, e.g. `6.0`. */
+  version?: string
+  /** Extensions it reads, minus the ambiguous ones the forge refuses to assume. */
+  importExts: string[]
+  /** Format ids from `assimp listexport`. */
+  exportFormats: string[]
+  /** Stable code the renderer localises: `unusable`, `noFbxExport`. */
+  problem?: string
 }
 
 /** One file of the Project Zomboid syntax pack for Notepad++. */

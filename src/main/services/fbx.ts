@@ -504,3 +504,144 @@ export function verifyFbxBinary(buf: Buffer, expect: FbxExpectation): FbxVerific
 
   return { ok: problems.length === 0, version, meshes: geometries.length, positionFloats, corners, problems }
 }
+
+/* ------------------------------------------------------------- foreign ---- */
+
+/**
+ * What a document holds, counted rather than compared.
+ *
+ * `verifyFbxBinary` answers "is this the file we meant to write", which needs an
+ * expectation and a version this module owns. A file that came out of assimp has
+ * neither: it is FBX 7500, its mesh count is whatever the source had, and the
+ * only sensible questions are whether it parses and what is inside it. That is
+ * what this answers, and it is also where the per-row vertex and polygon counts
+ * for the assimp route come from.
+ */
+export interface FbxSummary {
+  version: number
+  meshes: number
+  /** Distinct `Material` objects in the document. */
+  materials: number
+  /** Total vertices across every mesh, i.e. position floats / 3. */
+  vertices: number
+  /** Total polygons across every mesh, counted from the index terminators. */
+  polygons: number
+  corners: number
+  problems: string[]
+}
+
+/**
+ * Count the geometry in a parsed document.
+ *
+ * Polygons are counted from `PolygonVertexIndex` rather than assumed: FBX marks
+ * the last corner of each polygon by bit-inverting its index, so the number of
+ * negative entries *is* the number of polygons, whatever the source topology was.
+ * Counting triangles instead would be wrong for every n-gon that survived.
+ */
+export function summariseFbx(root: FbxNode, version: number): FbxSummary {
+  const problems: string[] = []
+  for (const required of ['FBXHeaderExtension', 'Objects']) {
+    if (!findNode(root, required)) problems.push(`missing ${required}`)
+  }
+
+  const geometries = findNodes(root, 'Geometry')
+  let corners = 0
+  let vertexFloats = 0
+  let polygons = 0
+
+  for (const geo of geometries) {
+    const vertices = geo.children.find((c) => c.name === 'Vertices')
+    const indices = geo.children.find((c) => c.name === 'PolygonVertexIndex')
+    const vLen = arrayLength(vertices)
+    const iLen = arrayLength(indices)
+    if (vLen < 0) problems.push('geometry without Vertices')
+    if (iLen < 0) problems.push('geometry without PolygonVertexIndex')
+    vertexFloats += Math.max(0, vLen)
+    corners += Math.max(0, iLen)
+
+    const array = indices?.props.find((p) => p.t === 'i')
+    if (array && array.t === 'i') {
+      for (let i = 0; i < array.v.length; i++) if (array.v[i] < 0) polygons++
+    }
+  }
+
+  if (geometries.length === 0) problems.push('no geometry')
+
+  return {
+    version,
+    meshes: geometries.length,
+    materials: findNodes(root, 'Material').length,
+    vertices: Math.floor(vertexFloats / 3),
+    polygons,
+    corners,
+    problems
+  }
+}
+
+/** Parse a binary FBX of any supported version and count what is inside it. */
+export function inspectFbxBinary(buf: Buffer): { root: FbxNode; summary: FbxSummary } {
+  const { version, root } = decodeFbxBinary(buf)
+  return { root, summary: summariseFbx(root, version) }
+}
+
+/**
+ * Corrections applied to a document this module did not build.
+ *
+ * The built-in importers get the same treatment in `applyGeometryPass`, on the
+ * neutral mesh model and before anything is written. Geometry that arrived as a
+ * finished FBX has no such stage, so the equivalent happens here — on the
+ * `Vertices` and `Normals` arrays of every `Geometry`, which is the only place
+ * an FBX keeps positions.
+ *
+ * Deliberately *not* done by moving the root node's transform: a `Lcl Scaling`
+ * on a null is something importers apply inconsistently and bake-on-import
+ * settings quietly drop, whereas multiplied coordinates are the same in every
+ * program that opens the file.
+ */
+export function transformFbxGeometry(
+  root: FbxNode,
+  opts: { scale?: number; zUpToYUp?: boolean }
+): boolean {
+  const scale = opts.scale ?? 1
+  const rotate = opts.zUpToYUp === true
+  if (scale === 1 && !rotate) return false
+
+  let touched = false
+  for (const geo of findNodes(root, 'Geometry')) {
+    // Normals are direction vectors: they take the rotation but never the scale,
+    // because a uniform scale leaves a direction unchanged and normalising it
+    // afterwards would only undo the multiplication.
+    touched = mapTriples(geo, 'Vertices', scale, rotate) || touched
+    touched = mapTriples(geo, 'Normals', 1, rotate) || touched
+  }
+  return touched
+}
+
+/** Rewrite one `d`-array child in place, three values at a time. */
+function mapTriples(geo: FbxNode, child: string, scale: number, rotate: boolean): boolean {
+  const target = geo.children.find((c) => c.name === child)
+  if (!target) return false
+  const index = target.props.findIndex((p) => p.t === 'd' || p.t === 'f')
+  if (index < 0) return false
+  const prop = target.props[index]
+  if (prop.t !== 'd' && prop.t !== 'f') return false
+
+  const source = prop.v
+  const next = new Float64Array(source.length)
+  let i = 0
+  for (; i + 2 < source.length; i += 3) {
+    const x = source[i]
+    const y = source[i + 1]
+    const z = source[i + 2]
+    // Quarter turn about X, matching `rotateZupToYup` in mesh.ts.
+    next[i] = x * scale
+    next[i + 1] = (rotate ? z : y) * scale
+    next[i + 2] = (rotate ? -y : z) * scale
+  }
+  // A trailing partial triple is not something a valid file has; it is copied
+  // rather than dropped so a malformed input stays the length it arrived as.
+  for (; i < source.length; i++) next[i] = source[i]
+  target.props[index] = { t: 'd', v: next }
+  return true
+}
+

@@ -52,6 +52,9 @@ export const IPC = {
   toolsCancel: 'tools:convert-cancel',
   toolsProgress: 'tools:progress',
   toolsReveal: 'tools:reveal',
+  /* The assimp backend. Like `npp:*`, neither channel accepts an exe path. */
+  toolsAssimpStatus: 'tools:assimp-status',
+  toolsAssimpLocate: 'tools:assimp-locate',
 
   /* Tools — the Notepad++ bridge. No channel here accepts an exe path. */
   nppStatus: 'npp:status',

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
+  AssimpStatus,
   ConvertProgress,
   ConvertResult,
   FbxEncoding,
+  ForgeEngine,
   ForgeInput,
   ForgeOutputMode
 } from '@shared/types'
@@ -19,13 +21,17 @@ import type {
  * Options live in localStorage rather than settings: they are per-machine
  * preferences with no security weight. The output *directory* is the exception —
  * it lives in main's settings because it is a path, and paths only become
- * writable by passing through a native dialog.
+ * writable by passing through a native dialog. The assimp executable is the same
+ * kind of exception for the same reason, which is why `assimp` here is a status
+ * this window reads and never a path it sets.
  */
 
 const LS_OPTIONS = 'pz.tools.forge'
 
 export interface ForgeOptions {
   encoding: FbxEncoding
+  /** Which reader handles mesh inputs. */
+  engine: ForgeEngine
   /** Kept as text so a half-typed number does not reset the field. */
   scaleText: string
   outputMode: ForgeOutputMode
@@ -39,6 +45,7 @@ export interface ForgeOptions {
 
 const DEFAULTS: ForgeOptions = {
   encoding: 'binary',
+  engine: 'auto',
   scaleText: '1',
   outputMode: 'beside',
   yUp: false,
@@ -70,6 +77,10 @@ export interface ForgeStore {
   options: ForgeOptions
   setOptions(patch: Partial<ForgeOptions>): void
   outputDir: string | undefined
+  /** What main knows about assimp; `undefined` until the first probe returns. */
+  assimp: AssimpStatus | undefined
+  /** Ask the user to point at the assimp executable, then re-probe. */
+  locateAssimp(): Promise<void>
   add(): Promise<void>
   /** Queue every convertible file under a picked folder. Returns how many were new. */
   addFolder(): Promise<number>
@@ -90,6 +101,7 @@ export function useForge(): ForgeStore {
   const [inputs, setInputs] = useState<ForgeInput[]>([])
   const [options, setOptionsState] = useState<ForgeOptions>(readOptions)
   const [outputDir, setOutputDir] = useState<string>()
+  const [assimp, setAssimp] = useState<AssimpStatus>()
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<ConvertProgress>()
   const [result, setResult] = useState<ConvertResult>()
@@ -97,6 +109,12 @@ export function useForge(): ForgeStore {
 
   useEffect(() => {
     void window.pz.settings.get().then((s) => setOutputDir(s.toolsOutputDir))
+  }, [])
+
+  // Probed once on mount. The answer drives which formats the queue will accept,
+  // so it is wanted before the user opens the file dialog, not after.
+  useEffect(() => {
+    void window.pz.tools.assimpStatus().then(setAssimp, () => undefined)
   }, [])
 
   useEffect(() => {
@@ -165,6 +183,15 @@ export function useForge(): ForgeStore {
     setOptions({ outputMode: 'custom' })
   }, [setOptions])
 
+  const locateAssimp = useCallback(async () => {
+    try {
+      setAssimp(await window.pz.tools.assimpLocate())
+      setError(undefined)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
   const run = useCallback(async () => {
     const scale = parseScale(options.scaleText)
     if (inputs.length === 0 || scale === undefined) return
@@ -176,6 +203,7 @@ export function useForge(): ForgeStore {
         inputs: inputs.map((i) => i.path),
         outputMode: options.outputMode,
         encoding: options.encoding,
+        engine: options.engine,
         scale,
         yUp: options.yUp,
         rebuildNormals: options.rebuildNormals,
@@ -208,6 +236,8 @@ export function useForge(): ForgeStore {
       options,
       setOptions,
       outputDir,
+      assimp,
+      locateAssimp,
       add,
       addFolder,
       remove,
@@ -226,6 +256,8 @@ export function useForge(): ForgeStore {
       options,
       setOptions,
       outputDir,
+      assimp,
+      locateAssimp,
       add,
       addFolder,
       remove,

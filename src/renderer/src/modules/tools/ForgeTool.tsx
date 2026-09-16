@@ -1,11 +1,21 @@
 import { useMemo } from 'react'
-import type { ConvertItemResult, ConvertProgress, ForgeInput, ForgeKind } from '@shared/types'
+import type {
+  AssimpStatus,
+  ConvertItemResult,
+  ConvertProgress,
+  ForgeEngineUsed,
+  ForgeInput,
+  ForgeKind
+} from '@shared/types'
 import { Alert, CheckField, Group, OptionCard, Panel, Readout, SelectField, TextField } from '@renderer/components/Form'
 import { Icon, type IconName } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { hasKey, useI18n, type TKey } from '@renderer/i18n'
 import { copyText, formatBytes, formatCount, formatDuration, shortenPath } from '@renderer/lib/format'
 import { parseScale, type ForgeStore } from './useForge'
+
+/** What this app reads on its own; everything else in the list came from assimp. */
+const BUILTIN_MESH = new Set(['obj', 'stl', 'ply', 'x', 'dae', 'gltf', 'glb'])
 
 const KIND_ICON: Record<ForgeKind, IconName> = {
   mesh: 'cube',
@@ -27,6 +37,16 @@ const PHASE_KEY: Record<ConvertProgress['phase'], TKey> = {
   write: 'tl.phase.write',
   verify: 'tl.phase.verify',
   done: 'tl.phase.done'
+}
+
+const ENGINE_KEY: Record<ForgeEngineUsed, TKey> = {
+  builtin: 'tl.engineUsed.builtin',
+  assimp: 'tl.engineUsed.assimp'
+}
+
+const ENGINE_TITLE_KEY: Record<ForgeEngineUsed, TKey> = {
+  builtin: 'tl.engineUsed.builtinTitle',
+  assimp: 'tl.engineUsed.assimpTitle'
 }
 
 /**
@@ -161,6 +181,19 @@ export function ForgeTool({ store }: { store: ForgeStore }) {
 
       <Group title={t('tl.output')} help={t('help.tl.output')} cols>
         <SelectField
+          label={t('tl.engine')}
+          value={store.options.engine}
+          hint={t('tl.engineHint')}
+          help={t('help.tl.engine')}
+          disabled={store.busy}
+          options={[
+            { value: 'auto', label: t('tl.engineAuto') },
+            { value: 'assimp', label: t('tl.engineAssimp') },
+            { value: 'builtin', label: t('tl.engineBuiltin') }
+          ]}
+          onChange={(engine) => store.setOptions({ engine })}
+        />
+        <SelectField
           label={t('tl.encoding')}
           value={store.options.encoding}
           hint={t('tl.encodingHint')}
@@ -183,6 +216,10 @@ export function ForgeTool({ store }: { store: ForgeStore }) {
           onChange={(scaleText) => store.setOptions({ scaleText })}
         />
       </Group>
+
+      {store.options.engine === 'assimp' && store.assimp && !store.assimp.ready && (
+        <Alert kind="warn">{t('tl.assimpRequired')}</Alert>
+      )}
 
       <Group title={t('tl.dest')} help={t('help.tl.dest')}>
         <div className="wboptrow">
@@ -268,7 +305,7 @@ export function ForgeTool({ store }: { store: ForgeStore }) {
         />
       </Group>
 
-      <FormatsGroup />
+      <FormatsGroup assimp={store.assimp} onLocate={() => void store.locateAssimp()} busy={store.busy} />
 
       {store.progress && (
         <div className="tlprogress mono">
@@ -366,6 +403,18 @@ function ResultRow({
       {item.status === 'ok' && (
         <>
           <span className="tlrow__format mono">{item.format}</span>
+          {item.engine && (
+            // Which reader ran is not trivia: an `assimp` row and a `builtin` row
+            // for the same file can differ in materials and hierarchy, and a
+            // `builtin` row with the fallback marker is how a refused file shows.
+            <span
+              className={`tlpill ${item.fellBack ? 'tlpill--warn' : ''}`}
+              title={t(item.fellBack ? 'tl.engineFellBackTitle' : ENGINE_TITLE_KEY[item.engine])}
+            >
+              {t(ENGINE_KEY[item.engine])}
+              {item.fellBack ? ` ${t('tl.engineFellBack')}` : ''}
+            </span>
+          )}
           {(item.vertices ?? 0) > 0 && (
             <span className="tlrow__stats mono">
               {t('tl.rowStats', {
@@ -395,14 +444,60 @@ function ResultRow({
   )
 }
 
-/** Read-only recap of what the forge can read. */
-function FormatsGroup() {
+/** Read-only recap of what the forge can read, plus the state of the assimp backend. */
+function FormatsGroup({
+  assimp,
+  onLocate,
+  busy
+}: {
+  assimp: AssimpStatus | undefined
+  onLocate: () => void
+  busy: boolean
+}) {
   const { t } = useI18n()
+  // The full list runs to forty entries, which is a wall of text in a panel this
+  // wide. The count carries the same information and the tooltip has the rest.
+  const extra = useMemo(() => {
+    if (!assimp?.ready) return undefined
+    return assimp.importExts.filter((e) => !BUILTIN_MESH.has(e))
+  }, [assimp])
+
   return (
     <Group title={t('tl.formats')} help={t('help.tl.formats')}>
       <Readout label={t('tl.fmtMesh')} value="obj · stl · ply · x · dae · gltf · glb" />
+      {extra && extra.length > 0 && (
+        <div className="field" title={extra.join(' · ')}>
+          <span className="field__label label">{t('tl.fmtAssimp')}</span>
+          <span className="field__value is-wrap mono">
+            {t('tl.fmtAssimpValue', { n: String(extra.length), list: extra.slice(0, 12).join(' · ') })}
+          </span>
+        </div>
+      )}
       <Readout label={t('tl.fmtImage')} value="png · jpg · bmp · gif · tga · dds" />
       <Readout label={t('tl.fmtOther')} value={t('tl.fmtOtherValue')} mono={false} />
+
+      <div className="field">
+        <span className="field__label label">{t('tl.assimp')}</span>
+        <span className="field__value is-wrap mono">
+          {assimp === undefined
+            ? t('tl.assimpProbing')
+            : assimp.ready
+              ? t('tl.assimpReady', { v: assimp.version ?? '?', n: String(assimp.importExts.length) })
+              : assimp.installed
+                ? t(assimp.problem === 'noFbxExport' ? 'tl.assimpNoFbx' : 'tl.assimpUnusable')
+                : t('tl.assimpMissing')}
+        </span>
+      </div>
+      {assimp?.exePath && (
+        <Readout label={t('tl.assimpPath')} value={shortenPath(assimp.exePath, 4)} />
+      )}
+      <div className="btnrow">
+        <button className="btn" onClick={onLocate} disabled={busy}>
+          <Icon name="search" size={13} />
+          {assimp?.ready ? t('tl.assimpRelocate') : t('tl.assimpLocate')}
+        </button>
+      </div>
+
       <div className="tlnote">
         <Icon name="info" size={12} />
         <span className="label">{t('tl.formatsNote')}</span>

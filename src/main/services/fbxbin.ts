@@ -32,8 +32,52 @@ const HEAD_MAGIC = Buffer.from('Kaydara FBX Binary  \u0000\u001a\u0000', 'latin1
  */
 const FOOT_MAGIC = Buffer.from('fabcab09d0c8d466b176fb831cf7267e', 'hex')
 
-/** A record list is closed by an all-zero record header (FBX < 7500: 13 bytes). */
-const SENTINEL = Buffer.alloc(13)
+/**
+ * Record header width, which is the one thing FBX 7.5 changed about the container.
+ *
+ * Up to 7.4 a record header is `endOffset u32 | numProperties u32 |
+ * propertyListLen u32 | nameLen u8` — 13 bytes. From 7500 those three counters
+ * are u64, so the header is 25 bytes and the all-zero sentinel that closes a
+ * record list grows to match. Nothing else about the format moved.
+ *
+ * This matters beyond our own writer: assimp exports 7500, so a reader stuck on
+ * the narrow layout mis-reads the very first record of anything it produces.
+ */
+const NARROW_HEAD = 13
+const WIDE_HEAD = 25
+
+/** True when `version` uses the 64-bit record header. */
+function isWide(version: number): boolean {
+  return version >= 7500
+}
+
+function headSize(wide: boolean): number {
+  return wide ? WIDE_HEAD : NARROW_HEAD
+}
+
+/** A record list is closed by an all-zero record header. */
+const SENTINEL_NARROW = Buffer.alloc(NARROW_HEAD)
+const SENTINEL_WIDE = Buffer.alloc(WIDE_HEAD)
+
+function sentinel(wide: boolean): Buffer {
+  return wide ? SENTINEL_WIDE : SENTINEL_NARROW
+}
+
+/**
+ * Read a header counter, u32 or u64 depending on the container version.
+ *
+ * `Number` is safe here: the values are file offsets and property counts, and an
+ * FBX large enough to exceed 2^53 bytes is far past every other limit in this
+ * module.
+ */
+function readCounter(buf: Buffer, pos: number, wide: boolean): number {
+  return wide ? Number(buf.readBigUInt64LE(pos)) : buf.readUInt32LE(pos)
+}
+
+function writeCounter(buf: Buffer, value: number, pos: number, wide: boolean): void {
+  if (wide) buf.writeBigUInt64LE(BigInt(Math.trunc(value)), pos)
+  else buf.writeUInt32LE(value, pos)
+}
 
 /** Arrays at least this long are worth a deflate pass. */
 const COMPRESS_FROM = 128
@@ -223,32 +267,34 @@ function encodeProp(p: FbxProp): Buffer {
   }
 }
 
-function writeNode(n: FbxNode, out: Sink): void {
+function writeNode(n: FbxNode, out: Sink, wide: boolean): void {
   const nameBytes = Buffer.from(n.name, 'utf8')
   if (nameBytes.length > 255) throw new Error(`FBX node name too long: ${n.name}`)
 
-  // endOffset u32 | numProperties u32 | propertyListLen u32 | nameLen u8 | name
-  const head = Buffer.alloc(13 + nameBytes.length)
-  head.writeUInt32LE(n.props.length, 4)
-  head.writeUInt8(nameBytes.length, 12)
-  nameBytes.copy(head, 13)
+  // endOffset | numProperties | propertyListLen | nameLen u8 | name
+  const size = headSize(wide)
+  const step = wide ? 8 : 4
+  const head = Buffer.alloc(size + nameBytes.length)
+  writeCounter(head, n.props.length, step, wide)
+  head.writeUInt8(nameBytes.length, step * 3)
+  nameBytes.copy(head, size)
   out.push(head)
 
   const propsStart = out.len
   for (const p of n.props) out.push(encodeProp(p))
-  head.writeUInt32LE(out.len - propsStart, 8)
+  writeCounter(head, out.len - propsStart, step * 2, wide)
 
   // The sentinel closes a nested list. An empty record with no properties gets
   // one too: that is what the Autodesk writer does for `References: { }`, and
   // every parser tolerates it because the record's own end offset agrees.
   if (n.children.length > 0) {
-    for (const c of n.children) writeNode(c, out)
-    out.push(SENTINEL)
+    for (const c of n.children) writeNode(c, out, wide)
+    out.push(sentinel(wide))
   } else if (n.props.length === 0) {
-    out.push(SENTINEL)
+    out.push(sentinel(wide))
   }
 
-  head.writeUInt32LE(out.len, 0)
+  writeCounter(head, out.len, 0, wide)
 }
 
 /**
@@ -257,14 +303,15 @@ function writeNode(n: FbxNode, out: Sink): void {
  * `root` is a carrier: only its children become top-level records.
  */
 export function encodeFbxBinary(root: FbxNode, version: number): Buffer {
+  const wide = isWide(version)
   const out = new Sink()
   const header = Buffer.alloc(4)
   header.writeUInt32LE(version, 0)
   out.push(HEAD_MAGIC)
   out.push(header)
 
-  for (const child of root.children) writeNode(child, out)
-  out.push(SENTINEL)
+  for (const child of root.children) writeNode(child, out, wide)
+  out.push(sentinel(wide))
 
   // Footer. The 16-byte id, the alignment padding, the repeated version and the
   // 120 zero bytes are all fixed shape; only the closing magic is checked.
@@ -384,36 +431,42 @@ export function encodeFbxAscii(root: FbxNode, version: number): string {
  *
  * Anything the forge produces is read back with this before it is reported as a
  * success, which turns "the writer compiled" into "the file parses and holds the
- * geometry we intended". It handles the subset this codebase emits; it is not a
- * general FBX importer.
+ * geometry we intended". It also reads what assimp produces, which is FBX 7500
+ * and therefore uses the wide record header.
+ *
+ * It handles the subset this codebase emits plus that; it is not a general FBX
+ * importer.
  */
 export function decodeFbxBinary(buf: Buffer): { version: number; root: FbxNode } {
   if (buf.length < 27 || !buf.subarray(0, HEAD_MAGIC.length).equals(HEAD_MAGIC)) {
     throw new Error('not a binary FBX file')
   }
   const version = buf.readUInt32LE(HEAD_MAGIC.length)
+  const wide = isWide(version)
+  const size = headSize(wide)
   const root: FbxNode = { name: '', props: [], children: [] }
   let pos = HEAD_MAGIC.length + 4
 
-  while (pos + 13 <= buf.length) {
-    const endOffset = buf.readUInt32LE(pos)
-    if (endOffset === 0) break
-    const [child, next] = readNode(buf, pos)
+  while (pos + size <= buf.length) {
+    if (readCounter(buf, pos, wide) === 0) break
+    const [child, next] = readNode(buf, pos, wide)
     root.children.push(child)
     pos = next
   }
   return { version, root }
 }
 
-function readNode(buf: Buffer, pos: number): [FbxNode, number] {
-  const endOffset = buf.readUInt32LE(pos)
-  const numProps = buf.readUInt32LE(pos + 4)
-  const propsLen = buf.readUInt32LE(pos + 8)
-  const nameLen = buf.readUInt8(pos + 12)
-  const name = buf.toString('utf8', pos + 13, pos + 13 + nameLen)
+function readNode(buf: Buffer, pos: number, wide: boolean): [FbxNode, number] {
+  const size = headSize(wide)
+  const step = wide ? 8 : 4
+  const endOffset = readCounter(buf, pos, wide)
+  const numProps = readCounter(buf, pos + step, wide)
+  const propsLen = readCounter(buf, pos + step * 2, wide)
+  const nameLen = buf.readUInt8(pos + step * 3)
+  const name = buf.toString('utf8', pos + size, pos + size + nameLen)
   if (endOffset > buf.length) throw new Error(`record "${name}" runs past end of file`)
 
-  let cursor = pos + 13 + nameLen
+  let cursor = pos + size + nameLen
   const propsEnd = cursor + propsLen
   const props: FbxProp[] = []
   for (let i = 0; i < numProps && cursor < propsEnd; i++) {
@@ -424,12 +477,12 @@ function readNode(buf: Buffer, pos: number): [FbxNode, number] {
 
   const children: FbxNode[] = []
   cursor = propsEnd
-  // Strictly less than `endOffset`: when a record has children, the last 13
-  // bytes before its end are the all-zero sentinel, and reading *that* as a
-  // record yields an end offset of 0 and walks the parser back to the header.
-  while (cursor + 13 < endOffset) {
-    if (buf.readUInt32LE(cursor) === 0) break
-    const [child, next] = readNode(buf, cursor)
+  // Strictly less than `endOffset`: when a record has children, the last header's
+  // worth of bytes before its end is the all-zero sentinel, and reading *that* as
+  // a record yields an end offset of 0 and walks the parser back to the header.
+  while (cursor + size < endOffset) {
+    if (readCounter(buf, cursor, wide) === 0) break
+    const [child, next] = readNode(buf, cursor, wide)
     children.push(child)
     cursor = next
   }

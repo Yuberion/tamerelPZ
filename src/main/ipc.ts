@@ -17,11 +17,13 @@ import type {
   WriteModInfoRequest
 } from '../shared/types'
 import { listAuthoringTargets, readModInfoDraft, scaffoldMod, writeModInfo } from './services/authoring'
+import { assimpStatus, cancelAssimp, looksLikeAssimp, prepareAssimp } from './services/assimp'
 import {
   assertForgePath,
   collectConvertible,
   convertFiles,
   inspectInputs,
+  meshExts,
   rememberPickedDir,
   rememberPickedFiles
 } from './services/convert'
@@ -74,13 +76,23 @@ let shoveCancelled = false
 /** Same contract for the FBX forge, which walks its queue one file at a time. */
 let convertCancelled = false
 
-/** File dialog filters for the forge: what it can actually read, then everything. */
-const FORGE_FILTERS: Electron.FileFilter[] = [
-  { name: 'Meshes (obj, stl, ply, x, dae, gltf, glb)', extensions: ['obj', 'stl', 'ply', 'x', 'dae', 'gltf', 'glb'] },
-  { name: 'Images (png, jpg, bmp, tga, dds)', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'tga', 'dds', 'webp'] },
-  { name: 'FBX', extensions: ['fbx'] },
-  { name: 'All files', extensions: ['*'] }
-]
+/**
+ * File dialog filters for the forge: what it can actually read, then everything.
+ *
+ * The mesh filter is built per call rather than fixed, because what the forge
+ * reads depends on whether assimp answered: seven formats without it, around
+ * forty with it, and a dialog that hides the file the user came to convert is
+ * worse than a long list.
+ */
+function forgeFilters(): Electron.FileFilter[] {
+  const meshes = [...meshExts()].sort()
+  return [
+    { name: `Meshes (${meshes.slice(0, 8).join(', ')}${meshes.length > 8 ? ', …' : ''})`, extensions: meshes },
+    { name: 'Images (png, jpg, bmp, tga, dds)', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'tga', 'dds', 'webp'] },
+    { name: 'FBX', extensions: ['fbx'] },
+    { name: 'All files', extensions: ['*'] }
+  ]
+}
 
 export function registerIpc(): void {
   ipcMain.handle(IPC.appInfo, (): AppInfo => {
@@ -302,21 +314,25 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.toolsPick, async (e) => {
     const win = senderWindow(e)
+    const settings = await getSettings()
+    // Probed before the dialog opens so the mesh filter lists what assimp adds.
+    await prepareAssimp(settings)
     const options: Electron.OpenDialogOptions = {
       title: 'Pick files to convert to FBX',
       properties: ['openFile', 'multiSelections'],
-      filters: FORGE_FILTERS
+      filters: forgeFilters()
     }
     const result = win
       ? await dialog.showOpenDialog(win, options)
       : await dialog.showOpenDialog(options)
     if (result.canceled || result.filePaths.length === 0) return []
     rememberPickedFiles(result.filePaths)
-    return inspectInputs(result.filePaths)
+    return inspectInputs(settings, result.filePaths)
   })
 
   ipcMain.handle(IPC.toolsPickFolder, async (e) => {
     const win = senderWindow(e)
+    const settings = await getSettings()
     const options: Electron.OpenDialogOptions = {
       title: 'Pick a folder of files to convert',
       properties: ['openDirectory']
@@ -328,10 +344,10 @@ export function registerIpc(): void {
     if (!picked) return []
     // The folder itself is consented too, so "beside the source" can write there.
     rememberPickedDir(picked)
-    const found = await collectConvertible(picked)
+    const found = await collectConvertible(settings, picked)
     if (found.length === 0) return []
     rememberPickedFiles(found)
-    return inspectInputs(found)
+    return inspectInputs(settings, found)
   })
 
   ipcMain.handle(IPC.toolsPickOutput, async (e) => {
@@ -371,6 +387,9 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.toolsCancel, async () => {
     convertCancelled = true
+    // The flag alone only stops the queue between files. An assimp child can be
+    // a minute into a large model, so cancelling has to reach the process too.
+    cancelAssimp()
   })
 
   ipcMain.handle(IPC.toolsReveal, async (_e, path: string) => {
@@ -380,6 +399,34 @@ export function registerIpc(): void {
     const target = await assertForgePath(await getSettings(), path)
     if (await isDir(target)) await shell.openPath(target)
     else shell.showItemInFolder(target)
+  })
+
+  // --- Tools (module 07): the assimp backend ---------------------------------
+  // Same rule as the Notepad++ bridge: the renderer asks *whether* assimp is
+  // there and may ask the user to find it, but never supplies the path itself.
+  // A picked path is probed before it is believed, so settings cannot be turned
+  // into a way to run an arbitrary executable on every conversion.
+
+  ipcMain.handle(IPC.toolsAssimpStatus, async () => assimpStatus(await getSettings()))
+
+  ipcMain.handle(IPC.toolsAssimpLocate, async (e) => {
+    const win = senderWindow(e)
+    const options: Electron.OpenDialogOptions = {
+      title: 'Pick the assimp executable or its folder',
+      properties: ['openFile'],
+      filters:
+        process.platform === 'win32'
+          ? [{ name: 'assimp', extensions: ['exe'] }, { name: 'All files', extensions: ['*'] }]
+          : [{ name: 'All files', extensions: ['*'] }]
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+    const picked = result.canceled ? undefined : result.filePaths[0]
+    if (picked && (await looksLikeAssimp(picked))) {
+      await setSettings({ assimpPath: picked })
+    }
+    return assimpStatus(await getSettings())
   })
 
   // --- Tools (module 07): the Notepad++ bridge -------------------------------

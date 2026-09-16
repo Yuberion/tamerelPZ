@@ -20,7 +20,7 @@ On launch the app auto-detects your Steam installation, every Steam library fold
 
 Then it reports cross-mod problems: **duplicate mod ids**, **unresolved requires**, and **mods with no readable `mod.info`**.
 
-The **Workbench** module then lets you author mods: scaffold a new one, edit its `mod.info`, run ~30 static checks over it, and pack it for the Workshop. The **Loadout** module edits the mod lists the game itself reads, so the inventory can be turned into an actual load order. The **Ledger** module reads the game's own logs back, folds each crash into a single entry and points at the mod that threw it. The **Tools** module converts arbitrary files into `.fbx` with its own writer — including the text DirectX `.x` files PZ ships its models in — and teaches Notepad++ to read `media/scripts` and `mod.info`.
+The **Workbench** module then lets you author mods: scaffold a new one, edit its `mod.info`, run ~30 static checks over it, and pack it for the Workshop. The **Loadout** module edits the mod lists the game itself reads, so the inventory can be turned into an actual load order. The **Ledger** module reads the game's own logs back, folds each crash into a single entry and points at the mod that threw it. The **Tools** module converts arbitrary files into `.fbx` with its own writer — including the text DirectX `.x` files PZ ships its models in, and, when assimp is installed, roughly forty more formats through it — and teaches Notepad++ to read `media/scripts` and `mod.info`.
 
 ## Features
 
@@ -93,23 +93,29 @@ Rows are virtualised, so a 10,000-line tail scrolls at native speed. Parsing run
 
 Two tools that share a toolbar and nothing else.
 
-**FBX forge** — turns a file into an `.fbx`. There is no FBX SDK and no external converter involved: the mesh readers, the FBX 7.4 binary container, the ASCII container and the verifier are all part of the app, in keeping with the zero-dependency rule (only `zlib`, a Node builtin, is borrowed — FBX array properties are plain zlib streams).
+**FBX forge** — turns a file into an `.fbx`. The app keeps its own writer: the mesh readers, the FBX binary container, the ASCII container and the verifier are all part of it, in keeping with the zero-dependency rule (only `zlib`, a Node builtin, is borrowed — FBX array properties are plain zlib streams). There is no FBX SDK, and no npm package was added for any of it.
+
+What *is* optional is a second **reader**. If [assimp](https://github.com/assimp/assimp)'s command-line tool is on the machine, the forge will use it for the mesh route, which takes the list of convertible formats from seven to around forty. It is a child process, not a linked library — nothing is compiled, nothing is bundled, and with assimp absent the forge is exactly what it was.
 
 | Route | Inputs | What comes out |
 |---|---|---|
-| **Mesh** | `obj`, `stl` (ascii + binary), `ply` (ascii + binary LE), `x` (text + binary), `dae`, `gltf`, `glb` | Real geometry: shared vertex pool, n-gons kept as n-gons, per-corner normals and UVs, one FBX material per source material |
+| **Mesh** | `obj`, `stl` (ascii + binary), `ply` (ascii + binary LE), `x` (text + binary), `dae`, `gltf`, `glb` — plus everything assimp reads, when it is installed | Real geometry: shared vertex pool, n-gons kept as n-gons, per-corner normals and UVs, one FBX material per source material |
 | **Image** | `png`, `jpg`, `bmp`, `gif`, `tga`, `dds` | A quad with the picture's aspect ratio, 100 units on its long side, the file embedded as media |
-| **Re-encode** | `fbx` (binary) | The same document as ASCII |
+| **Re-encode** | `fbx` (binary, 7.4 or 7.5) | The same document as ASCII |
 | **Capsule** | anything else | A named null carrying name, size, mtime and SHA-256 as custom properties, plus the original bytes as embedded media. **No geometry is invented** |
 
 Details that matter in practice:
 
+- **Two readers, one writer.** The *Reader* setting is `Auto`, `assimp only` or `Built-in only`. assimp is never asked for the final file: it is asked for binary FBX into a scratch file, which is then parsed, corrected and re-encoded here — so encoding, scale and the Z-up correction behave identically on both engines, and the result row says which reader actually ran.
+- **`Auto` falls back, and the fallback earns its keep.** assimp refuses Project Zomboid's own animated `.x` files (0 of 40 sampled from `media/anims_X` load), while the built-in parser reads their mesh. `Auto` tries assimp, hands a refused file to the built-in reader, and marks the row `built-in (fallback)` rather than hiding the switch.
+- **assimp is found, not configured.** Settings first, then a copy shipped in `resources/assimp`, then the usual install directories, then `PATH`. A candidate earns nothing until it answers `assimp version`, and the renderer never supplies the path — same rule as the Notepad++ bridge, for the same reason.
 - **Binary is the default** because Blender's importer rejects ASCII FBX outright. ASCII stays available — it is readable, diffable, and what the Autodesk tools and Unity accept.
 - **Embedding is a choice, but the reference is not.** With embedding on, the source bytes travel inside the `.fbx` (raw in binary, base64 in ASCII). With it off — or when the payload is over the 96 MB cap — the media node is still written and points at the file by path, so a texture still resolves and a capsule still knows where it came from.
-- **DirectX `.x` is here because Project Zomboid ships its own models in it**, and both flavours are read. The text one is brace-scanned; the binary one is a flat token stream of names, braces and typed number lists, where the float width comes from the header (`0032`/`0064`), GUIDs are 16 bytes of payload to skip rather than read, and `template` blocks declare the schema and must be discarded — get any of those wrong and you get a plausible-looking wrong mesh. Both collapse onto one block tree, so a single mesh reader serves them. `Frame` hierarchies are honoured: transforms are composed down the tree and baked into the vertices. Because DirectX is left-handed, geometry is mirrored on Z and every polygon rewound — otherwise every model arrives inside out. The **compressed** flavours (`tzip`, `bzip`) are refused: they wrap the token stream in MSZIP framing that `zlib` alone cannot walk.
+- **DirectX `.x` is here because Project Zomboid ships its own models in it**, and both flavours are read. The text one is brace-scanned; the binary one is a flat token stream of names, braces and typed number lists, where the float width comes from the header (`0032`/`0064`), GUIDs are 16 bytes of payload to skip rather than read, and `template` blocks declare the schema and must be discarded — get any of those wrong and you get a plausible-looking wrong mesh. Both collapse onto one block tree, so a single mesh reader serves them. `Frame` hierarchies are honoured: transforms are composed down the tree and baked into the vertices. Because DirectX is left-handed, geometry is mirrored on Z and every polygon rewound — otherwise every model arrives inside out. The **compressed** flavours (`tzip`, `bzip`) are refused: they wrap the token stream in MSZIP framing that `zlib` alone cannot walk, and assimp refuses them too.
 - **glTF and Collada node transforms are baked** the same way; a reader that ignores them piles every part of a model at the origin. Collada's `<up_axis>` is honoured, and a declared axis always beats the "source is Z-up" checkbox.
 - **STL always welds.** It repeats every shared corner, so a cube arrives as 36 vertices instead of 8; welding is keyed on a 1e-5 grid because exporters round.
-- **Verify after writing** re-parses the file that was just written with an independent reader and checks the mesh count, vertex data and polygon corners against what was intended. On by default for binary output — it is the difference between "the writer did not throw" and "the file parses and holds the geometry".
+- **Both FBX container generations are read.** 7.5 moved the three record-header counters from `u32` to `u64` and grew the list terminator from 13 bytes to 25; the codec switches on the version, which is what lets the verifier check assimp's output and the re-encode route accept a 7.5 file.
+- **Verify after writing** re-parses the file that was just written with an independent reader and checks the mesh count, vertex data and polygon corners against what was intended. On by default for binary output — it is the difference between "the writer did not throw" and "the file parses and holds the geometry". On the assimp route it compares the written file against what was counted in assimp's own output, since there is no scene of ours to compare a foreign document to.
 - **Scale** is applied before writing; FBX's unit is the centimetre, so a model authored in metres wants `100`.
 - **Add folder** queues every convertible file under a directory, recursively — capped at 2000 files and depth 6, symlinks skipped. It collects only extensions the forge actually reads: adding a folder is a request to convert its models, not to wrap its readme in a capsule.
 
@@ -222,8 +228,9 @@ src/
       loadout.ts         default.txt / server ini mod lists (Loadout)
       logs.ts            console.txt + Logs\*.txt tail reader (Ledger, read-only)
       convert.ts         FBX forge orchestration + the picked-path consent rule (Tools)
-      fbx.ts             FBX 7.4 document builder + verifier (Tools)
-      fbxbin.ts          hand-rolled FBX binary/ASCII codecs and node tree (Tools)
+      assimp.ts          assimp discovery, capability probe and export runs (Tools)
+      fbx.ts             FBX document builder, verifier + foreign-document passes (Tools)
+      fbxbin.ts          hand-rolled FBX binary/ASCII codecs and node tree, 7.4 + 7.5 (Tools)
       mesh.ts            OBJ/STL/PLY readers, welding, normals, axis + scale passes
       meshdcc.ts         DirectX .x / Collada / glTF readers, transforms baked
       npp.ts             Notepad++ detection + the PZ syntax pack (Tools)
@@ -290,6 +297,7 @@ Mod artwork and image previews load over a custom privileged scheme, `pzfile://f
 | `tools:pick` · `tools:pick-folder` · `tools:pick-output` | Native dialogs; the only way a path outside the mod roots enters the forge |
 | `tools:convert` · `tools:convert-cancel` · `tools:progress` | Run the FBX forge; progress *(event)*, throttled to ~60ms |
 | `tools:reveal` | Reveal a converted file / open the output folder (picked-path rule, not the read guard) |
+| `tools:assimp-status` · `tools:assimp-locate` | Report whether assimp is usable; let the user point at it. Neither accepts a path from the renderer |
 | `npp:status` · `npp:locate` | Probe for Notepad++; ask the user where it lives |
 | `npp:install` · `npp:preview` | Write the PZ syntax pack; render it as text first |
 | `npp:open` | Open one allowlisted file in Notepad++, optionally at a line |
@@ -304,8 +312,9 @@ Everything below is hand-rolled — the project has **no runtime dependencies at
 - **Syntax highlighter** (`lib/highlight.ts`, ~82 lines) — regex tokenizers for Lua, JSON, XML and INI (`mod.info` highlights as INI).
 - **Icon set** (`components/Icon.tsx`) — ~70 inline 24×24 stroke SVGs.
 - **Zip / PNG writers** (`services/binfmt.ts`) — CRC32 table, local + central directory records and PNG chunk framing written by hand; DEFLATE borrowed from Node's builtin `zlib`. Already-compressed extensions are stored rather than re-deflated.
-- **FBX containers** (`services/fbxbin.ts`) — the record format (end offset, property list, 13-byte nested-list sentinel), all eleven property types, zlib-packed array properties, the 23-byte header magic and the footer, plus a reader used to verify what was just written. Object names are stored reversed in binary (`Torso\0\1Model`) and as `Model::Torso` in ASCII, which is why the node tree carries a name *pair* and lets each encoder spell it its own way.
+- **FBX containers** (`services/fbxbin.ts`) — the record format, all eleven property types, zlib-packed array properties, the 23-byte header magic and the footer, plus a reader used to verify what was just written. Both container generations: up to 7.4 the three record-header counters are `u32` and the nested-list sentinel is 13 bytes, from 7.5 they are `u64` and it is 25 — the codec switches on the version in both directions, which is what makes assimp's 7.5 output readable here. Object names are stored reversed in binary (`Torso\0\1Model`) and as `Model::Torso` in ASCII, which is why the node tree carries a name *pair* and lets each encoder spell it its own way.
 - **Mesh readers** (`services/mesh.ts`, `services/meshdcc.ts`) — OBJ, STL (ascii + binary), PLY (ascii + binary LE), DirectX `.x` (text + binary token stream), Collada and glTF/GLB, all normalised to one model: shared position pool, n-gon polygons, attributes per polygon *corner* (the only layout that survives all six formats without an index table). Newell's method for n-gon normals, 1e-5 grid welding, and one flat-matrix convention that happens to be both DirectX's row-vector layout and glTF's column-vector layout, so both formats' matrices drop in untouched.
+- **assimp as a process, not a dependency** (`services/assimp.ts`) — discovery across settings, a shipped copy, the usual install dirs and `PATH`; a probe (`version`, `listext`, `listexport`) cached against the executable's mtime; `AbortController`-backed runs so cancelling the queue reaches the child. Ambiguous extensions assimp claims (`.xml`, `.zip`, `.raw`, …) are dropped from the accepted set, because classifying every layout file in a mod as a mesh is worse than carrying it as a capsule.
 - **`pLimit`** (`fsx.ts`, ~20 lines) — used at 48 (stat/listing), 32 (source enumeration) and 28 (mod analysis) so thousands of `stat` calls don't stampede.
 - **Frameless titlebar** — `frame: false` plus a React `TitleBar` with `-webkit-app-region` drag zones; native menu removed.
 - **Image dimensions without decoding** — PNG/GIF/BMP/JPEG headers parsed from the first ≤64KB; the forge adds DDS and TGA so a texture becomes a correctly proportioned quad.
@@ -355,6 +364,9 @@ Written atomically (tmp file + rename) and treated as best-effort — a corrupt 
   // Output container for the Tools converter. Only ever written by the module's
   // own folder dialog — that dialog is what makes the path writable at all.
   "toolsOutputDir": "…",
+  // assimp executable, when detection needs a manual answer. Probed before it is
+  // accepted, and never supplied by the renderer.
+  "assimpPath": "…",
   // Notepad++ install folder, when detection needs a manual answer.
   "nppPathOverride": "…",
   // Saved Loadout lists, newest first. Written by the module, not by hand.

@@ -815,7 +815,9 @@ export const EN = {
   'help.tl.tabs':
     'Two tools that share a toolbar and nothing else. The forge converts files into FBX; the Notepad++ page teaches that editor to read the two file formats Project Zomboid invented for itself. A queue you build in the forge survives switching to the other tab and back.',
   'help.tl.forge':
-    'Writes FBX 7.4 with no external converter involved — the mesh readers and both container writers are part of this app. Mesh formats become real geometry: vertices, polygons, per-corner normals and UVs, one material per source material. An image becomes a correctly proportioned quad with the picture embedded. Anything else becomes a capsule: a named null carrying the file\u2019s metadata and, if you let it, the original bytes. No geometry is ever invented.',
+    'Writes FBX 7.4 with its own writer — the mesh readers and both container writers are part of this app. Mesh formats become real geometry: vertices, polygons, per-corner normals and UVs, one material per source material. An image becomes a correctly proportioned quad with the picture embedded. Anything else becomes a capsule: a named null carrying the file\u2019s metadata and, if you let it, the original bytes. No geometry is ever invented. When assimp is installed it is offered as a second reader for the formats this app does not parse itself.',
+  'help.tl.engine':
+    'Two readers, one writer. The built-in importers handle seven formats and are the only thing running when assimp is absent. assimp reads around forty, and reads more of the formats they share: material libraries, texture references and deep node graphs that a hand-written parser drops. Auto tries assimp and falls back — which matters, because assimp refuses Project Zomboid\u2019s own animated .x files and the built-in parser reads them. The FBX itself is written here either way: assimp is asked for binary FBX, and this app re-encodes it, so encoding, scale and the Z-up correction mean the same thing on both.',
   'help.tl.queue':
     'Files are added through a native file dialog, and that is not just a convenience: the dialog is how a path outside your mod folders becomes readable at all. Nothing else in this app may hand the forge a path, which is what keeps a converter from doubling as a way to read the rest of your drive.',
   'help.tl.output':
@@ -827,9 +829,9 @@ export const EN = {
   'help.tl.dest':
     'Beside the source writes into the file\u2019s own folder. That is refused for anything inside the game install or Steam\u2019s Workshop cache — those are read-only in this app by design, because the game replaces one on update and Steam silently reverts the other. Pick a folder instead, and it is remembered.',
   'help.tl.geometry':
-    'Corrections applied on the way in. Z-up matters for CAD and Blender exports; the flag is ignored for formats that state their own axis, such as Collada. Welding is only useful for triangle-soup formats — STL repeats every shared corner, so a cube arrives as 36 vertices instead of 8. Rebuilding normals gives flat shading from polygon winding, which is honest: the source said nothing about smoothing.',
+    'Corrections applied on the way in. Z-up matters for CAD and Blender exports; the flag is ignored for formats that state their own axis, such as Collada, and assimp normalises the axis itself, so with that reader the flag is usually unnecessary. Welding is only useful for triangle-soup formats — STL repeats every shared corner, so a cube arrives as 36 vertices instead of 8. Rebuilding normals gives flat shading from polygon winding, which is honest: the source said nothing about smoothing. All four apply to both readers — assimp is asked for binary FBX and the corrections land on its vertex arrays here.',
   'help.tl.formats':
-    'DirectX .x is here because it is the format Project Zomboid ships its own models in — both the text and the binary flavour are read, and the two compressed flavours are refused rather than guessed at. glTF and Collada arrive with a scene graph, so node transforms are composed and baked into the vertices instead of being dropped, which is what otherwise piles every part of a model at the origin.',
+    'DirectX .x is here because it is the format Project Zomboid ships its own models in — both the text and the binary flavour are read, and the two compressed flavours are refused rather than guessed at. glTF and Collada arrive with a scene graph, so node transforms are composed and baked into the vertices instead of being dropped, which is what otherwise piles every part of a model at the origin. The assimp row below is the optional second reader: when it answers, the list of convertible formats grows from seven to around forty, and the file dialog widens with it.',
   'help.tl.npp':
     'Notepad++ is found through the registry, then the folders its installers use, then whatever you point it at. The syntax pack is written into Notepad++\u2019s own userDefineLangs folder, which it reads file by file since 7.6 — so nothing it ships is overwritten, nothing needs administrator rights, and deleting the two files undoes all of it.',
   'help.tl.nppEditor':
@@ -849,7 +851,7 @@ export const EN = {
 
   // ---- tools: forge panel -------------------------------------------------
   'tl.forgeTitle': 'Any file → .fbx',
-  'tl.forgeLede': 'Own FBX writer, no external converter. Meshes convert; everything else is carried.',
+  'tl.forgeLede': 'Own FBX writer. Two readers: the built-in importers, and assimp when it is there.',
   'tl.add': 'Add files',
   'tl.addTitle': 'Pick files to convert',
   'tl.addFolder': 'Add folder',
@@ -878,9 +880,15 @@ export const EN = {
   'tl.note.asciiFbx': 'ascii fbx',
   'tl.note.tooLarge': 'too large',
   'tl.note.truncated': 'truncated',
+  'tl.note.assimpOnly': 'assimp only',
 
   // ---- tools: output ------------------------------------------------------
   'tl.output': 'Output',
+  'tl.engine': 'Reader',
+  'tl.engineHint': 'Who parses the source file. The .fbx is written here either way.',
+  'tl.engineAuto': 'Auto — assimp, then built-in',
+  'tl.engineAssimp': 'assimp only',
+  'tl.engineBuiltin': 'Built-in only',
   'tl.encoding': 'Encoding',
   'tl.encodingHint': 'Blender only reads binary.',
   'tl.encBinary': 'Binary — FBX 7.4',
@@ -914,10 +922,30 @@ export const EN = {
   // ---- tools: formats -----------------------------------------------------
   'tl.formats': 'What converts',
   'tl.fmtMesh': 'Geometry',
+  'tl.fmtAssimp': 'Via assimp',
+  'tl.fmtAssimpValue': '{list} — {n} more formats',
   'tl.fmtImage': 'Textures',
   'tl.fmtOther': 'Everything else',
   'tl.fmtOtherValue': 'carried as a capsule — metadata plus the original bytes, no invented mesh',
   'tl.formatsNote': 'Text and binary DirectX .x both read; the compressed flavours are refused.',
+
+  // ---- tools: assimp backend ----------------------------------------------
+  'tl.assimp': 'assimp',
+  'tl.assimpProbing': 'looking for it…',
+  'tl.assimpReady': 'version {v} · {n} formats',
+  'tl.assimpMissing': 'not installed — the built-in reader is doing everything',
+  'tl.assimpUnusable': 'found, but it did not answer — check its DLL sits beside it',
+  'tl.assimpNoFbx': 'found, but this build cannot export FBX',
+  'tl.assimpPath': 'Executable',
+  'tl.assimpLocate': 'Locate assimp',
+  'tl.assimpRelocate': 'Point at another build',
+  'tl.assimpRequired': 'The reader is set to assimp only, and no usable assimp was found. Locate it below, or switch the reader to Auto.',
+  'tl.engineUsed.builtin': 'built-in',
+  'tl.engineUsed.builtinTitle': 'Parsed by this app\u2019s own importer.',
+  'tl.engineUsed.assimp': 'assimp',
+  'tl.engineUsed.assimpTitle': 'Parsed by assimp, then re-encoded here.',
+  'tl.engineFellBack': '(fallback)',
+  'tl.engineFellBackTitle': 'assimp refused this file, so the built-in importer took it.',
 
   // ---- tools: progress & results ------------------------------------------
   'tl.phase.read': 'reading',
@@ -953,6 +981,13 @@ export const EN = {
   'tl.msg.truncated': 'the source file was cut short — converted what was readable',
   'tl.msg.verifyFailed': 'written, but the check on re-reading it failed',
   'tl.msg.unknownFormat': 'no importer for this format',
+  'tl.msg.assimpFellBack': 'assimp refused it — converted with the built-in reader',
+  'tl.msg.assimpFailed': 'assimp could not read this file',
+  'tl.msg.assimpNoOutput': 'assimp reported success but wrote nothing',
+  'tl.msg.assimpCancelled': 'stopped while assimp was running',
+  'tl.msg.noAssimp': 'no usable assimp — switch the reader to Auto or locate it',
+  'tl.msg.needsAssimp': 'only assimp reads this format, and it is not available',
+  'tl.msg.builtinFormat': 'the built-in reader does not read this format',
 
   // ---- tools: notepad++ ---------------------------------------------------
   'tl.nppTitle': 'Notepad++ for Project Zomboid',
@@ -1845,7 +1880,9 @@ export const RU: Record<TKey, string> = {
   'help.tl.tabs':
     'Два инструмента, у которых общего только панель сверху. Кузница конвертирует файлы в FBX; страница Notepad++ учит этот редактор читать два формата, которые Project Zomboid придумал для себя. Собранная очередь не теряется при переключении вкладок.',
   'help.tl.forge':
-    'Пишет FBX 7.4 без единого внешнего конвертера — и чтение мешей, и оба формата контейнера являются частью приложения. Меш-форматы становятся настоящей геометрией: вершины, полигоны, нормали и UV на каждый угол, по материалу на исходный материал. Картинка становится плоскостью с правильными пропорциями и вложенным изображением. Всё остальное становится капсулой: именованный null с метаданными файла и, если разрешить, исходными байтами. Геометрия никогда не выдумывается.',
+    'Пишет FBX 7.4 своим собственным писателем — и чтение мешей, и оба формата контейнера являются частью приложения. Меш-форматы становятся настоящей геометрией: вершины, полигоны, нормали и UV на каждый угол, по материалу на исходный материал. Картинка становится плоскостью с правильными пропорциями и вложенным изображением. Всё остальное становится капсулой: именованный null с метаданными файла и, если разрешить, исходными байтами. Геометрия никогда не выдумывается. Если установлен assimp, он предлагается вторым читателем — для форматов, которые приложение само не разбирает.',
+  'help.tl.engine':
+    'Два читателя, один писатель. Встроенные импортёры знают семь форматов и работают в одиночку, когда assimp нет. assimp читает около сорока — и читает глубже там, где форматы общие: библиотеки материалов, ссылки на текстуры и вложенные графы узлов, которые самописный парсер теряет. «Авто» пробует assimp и откатывается на встроенный — это не теория: assimp отказывается от анимационных .x самой Project Zomboid, а встроенный парсер их читает. Сам FBX в любом случае пишется здесь: у assimp запрашивается бинарный FBX, приложение перекодирует его, поэтому кодировка, масштаб и правка Z-вверх означают одно и то же на обоих читателях.',
   'help.tl.queue':
     'Файлы добавляются через системный диалог, и это не для удобства: именно диалог делает путь вне ваших папок с модами читаемым. Больше ничто в приложении не может передать кузнице путь — иначе конвертер заодно стал бы способом читать весь диск.',
   'help.tl.output':
@@ -1857,9 +1894,9 @@ export const RU: Record<TKey, string> = {
   'help.tl.dest':
     'Рядом с исходником — значит в его собственную папку. Для всего внутри установки игры и кэша Workshop это запрещено: в этом приложении они только для чтения, потому что первую игра заменяет при обновлении, а вторую Steam молча откатывает. Тогда выберите папку — она запомнится.',
   'help.tl.geometry':
-    'Правки на входе. Z-вверх важен для экспорта из CAD и Blender; для форматов, которые сами объявляют ось (например Collada), флаг игнорируется. Сварка нужна только форматам-«супу из треугольников»: STL повторяет каждый общий угол, поэтому куб приезжает как 36 вершин вместо 8. Пересчёт нормалей даёт плоское затенение по обходу полигона — это честно: об сглаживании исходник ничего не сказал.',
+    'Правки на входе. Z-вверх важен для экспорта из CAD и Blender; для форматов, которые сами объявляют ось (например Collada), флаг игнорируется, а assimp приводит ось сам, поэтому с ним флаг обычно не нужен. Сварка нужна только форматам-«супу из треугольников»: STL повторяет каждый общий угол, поэтому куб приезжает как 36 вершин вместо 8. Пересчёт нормалей даёт плоское затенение по обходу полигона — это честно: об сглаживании исходник ничего не сказал. Все четыре правки действуют на обоих читателях: у assimp запрашивается бинарный FBX, и правки ложатся на его массивы вершин уже здесь.',
   'help.tl.formats':
-    'DirectX .x здесь потому, что именно в этом формате Project Zomboid поставляет свои модели — читаются и текстовый, и бинарный варианты, а два сжатых отклоняются, а не угадываются. glTF и Collada приходят со графом сцены, поэтому трансформации узлов перемножаются и запекаются в вершины, а не выбрасываются — иначе все части модели свалятся в начало координат.',
+    'DirectX .x здесь потому, что именно в этом формате Project Zomboid поставляет свои модели — читаются и текстовый, и бинарный варианты, а два сжатых отклоняются, а не угадываются. glTF и Collada приходят со графом сцены, поэтому трансформации узлов перемножаются и запекаются в вершины, а не выбрасываются — иначе все части модели свалятся в начало координат. Строка assimp ниже — необязательный второй читатель: когда он отвечает, список конвертируемых форматов растёт с семи до примерно сорока, и вместе с ним расширяется файловый диалог.',
   'help.tl.npp':
     'Notepad++ ищется в реестре, затем в папках его установщиков, затем там, куда укажете вы. Пакет синтаксиса пишется в собственную папку userDefineLangs, которую Notepad++ читает по файлам начиная с 7.6 — так ничего из штатного не перезаписывается, права администратора не нужны, а удаление двух файлов отменяет всё.',
   'help.tl.nppEditor':
@@ -1879,7 +1916,7 @@ export const RU: Record<TKey, string> = {
 
   // ---- tools: панель кузницы ------------------------------------------------
   'tl.forgeTitle': 'Любой файл → .fbx',
-  'tl.forgeLede': 'Свой писатель FBX, без внешних конвертеров. Меши конвертируются, остальное переносится.',
+  'tl.forgeLede': 'Свой писатель FBX. Два читателя: встроенные импортёры и assimp, когда он есть.',
   'tl.add': 'Добавить файлы',
   'tl.addTitle': 'Выбрать файлы для конвертации',
   'tl.addFolder': 'Добавить папку',
@@ -1908,9 +1945,15 @@ export const RU: Record<TKey, string> = {
   'tl.note.asciiFbx': 'ascii fbx',
   'tl.note.tooLarge': 'слишком большой',
   'tl.note.truncated': 'обрезан',
+  'tl.note.assimpOnly': 'только assimp',
 
   // ---- tools: вывод ---------------------------------------------------------
   'tl.output': 'Вывод',
+  'tl.engine': 'Читатель',
+  'tl.engineHint': 'Кто разбирает исходник. Сам .fbx в любом случае пишется здесь.',
+  'tl.engineAuto': 'Авто — assimp, затем встроенный',
+  'tl.engineAssimp': 'Только assimp',
+  'tl.engineBuiltin': 'Только встроенный',
   'tl.encoding': 'Формат',
   'tl.encodingHint': 'Blender читает только бинарный.',
   'tl.encBinary': 'Бинарный — FBX 7.4',
@@ -1944,10 +1987,30 @@ export const RU: Record<TKey, string> = {
   // ---- tools: форматы -------------------------------------------------------
   'tl.formats': 'Что конвертируется',
   'tl.fmtMesh': 'Геометрия',
+  'tl.fmtAssimp': 'Через assimp',
+  'tl.fmtAssimpValue': '{list} — и ещё {n} форматов',
   'tl.fmtImage': 'Текстуры',
   'tl.fmtOther': 'Всё остальное',
   'tl.fmtOtherValue': 'переносится капсулой — метаданные и исходные байты, без выдуманного меша',
   'tl.formatsNote': 'Текстовый и бинарный DirectX .x читаются; сжатые варианты отклоняются.',
+
+  // ---- tools: движок assimp -------------------------------------------------
+  'tl.assimp': 'assimp',
+  'tl.assimpProbing': 'ищу…',
+  'tl.assimpReady': 'версия {v} · форматов: {n}',
+  'tl.assimpMissing': 'не установлен — всё делает встроенный читатель',
+  'tl.assimpUnusable': 'найден, но не ответил — проверьте, что рядом лежит его DLL',
+  'tl.assimpNoFbx': 'найден, но эта сборка не умеет экспортировать FBX',
+  'tl.assimpPath': 'Исполняемый файл',
+  'tl.assimpLocate': 'Указать assimp',
+  'tl.assimpRelocate': 'Указать другую сборку',
+  'tl.assimpRequired': 'Читатель выставлен на «только assimp», но рабочий assimp не найден. Укажите его ниже или переключите читатель на «Авто».',
+  'tl.engineUsed.builtin': 'встроенный',
+  'tl.engineUsed.builtinTitle': 'Разобран собственным импортёром приложения.',
+  'tl.engineUsed.assimp': 'assimp',
+  'tl.engineUsed.assimpTitle': 'Разобран assimp, затем перекодирован здесь.',
+  'tl.engineFellBack': '(откат)',
+  'tl.engineFellBackTitle': 'assimp отказался от файла, его взял встроенный импортёр.',
 
   // ---- tools: прогресс и результаты -----------------------------------------
   'tl.phase.read': 'читаю',
@@ -1983,6 +2046,13 @@ export const RU: Record<TKey, string> = {
   'tl.msg.truncated': 'исходный файл оборван — сконвертировано то, что читалось',
   'tl.msg.verifyFailed': 'записан, но проверка при перечитывании не прошла',
   'tl.msg.unknownFormat': 'для этого формата нет читателя',
+  'tl.msg.assimpFellBack': 'assimp отказался — сконвертировано встроенным читателем',
+  'tl.msg.assimpFailed': 'assimp не смог прочитать этот файл',
+  'tl.msg.assimpNoOutput': 'assimp отчитался об успехе, но ничего не записал',
+  'tl.msg.assimpCancelled': 'остановлено во время работы assimp',
+  'tl.msg.noAssimp': 'рабочего assimp нет — переключите читатель на «Авто» или укажите его',
+  'tl.msg.needsAssimp': 'этот формат читает только assimp, а его нет',
+  'tl.msg.builtinFormat': 'встроенный читатель не читает этот формат',
 
   // ---- tools: notepad++ -----------------------------------------------------
   'tl.nppTitle': 'Notepad++ под Project Zomboid',

@@ -82,7 +82,9 @@ const api: PzApi = {
     convert: (opts: ConvertOptions) => ipcRenderer.invoke(IPC.toolsConvert, opts),
     cancel: () => ipcRenderer.invoke(IPC.toolsCancel),
     onProgress: (cb) => subscribe<ConvertProgress>(IPC.toolsProgress, cb),
-    reveal: (path: string) => ipcRenderer.invoke(IPC.toolsReveal, path)
+    reveal: (path: string) => ipcRenderer.invoke(IPC.toolsReveal, path),
+    assimpStatus: () => ipcRenderer.invoke(IPC.toolsAssimpStatus),
+    assimpLocate: () => ipcRenderer.invoke(IPC.toolsAssimpLocate)
   },
   npp: {
     status: () => ipcRenderer.invoke(IPC.nppStatus),

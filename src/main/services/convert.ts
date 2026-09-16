@@ -4,7 +4,8 @@
  * Turns a file into an `.fbx`. Three routes, picked by what the file actually is:
  *
  *  - **mesh** — OBJ, STL, PLY, DirectX `.x`, Collada, glTF/GLB are parsed into
- *    real geometry and re-emitted as FBX meshes.
+ *    real geometry and re-emitted as FBX meshes. With assimp present the same
+ *    route also covers everything *it* reads, which is roughly forty formats.
  *  - **image** — a texture becomes the one mesh a texture can honestly become: a
  *    correctly proportioned quad with the picture on it, embedded in the file.
  *  - **capsule** — anything else becomes a named null carrying the source's
@@ -12,6 +13,19 @@
  *    No geometry is invented; the file is transported, not reinterpreted.
  *
  * A fourth route, **transcode**, handles an `.fbx` input: binary in, ASCII out.
+ *
+ * ## Two readers, one writer
+ *
+ * The mesh route has two engines. The built-in importers are unchanged and stay
+ * the fallback; `assimp.ts` adds the formats and the fidelity a hand-written
+ * parser will not reach. Neither of them writes the file: assimp is asked for
+ * binary FBX, the result is parsed by `fbxbin.ts`, corrected by
+ * `transformFbxGeometry`, and re-encoded here — so scale, the Z-up correction
+ * and the binary/ASCII choice behave identically whichever engine ran.
+ *
+ * The fallback is not decorative. assimp refuses Project Zomboid's own animated
+ * `.x` files, which the built-in parser reads, so `auto` tries assimp first and
+ * quietly hands a refused file back to the reader that can take it.
  *
  * ## Why the writes are allowed at all
  *
@@ -27,7 +41,9 @@
  *    on purpose, and the forge does not get to widen it.
  *
  * The renderer can therefore never talk the forge into writing somewhere the
- * user has not physically navigated to.
+ * user has not physically navigated to. It does not name the assimp executable
+ * either: that is resolved in `assimp.ts` from settings and the usual install
+ * locations, never from a path sent in with a conversion request.
  */
 import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
@@ -38,11 +54,22 @@ import type {
   ConvertOptions,
   ConvertProgress,
   ConvertResult,
+  ForgeEngineUsed,
   ForgeInput,
   ForgeKind
 } from '../../shared/types'
-import { decodeFbxBinary, encodeFbxAscii } from './fbxbin'
-import { FBX_VERSION, verifyFbxBinary, writeFbx, type FbxMeshPart, type FbxScene } from './fbx'
+import { assimpImportExts, exportToFbx, prepareAssimp } from './assimp'
+import { decodeFbxBinary, encodeFbxAscii, encodeFbxBinary } from './fbxbin'
+import {
+  FBX_VERSION,
+  inspectFbxBinary,
+  summariseFbx,
+  transformFbxGeometry,
+  verifyFbxBinary,
+  writeFbx,
+  type FbxMeshPart,
+  type FbxScene
+} from './fbx'
 import { exists, extOf, isDir, readdirSafe } from './fsx'
 import { isPathAllowed, isPathWritable } from './guard'
 import { applyGeometryPass, importObj, importPly, importStl, meshName, type MeshImport } from './mesh'
@@ -53,6 +80,7 @@ const MAX_INPUT = 256 * 1024 * 1024
 /** Largest payload embedded inside an FBX. Above this the file is referenced. */
 const MAX_EMBED = 96 * 1024 * 1024
 
+/** Extensions the app's own importers read, with no help from anything. */
 const MESH_EXTS = new Set(['obj', 'stl', 'ply', 'x', 'dae', 'gltf', 'glb'])
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'bmp', 'gif', 'tga', 'dds', 'webp'])
 
@@ -136,10 +164,29 @@ export async function assertForgePath(settings: AppSettings, path: string): Prom
 
 /* ------------------------------------------------------------- classify ---- */
 
+/**
+ * Every extension the forge will treat as geometry right now.
+ *
+ * Deliberately not a constant: with assimp probed, this grows from seven formats
+ * to around forty, and the queue has to say so before the user presses convert.
+ * `.fbx` and the image extensions are excluded even though assimp reads them —
+ * an `.fbx` input belongs to the transcode route and a `.png` to the image one,
+ * and both of those do something the mesh route cannot.
+ */
+export function meshExts(): Set<string> {
+  const out = new Set(MESH_EXTS)
+  for (const ext of assimpImportExts()) {
+    if (ext === 'fbx' || IMAGE_EXTS.has(ext)) continue
+    out.add(ext)
+  }
+  return out
+}
+
 function classifyExt(ext: string): ForgeKind {
   if (ext === 'fbx') return 'transcode'
   if (MESH_EXTS.has(ext)) return 'mesh'
   if (IMAGE_EXTS.has(ext)) return 'image'
+  if (assimpImportExts().has(ext)) return 'mesh'
   return 'capsule'
 }
 
@@ -150,8 +197,13 @@ function classifyExt(ext: string): ForgeKind {
  * short header read. A `.x` file that turns out to be a compressed flavour is
  * reported as unsupported *here*, so the queue shows it before anyone presses
  * convert.
+ *
+ * assimp is resolved first because classification depends on it: without the
+ * probe a `.blend` is a capsule, and with it the same file is a mesh.
  */
-export async function inspectInputs(paths: string[]): Promise<ForgeInput[]> {
+export async function inspectInputs(settings: AppSettings, paths: string[]): Promise<ForgeInput[]> {
+  await prepareAssimp(settings)
+  const builtin = MESH_EXTS
   const out: ForgeInput[] = []
   for (const raw of paths) {
     const path = await assertReadable(raw)
@@ -179,6 +231,11 @@ export async function inspectInputs(paths: string[]): Promise<ForgeInput[]> {
       supported: true
     }
 
+    // A format only assimp reads is worth flagging: it converts, but it stops
+    // converting the moment assimp is unplugged, and the queue should not imply
+    // otherwise.
+    if (kind === 'mesh' && !builtin.has(ext)) input.note = 'assimpOnly'
+
     if (size > MAX_INPUT) {
       input.supported = false
       input.note = 'tooLarge'
@@ -192,6 +249,7 @@ export async function inspectInputs(paths: string[]): Promise<ForgeInput[]> {
       } else if (flavour === 'bin ') {
         input.format = 'x-binary'
       } else if (flavour !== 'txt ') {
+        // Neither reader takes these: assimp's `.x` importer refuses them too.
         input.supported = false
         input.note = 'compressedX'
       }
@@ -238,7 +296,9 @@ const MAX_FOLDER_DEPTH = 6
  * Breadth-first with a depth and count cap, and symlinks are skipped, so pointing
  * this at a drive root walks a bounded slice of it instead of never returning.
  */
-export async function collectConvertible(dir: string): Promise<string[]> {
+export async function collectConvertible(settings: AppSettings, dir: string): Promise<string[]> {
+  await prepareAssimp(settings)
+  const meshes = meshExts()
   const out: string[] = []
   let frontier: Array<{ path: string; depth: number }> = [{ path: dir, depth: 0 }]
 
@@ -253,7 +313,7 @@ export async function collectConvertible(dir: string): Promise<string[]> {
           continue
         }
         const ext = extOf(child.name)
-        if (MESH_EXTS.has(ext) || IMAGE_EXTS.has(ext) || ext === 'fbx') out.push(path)
+        if (meshes.has(ext) || IMAGE_EXTS.has(ext) || ext === 'fbx') out.push(path)
         if (out.length >= MAX_FOLDER_FILES) break
       }
       if (out.length >= MAX_FOLDER_FILES) break
@@ -390,7 +450,6 @@ interface ItemPlan {
   /** Importer caveat worth showing next to a *successful* row, e.g. `truncated`. */
   note?: string
 }
-
 async function planItem(path: string, opts: ConvertOptions): Promise<ItemPlan> {
   const ext = extOf(path)
   const kind = classifyExt(ext)
@@ -513,10 +572,181 @@ async function planItem(path: string, opts: ConvertOptions): Promise<ItemPlan> {
   }
 }
 
+/* --------------------------------------------------------------- produce --- */
+
+/**
+ * One finished conversion, before the bytes reach the disk.
+ *
+ * Both engines end here, which is what keeps the write, the atomic rename and
+ * the verify step written once. `check` is the route's own idea of what "this
+ * file is what I meant" means: the built-in routes compare against the scene
+ * they built, and the assimp route compares against what it counted in assimp's
+ * output — there is no expectation to compare a foreign document to.
+ */
+interface Produced {
+  data: Buffer
+  kind: ForgeKind
+  format: string
+  vertices: number
+  polygons: number
+  materials: number
+  engine?: ForgeEngineUsed
+  /** True when assimp was tried first and handed the file back. */
+  fellBack?: boolean
+  note?: string
+  check?: (written: Buffer) => string[]
+}
+
+/**
+ * The assimp route: hand the file over, take back an FBX, finish it here.
+ *
+ * assimp is always asked for binary FBX into a scratch file, never for the
+ * user's chosen encoding directly. Everything after that is this app's: the
+ * document is parsed, scale and the Z-up correction are applied to the vertex
+ * arrays, and it is re-encoded — or passed through untouched when binary was
+ * asked for and nothing needed correcting, which is the common case and costs a
+ * rename instead of a re-encode.
+ */
+async function produceViaAssimp(
+  exePath: string,
+  path: string,
+  output: string,
+  opts: ConvertOptions
+): Promise<Produced> {
+  const scratch = `${output}.assimp`
+  try {
+    await exportToFbx(exePath, path, scratch, {
+      rebuildNormals: opts.rebuildNormals,
+      weld: opts.weld
+    })
+
+    const raw = await fs.readFile(scratch)
+    const { root, summary } = inspectFbxBinary(raw)
+    // A document with no geometry is not a conversion. Thrown rather than
+    // written so `auto` can still offer the file to the built-in reader, which
+    // is exactly what rescues PZ's animated `.x`.
+    if (summary.meshes === 0) throw fail('noGeometry')
+
+    const corrected = transformFbxGeometry(root, { scale: opts.scale, zUpToYUp: opts.yUp })
+    let data: Buffer
+    if (opts.encoding === 'ascii') {
+      data = Buffer.from(encodeFbxAscii(root, summary.version), 'utf8')
+    } else if (corrected) {
+      data = encodeFbxBinary(root, summary.version)
+    } else {
+      data = raw
+    }
+
+    return {
+      data,
+      kind: 'mesh',
+      format: extOf(path),
+      engine: 'assimp',
+      vertices: summary.vertices,
+      polygons: summary.polygons,
+      materials: summary.materials,
+      check: (written) => {
+        const re = summariseFbx(decodeFbxBinary(written).root, summary.version)
+        const problems = [...re.problems]
+        if (re.meshes !== summary.meshes) problems.push(`mesh count ${re.meshes} != ${summary.meshes}`)
+        if (re.corners !== summary.corners) problems.push(`polygon data ${re.corners} != ${summary.corners}`)
+        return problems
+      }
+    }
+  } finally {
+    // The scratch file is this module's litter whether the run worked or not.
+    await fs.rm(scratch, { force: true }).catch(() => undefined)
+  }
+}
+
+/** The built-in route: the app's own importers, its own scene, its own writer. */
+async function produceBuiltin(path: string, opts: ConvertOptions): Promise<Produced> {
+  const plan = await planItem(path, opts)
+
+  if (plan.kind === 'transcode') {
+    const decoded = decodeFbxBinary(plan.buf)
+    return {
+      data: Buffer.from(encodeFbxAscii(decoded.root, decoded.version), 'utf8'),
+      kind: plan.kind,
+      format: plan.format,
+      vertices: plan.vertices,
+      polygons: plan.polygons,
+      materials: plan.materials,
+      note: plan.note
+    }
+  }
+
+  const expectation = {
+    meshes: plan.scene.meshes.length,
+    positionFloats: plan.scene.meshes.reduce((n, m) => n + m.positions.length, 0),
+    corners: plan.scene.meshes.reduce((n, m) => n + m.polygons.reduce((c, p) => c + p.length, 0), 0)
+  }
+
+  return {
+    data: writeFbx(plan.scene, opts.encoding),
+    kind: plan.kind,
+    format: plan.format,
+    engine: plan.kind === 'mesh' ? 'builtin' : undefined,
+    vertices: plan.vertices,
+    polygons: plan.polygons,
+    materials: plan.materials,
+    note: plan.note,
+    check: (written) => verifyFbxBinary(written, expectation).problems
+  }
+}
+
+/** The stable code carried on a thrown failure, when it has one. */
+function codeOf(e: unknown): string | undefined {
+  return typeof e === 'object' && e && 'code' in e ? String((e as { code: unknown }).code) : undefined
+}
+
+/**
+ * Pick an engine for one mesh input and run it.
+ *
+ * `auto` is the only branch with any judgement in it: assimp first when it reads
+ * the extension at all, the built-in reader second — but only for a format the
+ * built-in reader actually knows, because falling back to a capsule would turn a
+ * failed conversion into a silent non-conversion.
+ */
+async function produceMesh(
+  path: string,
+  output: string,
+  opts: ConvertOptions,
+  assimpExe: string | undefined
+): Promise<Produced> {
+  const ext = extOf(path)
+  const builtinReads = MESH_EXTS.has(ext)
+
+  if (opts.engine === 'builtin') {
+    if (!builtinReads) throw fail('builtinFormat', ext)
+    return produceBuiltin(path, opts)
+  }
+
+  if (!assimpExe) {
+    if (opts.engine === 'assimp') throw fail('noAssimp')
+    if (!builtinReads) throw fail('needsAssimp', ext)
+    return produceBuiltin(path, opts)
+  }
+
+  try {
+    return await produceViaAssimp(assimpExe, path, output, opts)
+  } catch (e) {
+    const code = codeOf(e)
+    // A cancelled run is the user's decision, not a reason to try harder.
+    if (code === 'assimpCancelled') throw e
+    if (opts.engine === 'assimp' || !builtinReads) throw e
+    const produced = await produceBuiltin(path, opts)
+    // The fallback is reported, never hidden: a row that says `builtin` when
+    // assimp was asked for is the only way to tell that assimp refused the file.
+    return { ...produced, fellBack: true, note: produced.note ?? 'assimpFellBack' }
+  }
+}
+
 async function convertOne(
   settings: AppSettings,
   path: string,
   opts: ConvertOptions,
+  assimpExe: string | undefined,
   onPhase: (phase: ConvertProgress['phase']) => void
 ): Promise<ConvertItemResult> {
   const startedAt = Date.now()
@@ -531,51 +761,44 @@ async function convertOne(
       return { ...base, status: 'skip', kind, output, message: 'exists', durationMs: Date.now() - startedAt }
     }
 
-    const plan = await planItem(path, opts)
-    let data: Buffer
-    if (plan.kind === 'transcode') {
-      const decoded = decodeFbxBinary(plan.buf)
-      data = Buffer.from(encodeFbxAscii(decoded.root, decoded.version), 'utf8')
-    } else {
-      data = writeFbx(plan.scene, opts.encoding)
-    }
+    const produced =
+      kind === 'mesh'
+        ? await produceMesh(path, output, opts, assimpExe)
+        : await produceBuiltin(path, opts)
 
     onPhase('write')
-    await writeAtomic(output, data)
+    await writeAtomic(output, produced.data)
 
     let verified: boolean | undefined
-    if (opts.verify && opts.encoding === 'binary' && plan.kind !== 'transcode') {
+    if (opts.verify && opts.encoding === 'binary' && produced.check) {
       onPhase('verify')
-      const check = verifyFbxBinary(await fs.readFile(output), {
-        meshes: plan.scene.meshes.length,
-        positionFloats: plan.scene.meshes.reduce((n, m) => n + m.positions.length, 0),
-        corners: plan.scene.meshes.reduce((n, m) => n + m.polygons.reduce((c, p) => c + p.length, 0), 0)
-      })
-      verified = check.ok
-      if (!check.ok) throw fail('verifyFailed', check.problems.join('; '))
+      const problems = produced.check(await fs.readFile(output))
+      verified = problems.length === 0
+      if (!verified) throw fail('verifyFailed', problems.join('; '))
     }
 
     return {
       ...base,
       status: 'ok',
-      kind: plan.kind,
-      format: plan.format,
+      kind: produced.kind,
+      format: produced.format,
+      engine: produced.engine,
+      fellBack: produced.fellBack,
       output,
-      bytes: data.length,
-      vertices: plan.vertices,
-      polygons: plan.polygons,
-      materials: plan.materials,
+      bytes: produced.data.length,
+      vertices: produced.vertices,
+      polygons: produced.polygons,
+      materials: produced.materials,
       verified,
       // A caveat, not a failure: the file was written, and the row says why it
       // might not hold everything the source did.
-      message: plan.note,
+      message: produced.note,
       durationMs: Date.now() - startedAt
     }
   } catch (e) {
-    const code = typeof e === 'object' && e && 'code' in e ? String((e as { code: unknown }).code) : undefined
     return {
       ...base,
-      message: code ?? (e instanceof Error ? e.message : String(e)),
+      message: codeOf(e) ?? (e instanceof Error ? e.message : String(e)),
       durationMs: Date.now() - startedAt
     }
   }
@@ -593,6 +816,10 @@ export async function convertFiles(
   const total = opts.inputs.length
   let cancelled = false
 
+  // Resolved once for the whole queue: the probe is three spawns, and paying it
+  // per file would cost more than most of the conversions it enables.
+  const assimp = opts.engine === 'builtin' ? undefined : await prepareAssimp(settings)
+
   for (let i = 0; i < total; i++) {
     if (isCancelled()) {
       cancelled = true
@@ -605,15 +832,16 @@ export async function convertFiles(
       const path = await assertReadable(raw)
       onProgress({ phase: 'build', index: i, total, name })
       items.push(
-        await convertOne(settings, path, opts, (phase) => onProgress({ phase, index: i, total, name }))
+        await convertOne(settings, path, opts, assimp?.exePath, (phase) =>
+          onProgress({ phase, index: i, total, name })
+        )
       )
     } catch (e) {
-      const code = typeof e === 'object' && e && 'code' in e ? String((e as { code: unknown }).code) : undefined
       items.push({
         input: raw,
         name,
         status: 'error',
-        message: code ?? (e instanceof Error ? e.message : String(e)),
+        message: codeOf(e) ?? (e instanceof Error ? e.message : String(e)),
         durationMs: 0
       })
     }
