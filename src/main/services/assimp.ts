@@ -63,10 +63,8 @@ interface RunResult {
   code: number
   stdout: string
   stderr: string
-  /** True when `cancelAssimp` aborted the child. */
-  cancelled: boolean
-  /** True when the child was killed for running past its deadline. */
-  timedOut: boolean
+  /** True when the child was terminated prematurely (signal or timeout). */
+  killed: boolean
 }
 
 /**
