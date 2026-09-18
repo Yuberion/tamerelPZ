@@ -305,3 +305,145 @@ OnAcceptInvite, OnAddBuilding, OnAddMessage, OnAdminMessage, OnAIStateChange, On
    - При написании новых модов или модификации/переделке/портировании существующих, вся работа, файлы и код создаются **ИСКЛЮЧИТЕЛЬНО** в папке с маркером `_Port` в имени (`<ModName>_Port`).
    - Оригинальная папка мода всегда имеет статус **READ-ONLY** и никогда не модифицируется.
 
+
+---
+
+## 9. Канонический пайплайн портирования модов с Build 41 на Build 42 (The Definitive B41 -> B42 Porting Pipeline)
+
+> [!IMPORTANT]
+> Данный раздел документирует проверенный и валидированный на практике метод полной адаптации модов любой сложности (оружие, одежда, профессии, крафт, 3D-модели, лут) с версии B41 на B42.20.4+ без единой ошибки.
+
+### 9.1. Изоляция и структура папок
+1. **Правило `_Port`**: Исходная папка оригинального мода — **СТРОГО READ-ONLY**. Вся разработка и адаптация ведутся исключительно в папке `<ModName>_Port/`.
+2. **Иерархия B42**:
+   - Файлы мода помещаются в поддиректорию `42/` (например, `<ModName>_Port/42/`).
+   - В `42/mod.info`: указать `versionMin=42.0.0`.
+   - Корневой `mod.info` в `<ModName>_Port/` не должен конфликтовать со специфичным для 42.
+
+### 9.2. Адаптация скриптов предметов (`item`)
+1. **Типизация предметов**:
+   - Каждому предмету требуется явный `ItemType` с неймспейсом:
+     - Оружие: `ItemType = base:weapon`
+     - Одежда: `ItemType = base:clothing`
+     - Контейнеры/сумки: `ItemType = base:container`
+     - Еда: `ItemType = base:food`
+     - Материалы/хлам: `ItemType = base:normal`
+2. **Точки крепления (`AttachmentType`)**:
+   - Использовать только канонические типы (`Holster`, `Rifle`, `Back`, `BeltLeft`, `BeltRight`).
+3. **Кастомные слоты тела (`BodyLocation`)**:
+   - В B42 кастомные слоты **ОБЯЗАНЫ** иметь неймспейс мода: например, `BodyLocation = remod:elbowpads` или `remod:kneepads`.
+   - Попытка зарегистрировать слот без неймспейса (`ItemBodyLocation.register("name")`) выбрасывает ошибку `Default namespace 'base:...' is not allowed!`.
+4. **Именование файлов скриптов (Критично!)**:
+   - **НИКОГДА** не называть скрипты стандартными именами (`character_professions.txt`, `recipes.txt`, `items.txt`, `clothing.txt`).
+   - Всегда добавлять префикс мода: `MyMod_items.txt`, `MyMod_professions.txt`. В противном случае движок полностью выгружает ванильные скрипты игры.
+
+### 9.3. Новая система профессий и реестров B42
+1. **Регистрация в `media/registries.lua`**:
+   - Выполняется на самом раннем этапе загрузки мода:
+   ```lua
+   if CharacterProfession and CharacterProfession.register then
+       CharacterProfession.register("modid:prof_id")
+   end
+   if ItemBodyLocation and ItemBodyLocation.register then
+       ItemBodyLocation.register("modid:slot_id")
+   end
+   ```
+2. **Скриптовое объявление профессии (`media/scripts/characters/MyMod_professions.txt`)**:
+   ```text
+   module MyMod
+   {
+       character_profession_definition modid:prof_id
+       {
+           CharacterProfession = modid:prof_id,
+           Cost = 0,
+           UIName = UI_prof_MyProf,
+           IconPathName = profession_MyProf,
+           GrantedTraits = base:desensitized,
+           XPBoosts = Aiming=3;Reloading=3,
+       }
+   }
+   ```
+3. **Слоты с поддержкой нескольких предметов (`MultiItem = true`)**:
+   - В `media/lua/shared/NPCs/MyMod_ExtraBodyLocations.lua`:
+   ```lua
+   local group = BodyLocations and BodyLocations.getGroup and BodyLocations.getGroup("Human")
+   if group then
+       local loc = group:getOrCreateLocation("modid:slot_id")
+       if loc and loc.setMultiItem then
+           loc:setMultiItem(true)
+       end
+   end
+   ```
+   Это предотвращает сбрасывание предметов друг другом (например, налокотники, наколенники и подсумки на одном персонаже).
+
+### 9.4. Система рецептов (`craftRecipe`)
+1. Синтаксис B42:
+   ```text
+   craftRecipe MyRecipe
+   {
+       time = 100,
+       category = General,
+       Tags = AnySurfaceCraft;InHandCraft,
+       timedAction = Making,
+       inputs
+       {
+           item 1 [Base.Hammer] mode:keep flags[Prop1],
+           item 2 [Base.Nails],
+           item 1 [Base.Plank],
+       }
+       outputs
+       {
+           item 1 Base.WoodenBox,
+       }
+   }
+   ```
+2. **Запрет дубликатов `Prop1`**: в секции `inputs` флаг `flags[Prop1]` может быть присвоен **только одному** предмету-инструменту. Дублирование вызывает ошибку компиляции рецепта.
+
+### 9.5. Наряды (Outfits) и создание персонажа
+1. **Ограничение движка**: В B42 `OutfitManager` инициализируется до загрузки модов, из-за чего XML-костюмы из `clothing.xml` не отображаются в окне создания персонажа.
+2. **Архитектурное решение**:
+   - Создать таблицу соответствия нарядов и предметов (`media/lua/shared/NPCs/MyMod_Outfits.lua`).
+   - Функция безопасной экипировки:
+     ```lua
+     function MyMod_Outfits.dressCharacter(desc, outfit)
+         if not desc or not outfit then return end
+         local wornItems = desc:getWornItems()
+         if wornItems then wornItems:clear() end
+         for _, itemType in ipairs(outfit.items) do
+             local item = instanceItem(itemType)
+             if item then
+                 local loc = item:getBodyLocation() -- В B42 возвращает готовый ItemBodyLocation!
+                 if loc then
+                     desc:setWornItem(loc, item) -- Напрямую передаем ItemBodyLocation, без ResourceLocation.of!
+                 end
+             end
+         end
+     end
+     ```
+   - Интеграция в интерфейс (`media/lua/client/OptionScreens/MyMod_CharacterCreation.lua`):
+     - Встраивание выпадающего списка `self.outfitCombo` в `CharacterCreationMain:initClothing()` (для доступности во всех режимах игры).
+     - Перехват `CharacterCreationMain:onOutfitSelected(combo)` для немедленной экипировки 3D-модели.
+
+### 9.6. Распределение лута и спавн в зомби
+1. **Инъекция в распределения контейнеров**:
+   - Добавление предметов парами `"Base.ItemName", chance` в:
+     - `ProceduralDistributions.list.<ListName>.items` (шкафы, аптечки, оружейные)
+     - `Distributions[1]["all"]["inventorymale"].items` и `["inventoryfemale"].items`
+2. **Гарантированный лут при гибели зомби (`Events.OnZombieDead`)**:
+   - При боевом геймплее гарантирует выпадение валюты/материалов мода:
+   ```lua
+   local function onZombieDead(zombie)
+       if not zombie then return end
+       local inv = zombie:getInventory()
+       if not inv then return end
+       if ZombRand(100) < 25 then -- Использовать встроенный ZombRand(100), НЕ ZomboidGlobals!
+           inv:AddItem("Base.MyMod_Item")
+       end
+   end
+   Events.OnZombieDead.Add(onZombieDead)
+   ```
+   *(Предметы, добавленные в `zombie:getInventory()`, автоматически наследуются создаваемым объектом трупа `IsoDeadBody`)*.
+
+### 9.7. Файлы локализации (Translate)
+- Имена файлов переводов обязаны содержать префикс мода: `RE_UI_RU.txt`, `RE_Items_RU.txt`. Без префикса файл `UI_RU.txt` сотрет все ванильные тексты меню игры.
+- Кодировка текстовых файлов: **UTF-8 с BOM (Byte Order Mark, \ufeff)** для кириллицы в Project Zomboid.
