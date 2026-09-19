@@ -400,29 +400,61 @@ OnAcceptInvite, OnAddBuilding, OnAddMessage, OnAdminMessage, OnAIStateChange, On
 2. **Запрет дубликатов `Prop1`**: в секции `inputs` флаг `flags[Prop1]` может быть присвоен **только одному** предмету-инструменту. Дублирование вызывает ошибку компиляции рецепта.
 
 ### 9.5. Наряды (Outfits) и создание персонажа
-1. **Ограничение движка**: В B42 `OutfitManager` инициализируется до загрузки модов, из-за чего XML-костюмы из `clothing.xml` не отображаются в окне создания персонажа.
-2. **Архитектурное решение**:
-   - Создать таблицу соответствия нарядов и предметов (`media/lua/shared/NPCs/MyMod_Outfits.lua`).
-   - Функция безопасной экипировки:
+1. **Ограничение движка**: В B42 `OutfitManager` инициализируется до загрузки модов, из-за чего XML-костюмы из `clothing.xml` не отображаются в окне создания персонажа без явной интеграции.
+2. **Разделение по полу в `clothing.xml`**:
+   - В `<m_MaleOutfits>` должны входить **строго мужские наряды**.
+   - В `<m_FemaleOutfits>` должны входить **строго женские наряды**.
+   - Ошибочное помещение женских нарядов в `<m_MaleOutfits>` приводит к появлению женских сетов в мужском редакторе и спавну мужских зомби в женской одежде (и наоборот).
+3. **Предотвращение отката одежды (Баг `onMouseMoveOutside`)**:
+   - В `CharacterCreationMain.lua` за каждым комбо-боксом закреплен обработчик `combo.onMouseMoveOutside`, который сравнивает надетое на 3D-модели с выбранным в выпадающем списке.
+   - Если надеть костюм через `desc:setWornItem`, но **не синхронизировать `self.clothingCombo`**, то при первом движении мыши движок сочтет, что одежда не совпадает, и мгновенно перезапишет её старыми гражданскими вещами (чаще всего брюками и обувью).
+   - **Обязательная синхронизация**:
      ```lua
-     function MyMod_Outfits.dressCharacter(desc, outfit)
-         if not desc or not outfit then return end
-         local wornItems = desc:getWornItems()
-         if wornItems then wornItems:clear() end
-         for _, itemType in ipairs(outfit.items) do
-             local item = instanceItem(itemType)
-             if item then
-                 local loc = item:getBodyLocation() -- В B42 возвращает готовый ItemBodyLocation!
-                 if loc then
-                     desc:setWornItem(loc, item) -- Напрямую передаем ItemBodyLocation, без ResourceLocation.of!
+     local function syncClothingCombosWithDesc(self, desc)
+         if not self or not self.clothingCombo or not desc then return end
+         for bodyLocation, combo in pairs(self.clothingCombo) do
+             local currentItem = nil
+             pcall(function()
+                 local resLoc = ResourceLocation.of(bodyLocation)
+                 if resLoc then
+                     local itemBodyLoc = ItemBodyLocation.get(resLoc)
+                     if itemBodyLoc then currentItem = desc:getWornItem(itemBodyLoc) end
                  end
+             end)
+             if currentItem then
+                 local fullType = currentItem:getFullType()
+                 local displayName = currentItem:getDisplayName()
+                 local foundIndex = nil
+                 if combo.options then
+                     for idx, opt in ipairs(combo.options) do
+                         if opt.data == fullType or (opt.text and displayName and opt.text == displayName) then
+                             foundIndex = idx; break
+                         end
+                     end
+                 end
+                 if not foundIndex then
+                     combo:addOptionWithData(displayName, fullType)
+                     foundIndex = #combo.options
+                 end
+                 combo.selected = foundIndex
+                 combo.lastIndex = foundIndex
+                 if self.updateColorButton then pcall(function() self:updateColorButton(bodyLocation, currentItem) end) end
+                 if self.updateClothingTextureCombo then pcall(function() self:updateClothingTextureCombo(bodyLocation, currentItem) end) end
+             else
+                 combo.selected = 1
+                 combo.lastIndex = 1
+                 if self.clothingColorBtn and self.clothingColorBtn[bodyLocation] then self.clothingColorBtn[bodyLocation]:setVisible(false) end
+                 if self.clothingTextureCombo and self.clothingTextureCombo[bodyLocation] then self.clothingTextureCombo[bodyLocation]:setVisible(false) end
              end
          end
      end
      ```
-   - Интеграция в интерфейс (`media/lua/client/OptionScreens/MyMod_CharacterCreation.lua`):
-     - Встраивание выпадающего списка `self.outfitCombo` в `CharacterCreationMain:initClothing()` (для доступности во всех режимах игры).
-     - Перехват `CharacterCreationMain:onOutfitSelected(combo)` для немедленной экипировки 3D-модели.
+4. **Единый стиль именования и защита от сброса ванилью**:
+   - Формат в списках: `[MOD] Название персонажа (Вариант)` через `getTextOrNull("UI_Outfit_" .. def.id) or def.name`.
+   - В хуке `CharacterCreationMain:disableBtn()` необходимо перехватывать затирание опций ванильным кодом и восстанавливать отфильтрованный по полу список с префиксом `[MOD]`.
+5. **Языковое правило (Zero Cyrillic in source code)**:
+   - Любой исходный код (.lua, .xml, .txt скрипты, mod.info) обязан быть строго на английском языке (ASCII).
+   - Кириллица разрешена **исключительно** в файлах локализации `media/lua/shared/Translate/RU/*`.
 
 ### 9.6. Распределение лута и спавн в зомби
 1. **Инъекция в распределения контейнеров**:
