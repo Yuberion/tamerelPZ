@@ -476,6 +476,43 @@ OnAcceptInvite, OnAddBuilding, OnAddMessage, OnAdminMessage, OnAIStateChange, On
    ```
    *(Предметы, добавленные в `zombie:getInventory()`, автоматически наследуются создаваемым объектом трупа `IsoDeadBody`)*.
 
-### 9.7. Файлы локализации (Translate)
-- Имена файлов переводов обязаны содержать префикс мода: `RE_UI_RU.txt`, `RE_Items_RU.txt`. Без префикса файл `UI_RU.txt` сотрет все ванильные тексты меню игры.
-- Кодировка текстовых файлов: **UTF-8 с BOM (Byte Order Mark, \ufeff)** для кириллицы в Project Zomboid.
+### 9.7. Локализация модов (Translate: Build 42 vs Build 41)
+
+В Build 42 система локализации была полностью переработана разработчиками (`zombie.core.Translator`), сохранив частичную обратную совместимость с форматом B41.
+
+#### 1. Карты движка и файлы JSON (Build 42)
+Движок загружает переводы через метод `Translator.tryFillMapFromFile()` по пути:
+`media/lua/shared/Translate/<LANG>/<MapName>.json` (из `42/`, `common/` и корня мода).
+
+Основные карты `Translator.BY_NAME`:
+| JSON-файл | Карта Java | Метод получения в игре | Назначение / Префиксы |
+|---|---|---|---|
+| `ItemName.json` | `itemName` | `Translator.getItemNameFromFullType("Base.<Id>")` | **Основной реестр предметов B42**. Ключи: `Base.<Id>` и `<Id>`. |
+| `Items.json` | `items` | `Translator.getDisplayItemName(displayName)` | Совместимость с UI. Ключ: имя с подчеркиваниями (`Jill_camo_beret`). |
+| `Recipes.json` | `recipe` | `Translator.getRecipeName(recipeName)` | Названия рецептов крафта. Ключи: `<RecipeId>` и `Recipe_<RecipeId>`. |
+| `Tooltip.json` | `tooltip` | `Translator.getText("Tooltip_<Key>")` | Описания предметов. Префикс: `Tooltip_`. |
+| `IG_UI.json` | `igui` | `Translator.getText("IGUI_<Key>")` | Категории крафта, интерфейс игры (`IGUI_CraftingCategories_RE_*`). |
+| `UI.json` | `ui` | `Translator.getText("UI_<Key>")` | Профессии, вкладки, настройки (`UI_prof_*`). |
+| `ContextMenu.json`| `contextMenu` | `Translator.getText("ContextMenu_<Key>")` | Контекстное меню ПКМ (`ContextMenu_*`). |
+| `MakeUp.json` | `makeup` | `Translator.getText("MakeUp_<Key>")` | Макияж и кастомизация лица (`MakeUp_*`). |
+
+#### 2. Золотое правило полного покрытия предметов (Dual Mapping)
+Для гарантии 100% перевода всех предметов как в инвентаре B42, так и в контекстных меню и крафте:
+- В `ItemName.json` записываются пары:
+  `"Base.<ItemId>": "Русское название"`, `" <ItemId>": "Русское название"`
+  `"<DisplayName_with_underscores>": "Русское название"`
+- В `Items.json` записываются:
+  `"<DisplayName_with_underscores>": "Русское название"`
+  `"DisplayName_<DisplayName_with_underscores>": "Русское название"`
+- В `RE_Items_RU.txt` (для legacy-совместимости B41):
+  `DisplayName_<DisplayName_with_underscores> = "Русское название",`
+
+#### 3. Критические подводные камни
+1. **Символы процента `%` и `UnknownFormatConversionException`**:
+   - При вызове `Translator.getText(...)` движок прогоняет строки через `String.format()`.
+   - Любой одиночный знак `%` перед точкой или символом не из формататоров (например, `90%.`) **намертво крашит метод с `UnknownFormatConversionException: Conversion = '.'`**.
+   - *Решение*: использовать словесное описание (*«на 90 процентов»*) либо экранировать знак процента удвоением: `%%`.
+2. **Кодировка UTF-8 строго БЕЗ BOM для JSON**:
+   - Парсер `org.json.JSONObject` в B42 падает с ошибкой `A JSONObject text must begin with '{'`, если файл содержит невидимый UTF-8 BOM (`\ufeff`). Все JSON-файлы должны быть строго UTF-8 Without BOM.
+3. **Отсутствие упоминаний «торговца» и «обмена»**:
+   - Описания крафта и предметов должны быть нейтральными и атмосферными (*«Модифицировать в...»*, *«Разделить...»*, *«Собрать...»*), избегая выражений про торговцев, если таковые не требуются по сюжету.
