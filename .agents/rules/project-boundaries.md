@@ -89,3 +89,16 @@ description: Boundaries between PZ Management project and the original Project Z
    - **Цель**: Безопасный перенос с предварительной гигиенической проверкой и жестким соблюдением правила исходника `*_Port`.
    - **Вызов**: `pz_sync_port_mod` с `sourceDir`, `modId`, `clean: true`.
 
+---
+
+## 5. 🎨 3D-Моделирование и интеграция с Blender MCP (`mcp-for-blender`)
+
+- **Blender 5.2 LTS**: `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe`
+- **MCP Server**: `blender` в `~/.gemini/config/mcp_config.json` (инструмент `mcp-for-blender` через `uvx`).
+- **Автономия**: Аддон активирован в `userpref.blend` с автозапуском сокета. Агент имеет право запускать Blender в фоновом режиме самостоятельно и использовать инструменты:
+  - `execute_blender_code`: скриптинг `bpy` (геометрия, UV, риггинг под 34 кости `Master_Bones.xml`, перенос весов).
+  - `get_scene_info` / `get_object_info`: проверка объектов, топологии и материалов.
+  - `get_viewport_screenshot`: визуальный контроль модели во вьюпорте.
+  - `export_scene`: экспорт в `.fbx` с правильными PZ осями и матрицами.
+
+

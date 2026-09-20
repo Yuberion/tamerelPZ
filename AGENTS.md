@@ -150,3 +150,26 @@ E:/PZ Management/
    - **Цель**: Безопасный перенос с предварительной гигиенической проверкой и жестким соблюдением правила исходника `*_Port`.
    - **Вызов**: `pz_sync_port_mod` с `sourceDir`, `modId`, `clean: true`.
 
+---
+
+## 6. 🎨 3D-Моделирование и интеграция с Blender MCP (`mcp-for-blender`)
+
+> [!NOTE]
+> В систему интегрирован и подключен **Blender 5.2 LTS** через официальный MCP-мост (`mcp-for-blender`).
+> Агент имеет право и возможность автономно создавать, редактировать, риггить и экспортировать 3D-модели для Project Zomboid.
+
+### Конфигурация и окружение:
+- **Blender 5.2 LTS**: `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe`
+- **Пакетный менеджер**: `C:\Users\tamer\.local\bin\uvx.exe` (входит в User PATH).
+- **Конфигурация MCP**: `C:\Users\tamer\.gemini\config\mcp_config.json` (сервер `blender`).
+- **Аддон**: `blender_mcp.py` установлен в `AppData/Roaming/Blender Foundation/Blender/5.2/scripts/addons/`, активирован в `userpref.blend` с `Auto-Start Server = True`.
+- **Автономия запуска**: Агент может запускать Blender в фоновом режиме самостоятельно при необходимости выполнения 3D-задач.
+
+### Набор доступных инструментов MCP Blender:
+1. `execute_blender_code`: Выполнение Python-скриптов (`bpy`) внутри Blender (создание мешей, модификаторы, булевы операции, UV-развертка, привязка весов к 34 костям `Master_Bones.xml`).
+2. `get_scene_info` / `get_object_info`: Инспекция иерархии объектов, мешей, материалов и полигонажа.
+3. `get_viewport_screenshot`: Получение прямого снимка 3D-вьюпорта для визуального контроля формы, нормалей и топологии.
+4. `export_scene`: Экспорт готовых моделей в формат `.fbx` (с соблюдением ориентации осей PZ, масштаба и запеканием трансформаций).
+5. Генераторы ассетов и библиотеки: `search_sketchfab_models`, `search_polypizza_models`, `search_polyhaven_assets`, `generate_hunyuan3d_model`, `generate_hyper3d_model_via_text`.
+
+
