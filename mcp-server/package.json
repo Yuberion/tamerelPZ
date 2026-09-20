@@ -1,0 +1,15 @@
+{
+  "name": "pz-modding-mcp",
+  "version": "1.0.0",
+  "description": "Project Zomboid Modding Model Context Protocol (MCP) Server for Antigravity",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "pz-modding-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Tamerel",
+  "license": "MIT"
+}
