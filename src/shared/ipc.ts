@@ -39,6 +39,11 @@ export const IPC = {
   /* Loadout — writes mod lists into the game's own config files. */
   loFiles: 'lo:files',
   loApply: 'lo:apply',
+  loRulesGet: 'lo:rules-get',
+  loRulesSave: 'lo:rules-save',
+  loGamePresetsGet: 'lo:game-presets-get',
+  loGamePresetsSave: 'lo:game-presets-save',
+  loLuaDeps: 'lo:lua-deps',
 
   /* Ledger — read-only log reader; main resolves the paths itself. */
   logList: 'log:list',

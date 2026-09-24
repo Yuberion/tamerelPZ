@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { LoadoutFile, ModEntry } from '@shared/types'
+import type { LoadoutFile, ModEntry, SortingRule } from '@shared/types'
 
 /**
  * Editing state for the Loadout module.
  *
- * The three lists of one config are edited together, because `apply` writes them
- * in one pass. Edits are held per target id rather than in a single draft, so
- * flipping between `default.txt` and a server ini to compare them never throws
- * away work — only an explicit revert, or a successful write, drops a draft.
+ * Supports:
+ *  - Target selection (Client default.txt, Player Saves, Server inis)
+ *  - Drafts per target
+ *  - Sorting rules (sorting_rules.txt)
+ *  - In-game presets (pz_modlist_settings.cfg)
+ *  - Auto-detected Lua soft dependencies
  */
 
 export type ListKind = 'mods' | 'maps' | 'workshop'
@@ -42,7 +44,7 @@ function listsOf(file: LoadoutFile | undefined): LoadoutDraft {
  * entries are normalised the same way before they are matched against it.
  */
 export function bareId(raw: string): string {
-  const trimmed = raw.trim()
+  const trimmed = raw.trim().replace(/^\\/, '')
   const m = /^\d+\/(.+)$/.exec(trimmed)
   return (m?.[1] ?? trimmed).trim().toLowerCase()
 }
@@ -84,12 +86,22 @@ export interface LoadoutStore {
   dirty: boolean
   loading: boolean
   error: string | undefined
-  /** Re-read every config from disk. Unsaved edits are dropped. */
+  /** Re-read every config, rules, and game presets from disk. */
   reload(): Promise<void>
   /** Re-read after a successful write, dropping only that target's draft. */
   commit(id: string): Promise<void>
   /** Restore the current target from disk without touching the other drafts. */
   revert(): void
+  /** Sorting rules (sorting_rules.txt). */
+  rules: Record<string, SortingRule>
+  saveRule(modId: string, rule: SortingRule): Promise<boolean>
+  deleteRule(modId: string): Promise<boolean>
+  /** In-game presets (pz_modlist_settings.cfg). */
+  gamePresets: Record<string, string[]>
+  reloadGamePresets(): Promise<void>
+  saveGamePresets(presets: Record<string, string[]>): Promise<boolean>
+  /** Auto-detected Lua soft dependencies. */
+  luaDeps: Record<string, string[]>
 }
 
 export function useLoadout(): LoadoutStore {
@@ -98,6 +110,10 @@ export function useLoadout(): LoadoutStore {
   const [targetId, setTargetId] = useState('client')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
+  const [rules, setRules] = useState<Record<string, SortingRule>>({})
+  const [gamePresets, setGamePresets] = useState<Record<string, string[]>>({})
+  const [luaDeps, setLuaDeps] = useState<Record<string, string[]>>({})
+
   const fetchFiles = useCallback(async (): Promise<LoadoutFile[]> => {
     const list = await window.pz.loadout.files()
     setFiles(list)
@@ -105,10 +121,25 @@ export function useLoadout(): LoadoutStore {
     return list
   }, [])
 
+  const fetchAux = useCallback(async (): Promise<void> => {
+    try {
+      const [r, gp, ld] = await Promise.all([
+        window.pz.loadout.getRules().catch(() => ({})),
+        window.pz.loadout.getGamePresets().catch(() => ({})),
+        window.pz.loadout.getLuaDeps().catch(() => ({}))
+      ])
+      setRules(r)
+      setGamePresets(gp)
+      setLuaDeps(ld)
+    } catch {
+      // non-fatal
+    }
+  }, [])
+
   const reload = useCallback(async (): Promise<void> => {
     setLoading(true)
     try {
-      await fetchFiles()
+      await Promise.all([fetchFiles(), fetchAux()])
       setDrafts({})
       setError(undefined)
     } catch (e) {
@@ -116,7 +147,7 @@ export function useLoadout(): LoadoutStore {
     } finally {
       setLoading(false)
     }
-  }, [fetchFiles])
+  }, [fetchFiles, fetchAux])
 
   const commit = useCallback(
     async (id: string): Promise<void> => {
@@ -164,9 +195,45 @@ export function useLoadout(): LoadoutStore {
     return set
   }, [drafts, files])
 
-  // Memoised so the callbacks keep a stable identity: the module hangs key
-  // handlers off them, and a fresh object every render would resubscribe on
-  // every keystroke.
+  const saveRule = useCallback(
+    async (modId: string, rule: SortingRule): Promise<boolean> => {
+      const next = { ...rules, [modId]: rule }
+      const ok = await window.pz.loadout.saveRules(next)
+      if (ok) setRules(next)
+      return ok
+    },
+    [rules]
+  )
+
+  const deleteRule = useCallback(
+    async (modId: string): Promise<boolean> => {
+      const next = { ...rules }
+      delete next[modId]
+      const ok = await window.pz.loadout.saveRules(next)
+      if (ok) setRules(next)
+      return ok
+    },
+    [rules]
+  )
+
+  const reloadGamePresets = useCallback(async (): Promise<void> => {
+    try {
+      const gp = await window.pz.loadout.getGamePresets()
+      setGamePresets(gp)
+    } catch {
+      // non-fatal
+    }
+  }, [])
+
+  const saveGamePresetsFn = useCallback(
+    async (presets: Record<string, string[]>): Promise<boolean> => {
+      const ok = await window.pz.loadout.saveGamePresets(presets)
+      if (ok) setGamePresets(presets)
+      return ok
+    },
+    []
+  )
+
   return useMemo(
     () => ({
       files,
@@ -181,9 +248,35 @@ export function useLoadout(): LoadoutStore {
       error,
       reload,
       commit,
-      revert
+      revert,
+      rules,
+      saveRule,
+      deleteRule,
+      gamePresets,
+      reloadGamePresets,
+      saveGamePresets: saveGamePresetsFn,
+      luaDeps
     }),
-    [files, target, targetId, lists, patch, dirtyIds, loading, error, reload, commit, revert]
+    [
+      files,
+      target,
+      targetId,
+      lists,
+      patch,
+      dirtyIds,
+      loading,
+      error,
+      reload,
+      commit,
+      revert,
+      rules,
+      saveRule,
+      deleteRule,
+      gamePresets,
+      reloadGamePresets,
+      saveGamePresetsFn,
+      luaDeps
+    ]
   )
 }
 
@@ -197,9 +290,7 @@ export interface MapFolder {
  * Map folder names across every installed mod.
  *
  * The `maps { }` block holds folder names under `media/maps`, not mod ids, and a
- * single mod can ship several. Only mods whose scan already reported a `maps`
- * media directory are listed, so this is a handful of `fs:list` calls rather
- * than a walk of the drive, and it is only run while the maps tab is open.
+ * single mod can ship several.
  */
 export function useMapFolders(
   mods: ModEntry[],
@@ -218,8 +309,6 @@ export function useMapFolders(
     void (async () => {
       const out: MapFolder[] = []
       for (const mod of mapMods) {
-        // A B42 mod keeps `media` inside a version folder, so probe every root
-        // the scanner recorded plus the mod root itself.
         const roots = [mod.path, ...mod.versionFolders.map((v) => v.path)]
         for (const root of roots) {
           let children: Awaited<ReturnType<typeof window.pz.fs.list>>

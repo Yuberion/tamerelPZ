@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
-import type { ModEntry } from '@shared/types'
+import { useMemo, useState } from 'react'
+import type { MLOSCategory, ModEntry } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useI18n } from '@renderer/i18n'
 import { SOURCE_META } from '@renderer/lib/catmeta'
 import { fuzzyMatch, segmentByIndices } from '@renderer/lib/format'
 import { useVirtual } from '@renderer/lib/useVirtual'
+import { CATEGORY_META, detectMlosCategory, RAW_CATEGORY_ORDER } from './mlos'
 
 const ROW_H = 30
 
@@ -29,21 +30,15 @@ interface AvailablePanelProps {
   emptyLabel: string
   emptyHint: string
   disabled?: boolean
+  showCategoryFilters?: boolean
 }
 
 interface Row {
   candidate: Candidate
-  /** Match positions inside the label, for `<mark>` highlighting. */
+  category?: MLOSCategory
   indices: number[]
 }
 
-/**
- * Left pane: everything that could be added to the active list.
- *
- * Entries already present stay visible but greyed, rather than disappearing —
- * a list you are building is easier to reason about when the source pane does
- * not reshuffle under the cursor on every click.
- */
 export function AvailablePanel({
   candidates,
   used,
@@ -54,25 +49,44 @@ export function AvailablePanel({
   onAddAll,
   emptyLabel,
   emptyHint,
-  disabled
+  disabled,
+  showCategoryFilters
 }: AvailablePanelProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const isRu = lang === 'ru'
+  const [selectedCat, setSelectedCat] = useState<MLOSCategory | 'all'>('all')
+
+  const candidatesWithCat = useMemo(() => {
+    return candidates.map((c) => ({
+      candidate: c,
+      category: c.mod ? detectMlosCategory(c.mod) : undefined
+    }))
+  }, [candidates])
+
+  const filteredCandidates = useMemo(() => {
+    if (selectedCat === 'all') return candidatesWithCat
+    return candidatesWithCat.filter((c) => c.category === selectedCat)
+  }, [candidatesWithCat, selectedCat])
 
   const rows = useMemo<Row[]>(() => {
     const needle = query.trim()
-    if (!needle) return candidates.map((candidate) => ({ candidate, indices: [] }))
+    if (!needle) {
+      return filteredCandidates.map(({ candidate, category }) => ({
+        candidate,
+        category,
+        indices: []
+      }))
+    }
     const hits: Array<Row & { score: number }> = []
-    for (const candidate of candidates) {
-      // The label is what gets highlighted, so only its own match contributes
-      // indices; a hit on the raw token still keeps the row, unhighlighted.
+    for (const { candidate, category } of filteredCandidates) {
       const onLabel = fuzzyMatch(needle, candidate.label)
       const hit = onLabel ?? fuzzyMatch(needle, candidate.value)
       if (!hit) continue
-      hits.push({ candidate, indices: onLabel?.indices ?? [], score: hit.score })
+      hits.push({ candidate, category, indices: onLabel?.indices ?? [], score: hit.score })
     }
     hits.sort((a, b) => b.score - a.score)
     return hits
-  }, [candidates, query])
+  }, [filteredCandidates, query])
 
   const addable = useMemo(
     () => rows.map((r) => r.candidate.value).filter((v) => !used.has(keyOf(v))),
@@ -109,6 +123,34 @@ export function AvailablePanel({
         </button>
       </div>
 
+      {showCategoryFilters && (
+        <div className="locat-filter-bar">
+          <button
+            className={`locat-chip ${selectedCat === 'all' ? 'is-active' : ''}`}
+            onClick={() => setSelectedCat('all')}
+          >
+            {isRu ? 'Все' : 'All'}
+          </button>
+          {RAW_CATEGORY_ORDER.map((cat) => {
+            const meta = CATEGORY_META[cat]
+            return (
+              <button
+                key={cat}
+                className={`locat-chip ${selectedCat === cat ? 'is-active' : ''}`}
+                style={
+                  selectedCat === cat
+                    ? { borderColor: meta.color, color: meta.color, background: meta.bg }
+                    : undefined
+                }
+                onClick={() => setSelectedCat(cat)}
+              >
+                {isRu ? meta.labelRu : meta.labelEn}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div className="pane__scroll">
           <div className="pane__empty">
@@ -121,9 +163,10 @@ export function AvailablePanel({
         <div className="pane__scroll" ref={v.ref}>
           <div style={{ height: v.totalHeight, position: 'relative' }}>
             <div style={{ transform: `translateY(${v.offset}px)` }}>
-              {rows.slice(v.start, v.end).map(({ candidate, indices }) => {
+              {rows.slice(v.start, v.end).map(({ candidate, category, indices }) => {
                 const isUsed = used.has(keyOf(candidate.value))
                 const src = candidate.mod ? SOURCE_META[candidate.mod.sourceKind] : undefined
+                const catMeta = category ? CATEGORY_META[category] : undefined
                 const segments = indices.length
                   ? segmentByIndices(candidate.label, indices)
                   : null
@@ -145,15 +188,30 @@ export function AvailablePanel({
                     </span>
                     <span className="locand__body">
                       <span className="locand__name truncate">
-                        {segments
-                          ? segments.map((s, i) =>
-                              s.hit ? <mark key={i}>{s.text}</mark> : <span key={i}>{s.text}</span>
-                            )
-                          : candidate.label}
+                        {segments ? (
+                          segments.map((s, i) =>
+                            s.hit ? <mark key={i}>{s.text}</mark> : <span key={i}>{s.text}</span>
+                          )
+                        ) : (
+                          candidate.label
+                        )}
                       </span>
-                      <span className="locand__id mono truncate">{candidate.value}</span>
+                      {candidate.mod && (
+                        <span className="locand__id mono truncate">{candidate.value}</span>
+                      )}
                     </span>
-                    <Icon name={isUsed ? 'check' : 'plus'} size={12} className="locand__go" />
+                    {catMeta && (
+                      <span
+                        className="lomlos-badge"
+                        style={{ color: catMeta.color, background: catMeta.bg }}
+                        title={`MLOS: ${isRu ? catMeta.labelRu : catMeta.labelEn}`}
+                      >
+                        {isRu ? catMeta.labelRu : catMeta.labelEn}
+                      </span>
+                    )}
+                    <span className="locand__go">
+                      <Icon name={isUsed ? 'check' : 'plus'} size={11} />
+                    </span>
                   </button>
                 )
               })}

@@ -194,6 +194,10 @@ async function analyzeMod(c: Candidate): Promise<ModEntry | undefined> {
   const tags = csv(fields, 'tags', 'category')
   const name = first(fields, 'name') ?? folderName
   const requires = csv(fields, 'require', 'requires').map((r) => normaliseModId(r) ?? r)
+  const loadAfter = csv(fields, 'loadafter', 'loadmodafter').map((r) => normaliseModId(r) ?? r)
+  const loadBefore = csv(fields, 'loadbefore', 'loadmodbefore').map((r) => normaliseModId(r) ?? r)
+  const incompatible = csv(fields, 'incompatible', 'incompatiblemods').map((r) => normaliseModId(r) ?? r)
+  const declaredCategory = first(fields, 'category')
 
   const evidence: ModEvidence = {
     mediaDirs: mediaDirSet,
@@ -252,6 +256,10 @@ async function analyzeMod(c: Candidate): Promise<ModEntry | undefined> {
     posterPath,
     iconPath,
     requires,
+    loadAfter,
+    loadBefore,
+    incompatible,
+    declaredCategory,
     tags,
     categories,
     builds: [...builds].sort(),
@@ -378,4 +386,8 @@ export async function scanMods(
     durationMs: Date.now() - started,
     fromCache
   }
+}
+
+export function getCachedMods(): ModEntry[] {
+  return Array.from(cache.values()).map((v) => v.entry)
 }

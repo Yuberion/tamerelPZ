@@ -98,6 +98,10 @@ export interface ModEntry {
   posterPath?: string
   iconPath?: string
   requires: string[]
+  loadAfter?: string[]
+  loadBefore?: string[]
+  incompatible?: string[]
+  declaredCategory?: string
   tags: string[]
   /** Detected categories, most relevant first. */
   categories: ModCategory[]
@@ -525,31 +529,72 @@ export interface BatchPackResult {
    Loadout (module 02) — load order & profiles
    ========================================================================= */
 
-export type LoadoutKind = 'client' | 'server'
+export type LoadoutKind = 'client' | 'server' | 'save'
 
 /**
  * One mod-list config the Loadout module can read and write.
  *
  * `client` is Build 42's `Zomboid\mods\default.txt` — a `VERSION` line plus
- * `mods { }` and `maps { }` blocks, one bare token per line. `server` is a flat
- * `Zomboid\Server\<name>.ini` where the interesting keys are semicolon
- * separated `Mods=` (mod.info text ids) and `WorkshopItems=` (numeric Steam
- * ids). Every list keeps its on-disk order, because that order *is* the data.
+ * `mods { }` and `maps { }` blocks, with `mod = <id>,` syntax.
+ * `save` is `Zomboid\Saves\<mode>\<save>\mods.txt` sharing the same format.
+ * `server` is a flat `Zomboid\Server\<name>.ini` where the interesting keys are
+ * semicolon separated `Mods=` and `WorkshopItems=`.
  */
 export interface LoadoutFile {
-  /** Stable selector for `loadout.apply`: `client` or `server:<base name>`. */
+  /** Stable selector for `loadout.apply`: `client`, `server:<base name>`, or `save:<mode>/<saveName>`. */
   id: string
   kind: LoadoutKind
   path: string
   exists: boolean
-  /** Config base name without `.ini`; absent for the client target. */
+  /** Config base name without `.ini`; present for server targets. */
   serverName?: string
+  /** Save mode and save folder name; present for save targets. */
+  saveMode?: string
+  saveName?: string
   /** Mod ids in load order. */
   mods: string[]
-  /** Client only: the `maps { }` block, in load order. */
+  /** Client and save targets: the `maps { }` block, in load order. */
   maps: string[]
   /** Server only: numeric Workshop item ids from `WorkshopItems=`. */
   workshopItems: string[]
+}
+
+/** Rule from sorting_rules.txt (MLOS format). */
+export interface SortingRule {
+  loadAfter: string[]
+  loadBefore: string[]
+  incompatibleMods: string[]
+  loadFirst: 'on' | 'category' | 'off'
+  loadLast: 'on' | 'category' | 'off'
+  category?: string
+}
+
+export type MLOSCategory =
+  | 'coreRequirement'
+  | 'tweaks'
+  | 'resource'
+  | 'map'
+  | 'vehicle'
+  | 'code'
+  | 'clothes'
+  | 'ui'
+  | 'other'
+  | 'translation'
+  | 'undefined'
+
+export interface OrderIssue {
+  type: 'missing' | 'incompatible' | 'rule' | 'cycle'
+  modId: string
+  targetId?: string
+  targetName?: string
+  message: string
+}
+
+export interface OrderValidationResult {
+  valid: boolean
+  issues: OrderIssue[]
+  cycles: string[][]
+  issuesByMod?: Map<string, OrderIssue[]>
 }
 
 export interface LoadoutApplyOptions {

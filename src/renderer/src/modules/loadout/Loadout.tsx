@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { LoadoutFile, LoadoutProfile, ModEntry } from '@shared/types'
+import type { LoadoutFile, LoadoutProfile, ModEntry, OrderValidationResult } from '@shared/types'
 import { Alert } from '@renderer/components/Form'
 import { Hint } from '@renderer/components/Hint'
 import { Icon, type IconName } from '@renderer/components/Icon'
@@ -7,10 +7,14 @@ import { MenuProvider } from '@renderer/components/Menu'
 import { Splitter } from '@renderer/components/Splitter'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n, type TKey } from '@renderer/i18n'
-import { formatBytes, formatCount, formatDate, shortenPath } from '@renderer/lib/format'
+import { copyText, formatBytes, formatCount, formatDate, shortenPath } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/state/store'
 import { AvailablePanel, type Candidate } from './AvailablePanel'
 import { OrderList, type OrderEntry } from './OrderList'
+import { RulesModal } from './RulesModal'
+import { PresetsModal } from './PresetsModal'
+import { ValidationModal } from './ValidationModal'
+import { copyOrderText, detectMlosCategory, sortModsMLOS, validateOrder } from './mlos'
 import {
   bareId,
   indexByModId,
@@ -41,8 +45,10 @@ const FIELD: Record<ListKind, keyof LoadoutDraft> = {
   workshop: 'workshopItems'
 }
 
-function targetLabel(file: LoadoutFile, t: (key: TKey) => string): string {
-  return file.kind === 'client' ? t('lo.targetClient') : (file.serverName ?? file.id)
+function targetLabel(file: LoadoutFile, t: (key: TKey) => string, isRu: boolean): string {
+  if (file.kind === 'client') return isRu ? 'Клиент (default.txt)' : t('lo.targetClient')
+  if (file.kind === 'save') return (isRu ? 'Сейв: ' : 'Save: ') + (file.saveName ?? file.id)
+  return (isRu ? 'Сервер: ' : 'Server: ') + (file.serverName ?? file.id)
 }
 
 /** Move `from` to `to`, shifting everything in between. */
@@ -69,7 +75,8 @@ export function Loadout({ onExit }: { onExit: () => void }) {
 
 function LoadoutBody({ onExit }: { onExit: () => void }) {
   const { scan, scanning, refresh, settings, saveSettings } = useAppStore()
-  const { t, p } = useI18n()
+  const { t, p, lang } = useI18n()
+  const isRu = lang === 'ru'
   const { notify } = useToast()
   const store = useLoadout()
 
@@ -80,6 +87,10 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
   const [profileName, setProfileName] = useState('')
   const [busy, setBusy] = useState(false)
   const [leftW, setLeftW] = useState(() => readWidth(320))
+
+  const [rulesModId, setRulesModId] = useState<string | null>(null)
+  const [showPresetsModal, setShowPresetsModal] = useState(false)
+  const [showValidationModal, setShowValidationModal] = useState(false)
 
   const mods = useMemo(() => scan?.mods ?? [], [scan])
   const target = store.target
@@ -131,6 +142,11 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
   // trustworthy once that listing has finished.
   const resolve = active !== 'maps' || mapsReady
 
+  const validationResult = useMemo<OrderValidationResult>(() => {
+    if (active !== 'mods') return { valid: true, issues: [], cycles: [], issuesByMod: new Map() }
+    return validateOrder(values, byModId, store.rules)
+  }, [active, values, byModId, store.rules])
+
   const entries = useMemo<OrderEntry[]>(() => {
     const seen = new Set<string>()
     return values.map((value, index) => {
@@ -138,9 +154,13 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
       const duplicate = seen.has(key)
       seen.add(key)
       const mod = lookup(value)
-      return { value, index, mod, missing: !mod, duplicate }
+      const category =
+        active === 'mods' && mod ? detectMlosCategory(mod, store.rules[key]?.category) : undefined
+      const issues = active === 'mods' ? validationResult.issuesByMod?.get(key) : undefined
+      const hasRule = active === 'mods' && Boolean(store.rules[key])
+      return { value, index, mod, missing: !mod, duplicate, category, issues, hasRule }
     })
-  }, [values, keyOf, lookup])
+  }, [values, keyOf, lookup, active, store.rules, validationResult])
 
   const used = useMemo(() => new Set(values.map(keyOf)), [values, keyOf])
   const missingCount = resolve ? entries.filter((e) => e.missing).length : 0
@@ -251,32 +271,24 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
    * cycle simply stops recursing instead of dropping an entry — the result is
    * always a permutation of the input.
    */
-  const sortByRequires = useCallback(() => {
-    const position = new Map<string, number>()
-    values.forEach((value, i) => {
-      const key = bareId(value)
-      if (!position.has(key)) position.set(key, i)
-    })
-    const emitted = new Set<number>()
-    const out: string[] = []
-    const visit = (index: number, stack: Set<number>): void => {
-      if (emitted.has(index) || stack.has(index)) return
-      stack.add(index)
-      for (const req of byModId.get(bareId(values[index]))?.requires ?? []) {
-        const at = position.get(bareId(req))
-        if (at !== undefined && at !== index) visit(at, stack)
-      }
-      stack.delete(index)
-      if (emitted.has(index)) return
-      emitted.add(index)
-      out.push(values[index])
-    }
-    for (let i = 0; i < values.length; i++) visit(i, new Set())
-    const moved = out.some((v, i) => v !== values[i])
-    setValues(out)
+  const sortMLOS = useCallback(() => {
+    const { sorted } = sortModsMLOS(values, byModId, store.rules, store.luaDeps)
+    const moved = sorted.some((v, i) => v !== values[i])
+    setValues(sorted)
     setSelected(undefined)
-    notify(moved ? t('lo.sortedToast') : t('lo.sortedNoneToast'), 'ok')
-  }, [values, byModId, setValues, notify, t])
+    notify(
+      moved
+        ? (isRu ? 'Порядок оптимизирован алгоритмом MLOS' : 'List sorted with MLOS algorithm')
+        : (isRu ? 'Порядок уже оптимален по MLOS' : 'Order is already optimal'),
+      'ok'
+    )
+  }, [values, byModId, store.rules, store.luaDeps, setValues, notify, isRu])
+
+  const handleCopyOrder = useCallback(async () => {
+    const text = copyOrderText(values, byModId)
+    await copyText(text)
+    notify(isRu ? 'Список ID скопирован в буфер обмена' : 'Order copied to clipboard', 'ok')
+  }, [values, byModId, notify, isRu])
 
   /** Server lists need the numeric ids too, or the server downloads nothing. */
   const fillWorkshopIds = useCallback(() => {
@@ -450,7 +462,11 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
                 onClick={() => store.selectTarget(file.id)}
                 title={file.path || t('lo.noUserDir')}
               >
-                {targetLabel(file, t)}
+                <Icon
+                  name={file.kind === 'client' ? 'user' : file.kind === 'save' ? 'save' : 'server'}
+                  size={12}
+                />
+                {targetLabel(file, t, isRu)}
                 {store.dirtyIds.has(file.id) && <span className="loseg__dot" />}
               </button>
             ))}
@@ -498,6 +514,19 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
 
         <div className="toolbar__row toolbar__row--filters">
           <span className="label toolbar__legend">{t('lo.profiles')}</span>
+          <button
+            className="btn is-active"
+            onClick={() => setShowPresetsModal(true)}
+            title={
+              isRu
+                ? 'Менеджер пресетов, пресеты игры и обмен текстом'
+                : 'Presets manager, in-game presets and text share'
+            }
+          >
+            <Icon name="book" size={12} />
+            {isRu ? 'Пресеты и обмен…' : 'Presets & Share…'}
+          </button>
+          <div className="divider-v" />
           <input
             className="loname"
             value={profileName}
@@ -571,6 +600,7 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             emptyLabel={active === 'maps' ? t('lo.noMaps') : t('lo.noCandidates')}
             emptyHint={active === 'maps' ? t('lo.noMapsHint') : t('lo.noCandidatesHint')}
             disabled={busy}
+            showCategoryFilters={active === 'mods'}
           />
         </section>
 
@@ -604,15 +634,45 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             />
             <div className="toolbar__spacer" />
             {active === 'mods' && (
-              <button
-                className="btn btn--tiny"
-                onClick={sortByRequires}
-                disabled={busy || values.length < 2}
-                title={t('lo.sortRequiresTitle')}
-              >
-                <Icon name="sort" size={11} />
-                {t('lo.sortRequires')}
-              </button>
+              <>
+                <button
+                  className="btn btn--tiny is-primary"
+                  onClick={sortMLOS}
+                  disabled={busy || values.length < 2}
+                  title={
+                    isRu
+                      ? 'Умная топологическая сортировка MLOS (категории, require, loadAfter, Lua soft-deps)'
+                      : 'Smart MLOS topological sort (categories, require, loadAfter, Lua soft-deps)'
+                  }
+                >
+                  <Icon name="sort" size={11} />
+                  {isRu ? 'Сортировка MLOS' : 'MLOS Sort'}
+                </button>
+                <button
+                  className={`btn btn--tiny ${validationResult.issues.length > 0 ? 'btn--warn' : ''}`}
+                  onClick={() => setShowValidationModal(true)}
+                  title={
+                    isRu
+                      ? 'Диагностика порядка, зависимостей и правил сортировки'
+                      : 'Order diagnostics, requirements and sorting rules'
+                  }
+                >
+                  <Icon name={validationResult.valid ? 'check' : 'alert'} size={11} />
+                  {isRu ? 'Диагностика' : 'Diagnostics'}
+                  {validationResult.issues.length > 0 && (
+                    <span className="lomlos-badge-count">{validationResult.issues.length}</span>
+                  )}
+                </button>
+                <button
+                  className="btn btn--tiny"
+                  onClick={() => void handleCopyOrder()}
+                  disabled={values.length === 0}
+                  title={isRu ? 'Скопировать список ID модов в буфер обмена' : 'Copy mod IDs to clipboard'}
+                >
+                  <Icon name="copy" size={11} />
+                  {isRu ? 'Копировать' : 'Copy'}
+                </button>
+              </>
             )}
             {kind === 'server' && active === 'workshop' && (
               <button
@@ -683,6 +743,7 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             onSelect={setSelected}
             onMove={move}
             onRemove={remove}
+            onEditRule={(modId) => setRulesModId(modId)}
             resolve={resolve}
             emptyLabel={t('lo.emptyList')}
             emptyHint={t('lo.emptyListHint')}
@@ -727,6 +788,96 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
           {target?.path ? shortenPath(target.path, 4) : '—'}
         </span>
       </footer>
+
+      {rulesModId && (
+        <RulesModal
+          modId={rulesModId}
+          modName={byModId.get(rulesModId)?.name}
+          initialRule={store.rules[rulesModId]}
+          onSave={async (rule) => {
+            await store.saveRule(rulesModId, rule)
+            notify(isRu ? 'Правило сохранено' : 'Rule saved', 'ok')
+          }}
+          onDelete={async () => {
+            await store.deleteRule(rulesModId)
+            notify(isRu ? 'Правило удалено' : 'Rule deleted', 'ok')
+          }}
+          onClose={() => setRulesModId(null)}
+        />
+      )}
+
+      {showPresetsModal && (
+        <PresetsModal
+          currentMods={store.lists.mods}
+          currentKind={kind}
+          byModId={byModId}
+          profiles={profiles}
+          gamePresets={store.gamePresets}
+          onSaveProfile={async (name) => {
+            const profile: LoadoutProfile = {
+              id: profileId(),
+              name,
+              kind,
+              mods: store.lists.mods,
+              maps: store.lists.maps,
+              workshopItems: store.lists.workshopItems,
+              savedAt: Date.now()
+            }
+            const rest = profiles.filter((x) => x.name.toLowerCase() !== name.toLowerCase())
+            await saveSettings({ loadoutProfiles: [profile, ...rest] })
+            notify(isRu ? `Пресет «${name}» сохранён` : `Saved preset "${name}"`, 'ok')
+          }}
+          onDeleteProfile={deleteProfile}
+          onApplyProfile={(profile) => {
+            loadProfile(profile)
+          }}
+          onApplyGamePreset={(name, ids) => {
+            store.patch({ mods: ids })
+            notify(
+              isRu ? `Применён пресет «${name}» (${ids.length} модов)` : `Applied preset "${name}"`,
+              'ok'
+            )
+          }}
+          onImportGamePresets={async (gp) => {
+            const imported: LoadoutProfile[] = Object.entries(gp).map(([pName, pMods]) => ({
+              id: profileId(),
+              name: `[Game] ${pName}`,
+              kind: 'client',
+              mods: pMods,
+              maps: [],
+              workshopItems: [],
+              savedAt: Date.now()
+            }))
+            await saveSettings({ loadoutProfiles: [...imported, ...profiles] })
+          }}
+          onDeleteGamePreset={async (name) => {
+            const next = { ...store.gamePresets }
+            delete next[name]
+            await store.saveGamePresets(next)
+            notify(
+              isRu
+                ? `Пресет «${name}» удалён из pz_modlist_settings.cfg`
+                : `Preset deleted from game cfg`,
+              'ok'
+            )
+          }}
+          onImportCustomList={(_name, modIds) => {
+            store.patch({ mods: modIds })
+            setSelected(undefined)
+          }}
+          onClose={() => setShowPresetsModal(false)}
+        />
+      )}
+
+      {showValidationModal && (
+        <ValidationModal
+          result={validationResult}
+          onFixWithSort={() => {
+            sortMLOS()
+          }}
+          onClose={() => setShowValidationModal(false)}
+        />
+      )}
     </div>
   )
 }

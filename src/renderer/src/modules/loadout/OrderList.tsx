@@ -1,68 +1,53 @@
 import { useState } from 'react'
-import type { ModEntry } from '@shared/types'
+import type { MLOSCategory, ModEntry, OrderIssue } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useMenu } from '@renderer/components/Menu'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n } from '@renderer/i18n'
 import { SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText } from '@renderer/lib/format'
+import { CATEGORY_META } from './mlos'
 
-/**
- * One line of a load order, already resolved against the scan.
- *
- * The raw token is the authority — it is what the game reads, and it is written
- * back verbatim. Everything else here is decoration used to explain the token:
- * whether a mod with that id is actually installed, and whether an earlier line
- * already claimed it.
- */
 export interface OrderEntry {
-  /** Token exactly as it appears in the config. */
   value: string
   index: number
-  /** Installed mod this token resolves to, when there is one. */
   mod?: ModEntry
-  /** Nothing on this machine answers to this token. */
   missing: boolean
-  /** An earlier line in the same list holds the same token. */
   duplicate: boolean
+  category?: MLOSCategory
+  issues?: OrderIssue[]
+  hasRule?: boolean
 }
 
 interface OrderListProps {
   entries: OrderEntry[]
   selected: number | undefined
   onSelect(index: number | undefined): void
-  /** Move the entry at `from` so it lands at `to`. */
   onMove(from: number, to: number): void
   onRemove(index: number): void
-  /** Resolution is only meaningful for lists that can be matched to a scan. */
+  onEditRule?(modId: string): void
   resolve: boolean
   emptyLabel: string
   emptyHint: string
   disabled?: boolean
 }
 
-/**
- * Reorderable list of config entries.
- *
- * Deliberately not virtualised, unlike the mod panes: HTML5 drag and drop needs
- * the source and target rows to exist in the DOM at the same time, and a load
- * order is bounded by what one person actually plays with — a few hundred lines
- * at the very worst, not the 10k file rows the skeleton tree has to survive.
- */
 export function OrderList({
   entries,
   selected,
   onSelect,
   onMove,
   onRemove,
+  onEditRule,
   resolve,
   emptyLabel,
   emptyHint,
   disabled
 }: OrderListProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { openMenu } = useMenu()
   const { notify } = useToast()
+  const isRu = lang === 'ru'
   const [dragIndex, setDragIndex] = useState<number>()
   const [overIndex, setOverIndex] = useState<number>()
 
@@ -84,7 +69,18 @@ export function OrderList({
   }
 
   const rowMenu = (e: React.MouseEvent, entry: OrderEntry): void => {
-    openMenu(e, [
+    const items: Parameters<typeof openMenu>[1] = []
+
+    if (onEditRule) {
+      items.push({
+        label: isRu ? 'Правила сортировки (MLOS)...' : 'Edit Sorting Rules...',
+        icon: 'wrench',
+        onClick: () => onEditRule(entry.value)
+      })
+      items.push({ separator: true })
+    }
+
+    items.push(
       {
         label: t('lo.moveTop'),
         icon: 'arrow-up',
@@ -121,7 +117,9 @@ export function OrderList({
         disabled,
         onClick: () => onRemove(entry.index)
       }
-    ])
+    )
+
+    openMenu(e, items)
   }
 
   return (
@@ -130,6 +128,9 @@ export function OrderList({
         {entries.map((entry) => {
           const src = entry.mod ? SOURCE_META[entry.mod.sourceKind] : undefined
           const bad = resolve && entry.missing
+          const catMeta = entry.category ? CATEGORY_META[entry.category] : undefined
+          const issueCount = entry.issues?.length ?? 0
+
           return (
             <div
               key={`${entry.index}:${entry.value}`}
@@ -138,6 +139,7 @@ export function OrderList({
                 selected === entry.index ? 'is-selected' : '',
                 bad ? 'is-missing' : '',
                 entry.duplicate ? 'is-duplicate' : '',
+                issueCount > 0 ? 'is-warn-issue' : '',
                 dragIndex === entry.index ? 'is-dragging' : '',
                 overIndex === entry.index && dragIndex !== entry.index ? 'is-over' : ''
               ]
@@ -149,7 +151,6 @@ export function OrderList({
               onDragStart={(e) => {
                 setDragIndex(entry.index)
                 e.dataTransfer.effectAllowed = 'move'
-                // Chromium refuses to start a drag without payload.
                 e.dataTransfer.setData('text/plain', entry.value)
               }}
               onDragOver={(e) => {
@@ -165,7 +166,11 @@ export function OrderList({
                 }
                 endDrag()
               }}
-              title={entry.mod?.path ?? entry.value}
+              title={
+                entry.issues?.length
+                  ? entry.issues.map((i) => `⚠ ${i.message}`).join('\n')
+                  : entry.mod?.path ?? entry.value
+              }
             >
               <span className="lorow__grip">
                 <Icon name="dots" size={12} />
@@ -182,8 +187,42 @@ export function OrderList({
               )}
               <span className="lorow__body">
                 <span className="lorow__name truncate">{entry.mod?.name ?? entry.value}</span>
-                {entry.mod && <span className="lorow__id mono truncate">{entry.value}</span>}
+                <span className="lorow__id mono truncate">{entry.value}</span>
               </span>
+
+              {catMeta && (
+                <span
+                  className="lomlos-badge"
+                  style={{ color: catMeta.color, background: catMeta.bg }}
+                  title={`MLOS Category: ${isRu ? catMeta.labelRu : catMeta.labelEn}`}
+                >
+                  {isRu ? catMeta.labelRu : catMeta.labelEn}
+                </span>
+              )}
+
+              {entry.hasRule && (
+                <button
+                  className="lorow__rule-btn"
+                  title={isRu ? 'Правило MLOS активно (нажмите для редактирования)' : 'MLOS rule active'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEditRule?.(entry.value)
+                  }}
+                >
+                  <Icon name="wrench" size={11} color="var(--rust-hot)" />
+                </button>
+              )}
+
+              {issueCount > 0 && (
+                <span
+                  className="lopill lopill--issue"
+                  title={entry.issues?.map((i) => i.message).join('\n')}
+                >
+                  <Icon name="alert" size={9} />
+                  {issueCount}
+                </span>
+              )}
+
               {entry.duplicate && (
                 <span className="lopill lopill--dupe" title={t('lo.statusDuplicate')}>
                   {t('lo.badgeDuplicate')}
@@ -194,7 +233,20 @@ export function OrderList({
                   {t('lo.badgeMissing')}
                 </span>
               )}
+
               <span className="lorow__actions">
+                {onEditRule && (
+                  <button
+                    className="btn btn-icon"
+                    title={isRu ? 'Редактировать правила сортировки' : 'Edit sorting rules'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onEditRule(entry.value)
+                    }}
+                  >
+                    <Icon name="wrench" size={11} />
+                  </button>
+                )}
                 <button
                   className="btn btn-icon"
                   title={t('lo.moveUp')}

@@ -10,6 +10,7 @@ import type {
   PackOptions,
   ScaffoldOptions,
   ScanProgress,
+  SortingRule,
   ValidateOptions,
   WorkbenchProgress,
   WriteModInfoRequest
@@ -69,7 +70,12 @@ const api: PzApi = {
   },
   loadout: {
     files: () => ipcRenderer.invoke(IPC.loFiles),
-    apply: (opts: LoadoutApplyOptions) => ipcRenderer.invoke(IPC.loApply, opts)
+    apply: (opts: LoadoutApplyOptions) => ipcRenderer.invoke(IPC.loApply, opts),
+    getRules: () => ipcRenderer.invoke(IPC.loRulesGet),
+    saveRules: (rules: Record<string, SortingRule>) => ipcRenderer.invoke(IPC.loRulesSave, rules),
+    getGamePresets: () => ipcRenderer.invoke(IPC.loGamePresetsGet),
+    saveGamePresets: (presets: Record<string, string[]>) => ipcRenderer.invoke(IPC.loGamePresetsSave, presets),
+    getLuaDeps: () => ipcRenderer.invoke(IPC.loLuaDeps)
   },
   logs: {
     list: () => ipcRenderer.invoke(IPC.logList),

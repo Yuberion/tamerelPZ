@@ -1,85 +1,92 @@
 import { promises as fs } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import type {
   AppSettings,
   LoadoutApplyOptions,
   LoadoutApplyResult,
-  LoadoutFile
+  LoadoutFile,
+  ModEntry,
+  SortingRule
 } from '../../shared/types'
-import { exists, readdirSafe, readTextSafe } from './fsx'
+import { exists, isDir, readdirSafe, readTextSafe } from './fsx'
 import { invalidateGuard } from './guard'
 import { detectZomboidDir } from './paths'
+import { getCachedMods } from './scanner'
 
 /**
- * Load order & profiles (module 02).
+ * Load order, profiles, saves & rules (module 02).
  *
- * Two on-disk formats are handled; both keep the rest of the file intact and
- * rewrite only the lines this module owns:
- *
- *  - client: `Zomboid\mods\default.txt` (Build 42). A `VERSION = 1,` line plus
- *    two Lua-ish blocks, `mods { ... }` / `maps { ... }`, one bare token per
- *    line. The game also keeps per-save copies under `Saves\...\mods.txt` in
- *    the same shape — those are never touched from here.
- *  - server: `Zomboid\Server\<name>.ini`. Flat `key=value` lines, no sections.
- *    `Mods=` holds semicolon-separated mod.info text ids and `WorkshopItems=`
- *    numeric Steam Workshop ids. Order inside the values is load order.
+ * Supports:
+ *  - client: `Zomboid\mods\default.txt` (Build 42).
+ *    VERSION = 1,
+ *    mods { mod = <ModId>, }
+ *    maps { map = <MapName>, }
+ *  - save: `Zomboid\Saves\<mode>\<save>\mods.txt` (identical format to default.txt).
+ *  - server: `Zomboid\Server\<name>.ini` with `Mods=` and `WorkshopItems=`.
+ *  - sorting rules: `Zomboid\sorting_rules.txt` (MLOS format) + auto backup.
+ *  - lua soft dependencies: scans media/lua files for require expressions.
  */
 
-/** Client list path relative to the Zomboid user dir. */
 const CLIENT_REL = join('mods', 'default.txt')
+const RULES_FILENAME = 'sorting_rules.txt'
+const RULES_BACKUP_FILENAME = 'backup_1.1.2_sorting_rules.txt'
+const GAME_PRESETS_REL = join('Lua', 'pz_modlist_settings.cfg')
 
-/**
- * Server config names that may be written. The shared write guard's allowlist
- * covers mod containers only, so ini writes carry their own narrow rule: a
- * plain base name with no separators or traversal.
- */
 const SAFE_SERVER_NAME = /^[\w][\w .-]{0,63}$/
+const SAFE_SAVE_PART = /^[\w][\w ._-]{0,128}$/
 
-function parseClientList(text: string): { mods: string[]; maps: string[]; version?: string } {
+export function parseClientList(text: string): { mods: string[]; maps: string[]; version?: string } {
   const mods: string[] = []
   const maps: string[] = []
   let version: string | undefined
-  let block = ''
+  let block: 'mods' | 'maps' | '' = ''
+
   for (const raw of text.split(/\r?\n/)) {
     const t = raw.trim()
+    if (!t) continue
+
     if (/^VERSION\s*=/i.test(t)) {
       version = t
       continue
     }
-    if (/^mods\s*\{$/i.test(t)) {
+    if (/^mods\s*\{?$/i.test(t)) {
       block = 'mods'
       continue
     }
-    if (/^maps\s*\{$/i.test(t)) {
+    if (/^maps\s*\{?$/i.test(t)) {
       block = 'maps'
       continue
     }
+    if (t === '{') continue
     if (t === '}') {
       block = ''
       continue
     }
-    if (!t || !block) continue
-    const token = t.replace(/,$/, '').trim()
-    ;(block === 'mods' ? mods : maps).push(token)
+    if (!block) continue
+
+    if (block === 'mods') {
+      const m = /^\s*mod\s*=\s*(.*?)\s*,?\s*$/i.exec(t)
+      const token = (m ? m[1] : t.replace(/,$/, '')).trim().replace(/^\\/, '')
+      if (token) mods.push(token)
+    } else if (block === 'maps') {
+      const m = /^\s*map\s*=\s*(.*?)\s*,?\s*$/i.exec(t)
+      const token = (m ? m[1] : t.replace(/,$/, '')).trim()
+      if (token) maps.push(token)
+    }
   }
+
   return { mods, maps, version }
 }
 
-/**
- * Rebuild the whole file. The client list has no other content to preserve —
- * except the `VERSION` line, which is echoed back exactly as it was found so a
- * future format bump is not silently downgraded to `1`.
- */
-function renderClientList(mods: string[], maps: string[], version?: string): string {
-  const out: string[] = [version ?? 'VERSION = 1,', '', 'mods {']
-  for (const m of mods) out.push(`\t${m}`)
-  out.push('}', '', 'maps {')
-  for (const m of maps) out.push(`\t${m}`)
-  out.push('}')
+export function renderClientList(mods: string[], maps: string[], version?: string): string {
+  const out: string[] = [version ?? 'VERSION = 1,', '', 'mods', '{']
+  for (const m of mods) out.push(`    mod = ${m},`)
+  out.push('}', '', 'maps', '{')
+  for (const m of maps) out.push(`    map = ${m},`)
+  out.push('}', '')
   return `${out.join('\r\n')}\r\n`
 }
 
-/** One physical line of a flat ini; comments and blanks pass through verbatim. */
 interface IniLine {
   kind: 'pair' | 'other'
   key?: string
@@ -121,8 +128,6 @@ export async function listLoadoutFiles(settings: AppSettings): Promise<LoadoutFi
       id: 'client',
       kind: 'client',
       path: clientPath,
-      // An existing but empty default.txt still exists; `readTextSafe` cannot tell
-      // that apart from a missing file, so ask the filesystem directly.
       exists: clientPath ? await exists(clientPath) : false,
       mods: parsed.mods,
       maps: parsed.maps,
@@ -131,6 +136,37 @@ export async function listLoadoutFiles(settings: AppSettings): Promise<LoadoutFi
   ]
 
   if (zomboidDir) {
+    // 1. Scan player saves: Zomboid/Saves/<mode>/<save>/mods.txt
+    const savesRoot = join(zomboidDir, 'Saves')
+    if (await isDir(savesRoot)) {
+      const modes = await readdirSafe(savesRoot)
+      for (const m of modes) {
+        if (!m.isDirectory()) continue
+        const modePath = join(savesRoot, m.name)
+        const saveDirs = await readdirSafe(modePath)
+        for (const s of saveDirs) {
+          if (!s.isDirectory()) continue
+          const modsTxtPath = join(modePath, s.name, 'mods.txt')
+          if (await exists(modsTxtPath)) {
+            const saveText = await readTextSafe(modsTxtPath)
+            const saveParsed = parseClientList(saveText ?? '')
+            files.push({
+              id: `save:${m.name}/${s.name}`,
+              kind: 'save',
+              path: modsTxtPath,
+              exists: true,
+              saveMode: m.name,
+              saveName: s.name,
+              mods: saveParsed.mods,
+              maps: saveParsed.maps,
+              workshopItems: []
+            })
+          }
+        }
+      }
+    }
+
+    // 2. Scan server configs: Zomboid/Server/*.ini
     const serversDir = join(zomboidDir, 'Server')
     const names = (await readdirSafe(serversDir))
       .map((e) => e.name)
@@ -145,7 +181,6 @@ export async function listLoadoutFiles(settings: AppSettings): Promise<LoadoutFi
         if (line.kind !== 'pair') continue
         if (line.key === 'mods') mods.push(...splitIniList(line.value))
         else if (line.key === 'workshopitems') workshopItems.push(...splitIniList(line.value))
-        // Repeated keys would be merged in order; PZ itself writes one of each.
       }
       const base = name.replace(/\.ini$/i, '')
       files.push({
@@ -172,27 +207,42 @@ export async function applyLoadout(
   const zomboidDir = await detectZomboidDir(settings)
   if (!zomboidDir) throw new Error('Zomboid user directory not found')
 
-  const baseName = opts.targetId.startsWith('server:') ? opts.targetId.slice(7) : undefined
   const isClient = opts.targetId === 'client'
-  if (!isClient && !baseName) throw new Error(`Unknown loadout target: ${opts.targetId}`)
-  if (baseName && !SAFE_SERVER_NAME.test(baseName)) {
-    throw new Error(`Refusing to write server config named "${baseName}"`)
+  const isSave = opts.targetId.startsWith('save:')
+  const isServer = opts.targetId.startsWith('server:')
+
+  let path: string
+
+  if (isClient) {
+    path = join(zomboidDir, CLIENT_REL)
+  } else if (isSave) {
+    const rawParts = opts.targetId.slice(5).split('/')
+    if (rawParts.length !== 2) throw new Error(`Invalid save target format: ${opts.targetId}`)
+    const [mode, saveName] = rawParts
+    if (!SAFE_SAVE_PART.test(mode) || !SAFE_SAVE_PART.test(saveName)) {
+      throw new Error(`Refusing to write save with invalid folder name: ${mode}/${saveName}`)
+    }
+    path = join(zomboidDir, 'Saves', mode, saveName, 'mods.txt')
+  } else if (isServer) {
+    const baseName = opts.targetId.slice(7)
+    if (!SAFE_SERVER_NAME.test(baseName)) {
+      throw new Error(`Refusing to write server config named "${baseName}"`)
+    }
+    path = join(zomboidDir, 'Server', `${baseName}.ini`)
+  } else {
+    throw new Error(`Unknown loadout target: ${opts.targetId}`)
   }
 
-  const path = isClient ? join(zomboidDir, CLIENT_REL) : join(zomboidDir, 'Server', `${baseName}.ini`)
   const prev = await readTextSafe(path)
 
   let next: string
-  if (isClient) {
+  if (isClient || isSave) {
     next = renderClientList(opts.mods, opts.maps ?? [], parseClientList(prev ?? '').version)
   } else {
-    // Rewrite only the two owned keys in place; every other line survives.
+    // Server flat INI: rewrite only Mods= and WorkshopItems= keys
     const body = parseIniLines(prev ?? '').map((l) => l.raw)
     const setKey = (key: string, value: string[]): void => {
-      const line = `${key}=${value.join(';')}`
-      // `parseIniLines` lowercases keys, so the comparison has to as well —
-      // matching against the canonical `Mods` / `WorkshopItems` spelling never
-      // hits, and the value would be appended as a second, losing duplicate.
+      const line = `${key}=${value.join(';')}${value.length > 0 ? ';' : ''}`
       const wanted = key.toLowerCase()
       const kept: string[] = []
       let wrote = false
@@ -200,8 +250,6 @@ export async function applyLoadout(
         const t = raw.trim()
         const eq = t.indexOf('=')
         if (eq > 0 && t.slice(0, eq).trim().toLowerCase() === wanted) {
-          // A hand-edited file may hold the key twice. Keep the first slot and
-          // drop the rest: leaving them would let a stale line win at load time.
           if (!wrote) {
             kept.push(line)
             wrote = true
@@ -235,4 +283,317 @@ export async function applyLoadout(
     backupPath,
     durationMs: Date.now() - startedAt
   }
+}
+
+/* =========================================================================
+   Sorting Rules (sorting_rules.txt)
+   ========================================================================= */
+
+function splitCsvList(value: string): string[] {
+  return value
+    .split(',')
+    .map((s) => s.trim().replace(/^\\/, ''))
+    .filter(Boolean)
+}
+
+function parseRulesText(text: string): Record<string, SortingRule> {
+  const rules: Record<string, SortingRule> = {}
+  let currentId: string | undefined
+
+  const sectionRe = /^\s*\[\s*(.*?)\s*\]\s*$/
+  const kvRe = /^\s*(.*?)\s*=\s*(.*?)\s*$/
+
+  for (const line of text.split(/\r?\n/)) {
+    const stripped = line.trim()
+    if (!stripped) continue
+
+    const sm = sectionRe.exec(stripped)
+    if (sm) {
+      currentId = sm[1].replace(/^\\/, '').trim()
+      rules[currentId] ??= {
+        loadAfter: [],
+        loadBefore: [],
+        incompatibleMods: [],
+        loadFirst: 'off',
+        loadLast: 'off'
+      }
+      continue
+    }
+
+    if (!currentId) continue
+
+    const kv = kvRe.exec(stripped)
+    if (!kv) continue
+
+    const key = kv[1].toLowerCase().trim()
+    const val = kv[2].trim()
+    const rule = rules[currentId]
+
+    if (key === 'loadafter' || key === 'loadmodafter') {
+      rule.loadAfter.push(...splitCsvList(val))
+    } else if (key === 'loadbefore' || key === 'loadmodbefore') {
+      rule.loadBefore.push(...splitCsvList(val))
+    } else if (key === 'incompatiblemods' || key === 'incompatible') {
+      rule.incompatibleMods.push(...splitCsvList(val))
+    } else if (key === 'loadfirst') {
+      const v = val.toLowerCase()
+      rule.loadFirst = v === 'on' || v === 'category' ? v : 'off'
+    } else if (key === 'loadlast') {
+      const v = val.toLowerCase()
+      rule.loadLast = v === 'on' || v === 'category' ? v : 'off'
+    } else if (key === 'category') {
+      rule.category = val || undefined
+    }
+  }
+
+  // Deduplicate and filter out empty rules
+  const result: Record<string, SortingRule> = {}
+  for (const [id, r] of Object.entries(rules)) {
+    r.loadAfter = [...new Set(r.loadAfter)]
+    r.loadBefore = [...new Set(r.loadBefore)]
+    r.incompatibleMods = [...new Set(r.incompatibleMods)]
+    const empty =
+      r.loadAfter.length === 0 &&
+      r.loadBefore.length === 0 &&
+      r.incompatibleMods.length === 0 &&
+      r.loadFirst === 'off' &&
+      r.loadLast === 'off' &&
+      !r.category
+    if (!empty) result[id] = r
+  }
+  return result
+}
+
+function dumpRulesText(rules: Record<string, SortingRule>): string {
+  const lines: string[] = []
+  for (const modId of Object.keys(rules).sort((a, b) => a.localeCompare(b))) {
+    const r = rules[modId]
+    lines.push(`[${modId}]`)
+    if (r.loadAfter.length) lines.push(`loadAfter=${r.loadAfter.join(',')}`)
+    if (r.loadBefore.length) lines.push(`loadBefore=${r.loadBefore.join(',')}`)
+    if (r.incompatibleMods.length) lines.push(`incompatibleMods=${r.incompatibleMods.join(',')}`)
+    if (r.loadFirst !== 'off') lines.push(`loadFirst=${r.loadFirst}`)
+    if (r.loadLast !== 'off') lines.push(`loadLast=${r.loadLast}`)
+    if (r.category) lines.push(`category=${r.category}`)
+    lines.push('')
+  }
+  return lines.join('\r\n')
+}
+
+export async function readSortingRules(settings: AppSettings): Promise<Record<string, SortingRule>> {
+  const zomboidDir = await detectZomboidDir(settings)
+  if (!zomboidDir) return {}
+
+  const rulesPath = join(zomboidDir, RULES_FILENAME)
+  const backupPath = join(zomboidDir, RULES_BACKUP_FILENAME)
+
+  if (await exists(rulesPath)) {
+    // Create initial backup if not already present
+    if (!(await exists(backupPath))) {
+      try {
+        await fs.copyFile(rulesPath, backupPath)
+      } catch {
+        // non-fatal
+      }
+    }
+    const text = await readTextSafe(rulesPath)
+    return parseRulesText(text ?? '')
+  }
+  return {}
+}
+
+export async function saveSortingRules(
+  settings: AppSettings,
+  rules: Record<string, SortingRule>
+): Promise<boolean> {
+  const zomboidDir = await detectZomboidDir(settings)
+  if (!zomboidDir) return false
+
+  const rulesPath = join(zomboidDir, RULES_FILENAME)
+  const text = dumpRulesText(rules)
+  try {
+    await fs.mkdir(dirname(rulesPath), { recursive: true })
+    await fs.writeFile(rulesPath, text, 'utf8')
+    invalidateGuard()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/* =========================================================================
+   In-game Presets ([B42] Mod Manager: pz_modlist_settings.cfg)
+   ========================================================================= */
+
+export async function readGamePresets(settings: AppSettings): Promise<Record<string, string[]>> {
+  const zomboidDir = await detectZomboidDir(settings)
+  if (!zomboidDir) return {}
+
+  const cfgPath = join(zomboidDir, GAME_PRESETS_REL)
+  if (!(await exists(cfgPath))) return {}
+
+  const text = await readTextSafe(cfgPath)
+  if (!text) return {}
+
+  const presets: Record<string, string[]> = {}
+  for (const line of text.split(/\r?\n/)) {
+    const stripped = line.trim()
+    if (!stripped || stripped.startsWith('!fav!')) continue
+    const sep = stripped.indexOf(':')
+    if (sep <= 0) continue
+
+    const name = stripped.slice(0, sep).trim()
+    const raw = stripped.slice(sep + 1)
+    if (!name) continue
+
+    const ids: string[] = []
+    for (const part of raw.replace(/,/g, ';').split(';')) {
+      const p = part.trim().replace(/^\\/, '')
+      if (p) ids.push(p)
+    }
+    if (ids.length > 0) presets[name] = ids
+  }
+  return presets
+}
+
+export async function saveGamePresets(
+  settings: AppSettings,
+  presets: Record<string, string[]>
+): Promise<boolean> {
+  const zomboidDir = await detectZomboidDir(settings)
+  if (!zomboidDir) return false
+
+  const cfgPath = join(zomboidDir, GAME_PRESETS_REL)
+  const lines: string[] = []
+  for (const [name, ids] of Object.entries(presets)) {
+    if (!name || ids.length === 0) continue
+    lines.push(`${name}:${ids.join(';')};`)
+  }
+  const text = lines.join('\r\n') + '\r\n'
+
+  try {
+    await fs.mkdir(dirname(cfgPath), { recursive: true })
+    await fs.writeFile(cfgPath, text, 'utf8')
+    invalidateGuard()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/* =========================================================================
+   Lua Soft Dependencies Scanner
+   ========================================================================= */
+
+const PZ_LUA_STDLIB = new Set([
+  'string', 'table', 'math', 'os', 'io', 'coroutine', 'debug', 'utf8',
+  'package', 'bit', 'bit32', 'lpeg', 'luautils', 'util', 'utils',
+  'defines', 'logger', 'log', 'errors', 'debugtools', 'textutils',
+  'sanity', 'rng', 'rand', 'calldeinfo', 'callfunc', 'iso',
+  'zombie', 'isoplayer', 'isozombie', 'isoobject', 'isogridsquare',
+  'isocell', 'isoscene', 'isomap', 'isonet', 'isoserver', 'isoclient',
+  'isodin', 'isobuilding', 'isodamage', 'isoinventory', 'isovehicle',
+  'isowindow', 'isodoor', 'isofurniture', 'isometaldetector', 'isonpc',
+  'event', 'events', 'sandboxvars', 'getcore', 'gettext', 'getkey',
+  'getmonth', 'getclock', 'getgametime', 'getworld', 'getplayer',
+  'getcell', 'getwindowmanager', 'getmodmanager', 'moddata', 'modinfo',
+  'require', 'inspect', 'serpent', 'pl', 'penlight', 'commander',
+  'chatmanager', 'workshop', 'steam', 'gameclient', 'gameserver'
+])
+
+const REQUIRE_RE = /\brequire\s*(?:\(\s*)?["']([A-Za-z0-9_\-./\\]+)["']/g
+
+interface LuaDepsCacheEntry {
+  mtime: number
+  deps: string[]
+}
+
+const luaDepsCache = new Map<string, LuaDepsCacheEntry>()
+
+function normalizeRequireToken(token: string): string {
+  const clean = token.replace(/\\/g, '/').split('/').pop() ?? ''
+  return clean.replace(/\.(lua|txt|module)$/i, '').trim().toLowerCase()
+}
+
+async function collectLuaFiles(dir: string, maxFiles = 500, maxDepth = 6): Promise<string[]> {
+  const result: string[] = []
+  const queue: Array<{ path: string; depth: number }> = [{ path: dir, depth: 0 }]
+
+  while (queue.length > 0 && result.length < maxFiles) {
+    const item = queue.shift()!
+    const entries = await readdirSafe(item.path)
+    for (const e of entries) {
+      if (result.length >= maxFiles) break
+      const full = join(item.path, e.name)
+      if (e.isFile() && e.name.toLowerCase().endsWith('.lua')) {
+        result.push(full)
+      } else if (e.isDirectory() && item.depth < maxDepth && !e.name.startsWith('.')) {
+        queue.push({ path: full, depth: item.depth + 1 })
+      }
+    }
+  }
+  return result
+}
+
+export async function scanLuaSoftDeps(mods?: ModEntry[]): Promise<Record<string, string[]>> {
+  const allMods = mods ?? getCachedMods()
+  if (!allMods || allMods.length === 0) return {}
+
+  // Build lookup: normalized name -> modId
+  const known = new Map<string, string>()
+  for (const m of allMods) {
+    if (m.modId) {
+      known.set(m.modId.toLowerCase(), m.modId)
+      known.set(basename(m.path).toLowerCase(), m.modId)
+      if (m.folderName) known.set(m.folderName.toLowerCase(), m.modId)
+    }
+  }
+
+  const results: Record<string, string[]> = {}
+
+  for (const mod of allMods) {
+    if (!mod.modId || !mod.path) continue
+    const modId = mod.modId
+
+    const cached = luaDepsCache.get(mod.path)
+    if (cached && cached.mtime === mod.mtime) {
+      results[modId] = cached.deps
+      continue
+    }
+
+    const candidateDirs = [
+      join(mod.path, 'media', 'lua'),
+      join(mod.path, 'common', 'media', 'lua'),
+      join(mod.path, '42', 'media', 'lua')
+    ]
+
+    const luaFiles: string[] = []
+    for (const d of candidateDirs) {
+      if (await isDir(d)) {
+        luaFiles.push(...(await collectLuaFiles(d, 300, 5)))
+      }
+    }
+
+    const matchedDeps = new Set<string>()
+
+    for (const file of luaFiles) {
+      const text = await readTextSafe(file, 256 * 1024)
+      if (!text) continue
+      let match: RegExpExecArray | null
+      while ((match = REQUIRE_RE.exec(text)) !== null) {
+        const norm = normalizeRequireToken(match[1])
+        if (!norm || PZ_LUA_STDLIB.has(norm)) continue
+        const targetMod = known.get(norm)
+        if (targetMod && targetMod.toLowerCase() !== modId.toLowerCase()) {
+          matchedDeps.add(targetMod)
+        }
+      }
+    }
+
+    const depList = Array.from(matchedDeps)
+    luaDepsCache.set(mod.path, { mtime: mod.mtime, deps: depList })
+    results[modId] = depList
+  }
+
+  return results
 }

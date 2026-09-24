@@ -14,6 +14,7 @@ import type {
   LoadoutApplyOptions,
   LoadoutApplyResult,
   LoadoutFile,
+  SortingRule,
   LogReadResult,
   LogSource,
   ModInfoDraft,
@@ -100,9 +101,14 @@ export interface PzApi {
    * them back; the write goes through the same guarded paths as Workbench.
    */
   loadout: {
-    /** Every config the module can edit (client default.txt + server inis). */
+    /** Every config the module can edit (client default.txt + saves + server inis). */
     files(): Promise<LoadoutFile[]>
     apply(opts: LoadoutApplyOptions): Promise<LoadoutApplyResult>
+    getRules(): Promise<Record<string, SortingRule>>
+    saveRules(rules: Record<string, SortingRule>): Promise<boolean>
+    getGamePresets(): Promise<Record<string, string[]>>
+    saveGamePresets(presets: Record<string, string[]>): Promise<boolean>
+    getLuaDeps(): Promise<Record<string, string[]>>
   }
   /**
    * Crash logs and console output. Read-only: there is no write counterpart, and

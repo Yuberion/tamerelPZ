@@ -12,6 +12,7 @@ import type {
   PackOptions,
   ScaffoldOptions,
   ScanProgress,
+  SortingRule,
   ValidateOptions,
   WorkbenchProgress,
   WriteModInfoRequest
@@ -28,7 +29,15 @@ import {
   rememberPickedFiles
 } from './services/convert'
 import { assertPathAllowed, invalidateGuard } from './services/guard'
-import { applyLoadout, listLoadoutFiles } from './services/loadout'
+import {
+  applyLoadout,
+  listLoadoutFiles,
+  readGamePresets,
+  readSortingRules,
+  saveGamePresets,
+  saveSortingRules,
+  scanLuaSoftDeps
+} from './services/loadout'
 import { buildTree, exists, isDir, listDir, readPreview, walkStats } from './services/fsx'
 import { listLogSources, readLog } from './services/logs'
 import {
@@ -298,6 +307,20 @@ export function registerIpc(): void {
     invalidateGuard()
     return result
   })
+
+  ipcMain.handle(IPC.loRulesGet, async () => readSortingRules(await getSettings()))
+
+  ipcMain.handle(IPC.loRulesSave, async (_e, rules: Record<string, SortingRule>) =>
+    saveSortingRules(await getSettings(), rules)
+  )
+
+  ipcMain.handle(IPC.loGamePresetsGet, async () => readGamePresets(await getSettings()))
+
+  ipcMain.handle(IPC.loGamePresetsSave, async (_e, presets: Record<string, string[]>) =>
+    saveGamePresets(await getSettings(), presets)
+  )
+
+  ipcMain.handle(IPC.loLuaDeps, async () => scanLuaSoftDeps())
 
   // --- Ledger (module 09): read-only log reader -----------------------------
   // No guard call and no invalidateGuard: readLog builds the path itself from
