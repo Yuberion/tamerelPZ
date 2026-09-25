@@ -36,7 +36,9 @@ import {
   readSortingRules,
   saveGamePresets,
   saveSortingRules,
-  scanLuaSoftDeps
+  scanFileOverwrites,
+  scanLuaSoftDeps,
+  scanMapCells
 } from './services/loadout'
 import { buildTree, exists, isDir, listDir, readPreview, walkStats } from './services/fsx'
 import { listLogSources, readLog } from './services/logs'
@@ -321,6 +323,14 @@ export function registerIpc(): void {
   )
 
   ipcMain.handle(IPC.loLuaDeps, async () => scanLuaSoftDeps())
+
+  ipcMain.handle(IPC.loFileOverwrites, async (_e, activeModIds: string[]) =>
+    scanFileOverwrites(activeModIds)
+  )
+
+  ipcMain.handle(IPC.loMapCells, async (_e, activeModIds: string[]) =>
+    scanMapCells(activeModIds)
+  )
 
   // --- Ledger (module 09): read-only log reader -----------------------------
   // No guard call and no invalidateGuard: readLog builds the path itself from

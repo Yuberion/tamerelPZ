@@ -75,7 +75,9 @@ const api: PzApi = {
     saveRules: (rules: Record<string, SortingRule>) => ipcRenderer.invoke(IPC.loRulesSave, rules),
     getGamePresets: () => ipcRenderer.invoke(IPC.loGamePresetsGet),
     saveGamePresets: (presets: Record<string, string[]>) => ipcRenderer.invoke(IPC.loGamePresetsSave, presets),
-    getLuaDeps: () => ipcRenderer.invoke(IPC.loLuaDeps)
+    getLuaDeps: () => ipcRenderer.invoke(IPC.loLuaDeps),
+    getFileOverwrites: (activeModIds: string[]) => ipcRenderer.invoke(IPC.loFileOverwrites, activeModIds),
+    getMapCells: (activeModIds: string[]) => ipcRenderer.invoke(IPC.loMapCells, activeModIds)
   },
   logs: {
     list: () => ipcRenderer.invoke(IPC.logList),

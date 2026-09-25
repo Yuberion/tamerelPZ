@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react'
-import type { ModEntry } from '@shared/types'
+import type { ModEntry, UserModAnnotation } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useMenu } from '@renderer/components/Menu'
 import { useToast } from '@renderer/components/Toast'
@@ -17,8 +17,10 @@ interface ModListProps {
   duplicateKeys: Set<string>
   missingKeys: Set<string>
   indexByKey: Map<string, number>
+  annotations?: Record<string, UserModAnnotation>
   onSelect: (mod: ModEntry) => void
   onToggleGroup: (id: string) => void
+  onToggleFavorite?: (modKey: string) => void
 }
 
 export function ModList({
@@ -27,8 +29,10 @@ export function ModList({
   duplicateKeys,
   missingKeys,
   indexByKey,
+  annotations,
   onSelect,
-  onToggleGroup
+  onToggleGroup,
+  onToggleFavorite
 }: ModListProps) {
   const v = useVirtual(rows.length, ROW_H)
   const { openMenu } = useMenu()
@@ -100,6 +104,7 @@ export function ModList({
             const src = SOURCE_META[mod.sourceKind]
             const isDup = duplicateKeys.has(mod.key)
             const isMissing = missingKeys.has(mod.key)
+            const isFav = Boolean(annotations?.[mod.key]?.favorite)
 
             return (
               <div
@@ -111,6 +116,15 @@ export function ModList({
                 onContextMenu={(e) => {
                   onSelect(mod)
                   openMenu(e, [
+                    {
+                      label: isFav ? 'Убрать из избранного' : 'Добавить в избранное',
+                      icon: 'star',
+                      onClick: () => {
+                        onToggleFavorite?.(mod.key)
+                        notify(isFav ? 'Удалено из избранного' : 'Добавлено в избранное', 'ok')
+                      }
+                    },
+                    { separator: true },
                     {
                       label: t('menu.openFolder'),
                       icon: 'folder-open',
@@ -171,6 +185,11 @@ export function ModList({
                     )
                   )}
                 </span>
+                {isFav && (
+                  <span className="modrow__fav" title="В избранном">
+                    ★
+                  </span>
+                )}
                 {mod.builds.map((b) => (
                   <span key={b} className={`bbadge bbadge--${b.toLowerCase()}`}>
                     {b.replace('B', '')}

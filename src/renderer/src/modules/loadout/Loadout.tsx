@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { LoadoutFile, LoadoutProfile, ModEntry, OrderValidationResult } from '@shared/types'
+import type { LoadoutFile, LoadoutProfile, ModEntry, ModOverwritesSummary, OrderValidationResult } from '@shared/types'
 import { Alert } from '@renderer/components/Form'
 import { Hint } from '@renderer/components/Hint'
 import { Icon, type IconName } from '@renderer/components/Icon'
@@ -10,11 +10,16 @@ import { useI18n, type TKey } from '@renderer/i18n'
 import { copyText, formatBytes, formatCount, formatDate, shortenPath } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/state/store'
 import { AvailablePanel, type Candidate } from './AvailablePanel'
-import { OrderList, type OrderEntry } from './OrderList'
+import { OrderList, isSeparator, type OrderEntry } from './OrderList'
 import { RulesModal } from './RulesModal'
 import { PresetsModal } from './PresetsModal'
 import { ValidationModal } from './ValidationModal'
+import { IntegrityModal } from './IntegrityModal'
+import { MapConflictModal } from './MapConflictModal'
+import { ServerSyncModal } from './ServerSyncModal'
+import { BuildReportModal } from './BuildReportModal'
 import { copyOrderText, detectMlosCategory, sortModsMLOS, validateOrder } from './mlos'
+import { ModDetailPanel } from './ModDetailPanel'
 import {
   bareId,
   indexByModId,
@@ -26,6 +31,10 @@ import {
 } from './useLoadout'
 
 const LS_LEFT = 'pz.loadout.leftWidth'
+const LS_RIGHT = 'pz.loadout.rightWidth'
+const LS_SHOW_INFO = 'pz.loadout.showInfo'
+const LS_SHOW_TOOLS = 'pz.loadout.showTools'
+const LS_PINNED = 'pz.loadout.pinned'
 
 const TABS: Array<{ id: ListKind; labelKey: TKey; icon: IconName; only?: 'client' | 'server' }> = [
   { id: 'mods', labelKey: 'lo.tabMods', icon: 'list' },
@@ -33,9 +42,30 @@ const TABS: Array<{ id: ListKind; labelKey: TKey; icon: IconName; only?: 'client
   { id: 'workshop', labelKey: 'lo.tabWorkshop', icon: 'download', only: 'server' }
 ]
 
-function readWidth(fallback: number): number {
-  const raw = Number(localStorage.getItem(LS_LEFT))
+function readWidth(key: string, fallback: number): number {
+  const raw = Number(localStorage.getItem(key))
   return Number.isFinite(raw) && raw > 200 ? raw : fallback
+}
+
+function readShowInfo(fallback: boolean): boolean {
+  const raw = localStorage.getItem(LS_SHOW_INFO)
+  return raw !== null ? raw === 'true' : fallback
+}
+
+function readShowTools(fallback: boolean): boolean {
+  const raw = localStorage.getItem(LS_SHOW_TOOLS)
+  return raw !== null ? raw === 'true' : fallback
+}
+
+function readPinnedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(LS_PINNED)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw)
+    return new Set(Array.isArray(arr) ? arr.map(bareId) : [])
+  } catch {
+    return new Set()
+  }
 }
 
 /** Field of `LoadoutDraft` each tab edits. */
@@ -65,6 +95,46 @@ function profileId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function collectDependencies(
+  modId: string,
+  byModId: Map<string, ModEntry>,
+  alreadyUsed: Set<string>
+): { resolved: string[]; missing: string[] } {
+  const missing: string[] = []
+  const resolved: string[] = []
+  const visited = new Set<string>()
+
+  function recurse(id: string) {
+    const bare = bareId(id)
+    if (visited.has(bare)) return
+    visited.add(bare)
+
+    const target = byModId.get(bare)
+    if (!target) {
+      if (!alreadyUsed.has(bare) && !resolved.map(bareId).includes(bare)) {
+        missing.push(id)
+      }
+      return
+    }
+
+    for (const req of target.requires ?? []) {
+      const reqBare = bareId(req)
+      if (!alreadyUsed.has(reqBare) && !resolved.map(bareId).includes(reqBare)) {
+        recurse(req)
+      }
+    }
+
+    const val = target.modId ?? target.folderName
+    const valBare = bareId(val)
+    if (!alreadyUsed.has(valBare) && !resolved.map(bareId).includes(valBare)) {
+      resolved.push(val)
+    }
+  }
+
+  recurse(modId)
+  return { resolved, missing }
+}
+
 export function Loadout({ onExit }: { onExit: () => void }) {
   return (
     <MenuProvider>
@@ -86,11 +156,48 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
   const [backup, setBackup] = useState(true)
   const [profileName, setProfileName] = useState('')
   const [busy, setBusy] = useState(false)
-  const [leftW, setLeftW] = useState(() => readWidth(320))
+  const [autoResolve, setAutoResolve] = useState(true)
+  const [leftW, setLeftW] = useState(() => readWidth(LS_LEFT, 320))
+  const [rightW, setRightW] = useState(() => readWidth(LS_RIGHT, 340))
+  const [showInfo, setShowInfo] = useState(() => readShowInfo(true))
+  const [showTools, setShowTools] = useState(() => readShowTools(true))
+  const [inspectedModId, setInspectedModId] = useState<string | null>(null)
 
   const [rulesModId, setRulesModId] = useState<string | null>(null)
   const [showPresetsModal, setShowPresetsModal] = useState(false)
   const [showValidationModal, setShowValidationModal] = useState(false)
+  const [showIntegrityModal, setShowIntegrityModal] = useState(false)
+  const [showMapConflictModal, setShowMapConflictModal] = useState(false)
+  const [showServerSyncModal, setShowServerSyncModal] = useState(false)
+  const [showAddSepModal, setShowAddSepModal] = useState(false)
+  const [sepTitle, setSepTitle] = useState('')
+  const [sepColor, setSepColor] = useState('#3b82f6')
+  const [overwritesSummary, setOverwritesSummary] = useState<ModOverwritesSummary>()
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => readPinnedIds())
+  const [showReportModal, setShowReportModal] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const activeMods = store.lists.mods
+    if (activeMods.length === 0) {
+      setOverwritesSummary(undefined)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      window.pz.loadout
+        .getFileOverwrites(activeMods)
+        .then((res) => {
+          if (!cancelled) setOverwritesSummary(res)
+        })
+        .catch(() => {})
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [store.lists.mods])
 
   const mods = useMemo(() => scan?.mods ?? [], [scan])
   const target = store.target
@@ -138,6 +245,19 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
     [active, byModId, byWorkshopId, mapIndex]
   )
 
+  const inspectedMod = useMemo<ModEntry | undefined>(() => {
+    if (inspectedModId) {
+      return lookup(inspectedModId)
+    }
+    if (selected !== undefined && values[selected]) {
+      return lookup(values[selected])
+    }
+    if (values.length > 0) {
+      return lookup(values[0])
+    }
+    return undefined
+  }, [inspectedModId, selected, values, lookup])
+
   // Map names come from a directory listing, so "not installed" is only
   // trustworthy once that listing has finished.
   const resolve = active !== 'maps' || mapsReady
@@ -150,6 +270,9 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
   const entries = useMemo<OrderEntry[]>(() => {
     const seen = new Set<string>()
     return values.map((value, index) => {
+      if (isSeparator(value)) {
+        return { value, index, missing: false, duplicate: false }
+      }
       const key = keyOf(value)
       const duplicate = seen.has(key)
       seen.add(key)
@@ -162,9 +285,9 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
     })
   }, [values, keyOf, lookup, active, store.rules, validationResult])
 
-  const used = useMemo(() => new Set(values.map(keyOf)), [values, keyOf])
-  const missingCount = resolve ? entries.filter((e) => e.missing).length : 0
-  const duplicateCount = entries.filter((e) => e.duplicate).length
+  const used = useMemo(() => new Set(values.filter((v) => !isSeparator(v)).map(keyOf)), [values, keyOf])
+  const missingCount = resolve ? entries.filter((e) => !isSeparator(e.value) && e.missing).length : 0
+  const duplicateCount = entries.filter((e) => !isSeparator(e.value) && e.duplicate).length
 
   const candidates = useMemo<Candidate[]>(() => {
     if (active === 'maps') {
@@ -218,13 +341,45 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
     [values, setValues]
   )
 
+  const removeValue = useCallback(
+    (value: string) => {
+      const key = keyOf(value)
+      setValues(values.filter((v) => keyOf(v) !== key))
+      setSelected(undefined)
+    },
+    [values, keyOf, setValues]
+  )
+
   const add = useCallback(
     (value: string) => {
       const token = value.trim()
       if (!token || used.has(keyOf(token))) return
-      setValues([...values, token])
+
+      if (active === 'mods' && autoResolve) {
+        const { resolved, missing } = collectDependencies(token, byModId, used)
+        if (missing.length > 0) {
+          notify(
+            isRu
+              ? `Отсутствуют необходимые моды: ${missing.join(', ')}`
+              : `Missing required mods: ${missing.join(', ')}`,
+            'warn'
+          )
+        }
+        const extraDeps = resolved.filter((v) => keyOf(v) !== keyOf(token))
+        if (extraDeps.length > 0) {
+          notify(
+            isRu
+              ? `Авто-подключено зависимостей (${extraDeps.length}): ${extraDeps.map((id) => lookup(id)?.name ?? id).join(', ')}`
+              : `Auto-resolved ${extraDeps.length} dependencies: ${extraDeps.join(', ')}`,
+            'ok'
+          )
+        }
+        setValues([...values, ...resolved])
+      } else {
+        setValues([...values, token])
+      }
     },
-    [values, used, keyOf, setValues]
+    [values, used, keyOf, setValues, active, autoResolve, byModId, isRu, notify, lookup]
   )
 
   const addAll = useCallback(
@@ -243,6 +398,23 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
       notify(t('lo.addedToast', { n: extra.length }), 'ok')
     },
     [values, used, keyOf, setValues, notify, t]
+  )
+
+  const handleAddSeparator = useCallback(
+    (title: string, color: string) => {
+      const clean = title.trim().toUpperCase() || 'CATEGORY'
+      const token = `__SEP__:${clean}:${color}`
+      const next = [...values]
+      if (selected !== undefined && selected >= 0 && selected <= next.length) {
+        next.splice(selected + 1, 0, token)
+      } else {
+        next.push(token)
+      }
+      setValues(next)
+      setShowAddSepModal(false)
+      setSepTitle('')
+    },
+    [values, selected, setValues]
   )
 
   const dedupe = useCallback(() => {
@@ -272,17 +444,23 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
    * always a permutation of the input.
    */
   const sortMLOS = useCallback(() => {
-    const { sorted } = sortModsMLOS(values, byModId, store.rules, store.luaDeps)
+    const { sorted } = sortModsMLOS(values, byModId, store.rules, store.luaDeps, pinnedIds)
     const moved = sorted.some((v, i) => v !== values[i])
     setValues(sorted)
     setSelected(undefined)
     notify(
       moved
-        ? (isRu ? 'Порядок оптимизирован алгоритмом MLOS' : 'List sorted with MLOS algorithm')
+        ? (isRu
+            ? (pinnedIds.size > 0
+                ? `Порядок оптимизирован MLOS (с фиксацией ${pinnedIds.size} модов)`
+                : 'Порядок оптимизирован алгоритмом MLOS')
+            : (pinnedIds.size > 0
+                ? `Order sorted via MLOS (${pinnedIds.size} mods locked)`
+                : 'List sorted with MLOS algorithm'))
         : (isRu ? 'Порядок уже оптимален по MLOS' : 'Order is already optimal'),
       'ok'
     )
-  }, [values, byModId, store.rules, store.luaDeps, setValues, notify, isRu])
+  }, [values, byModId, store.rules, store.luaDeps, pinnedIds, setValues, notify, isRu])
 
   const handleCopyOrder = useCallback(async () => {
     const text = copyOrderText(values, byModId)
@@ -402,6 +580,49 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
     })
   }, [])
 
+  const dragRight = useCallback((dx: number) => {
+    setRightW((w) => {
+      const next = Math.min(Math.max(w - dx, 240), 580)
+      localStorage.setItem(LS_RIGHT, String(next))
+      return next
+    })
+  }, [])
+
+  const toggleShowInfo = useCallback(() => {
+    setShowInfo((prev) => {
+      const next = !prev
+      localStorage.setItem(LS_SHOW_INFO, String(next))
+      return next
+    })
+  }, [])
+
+  const toggleShowTools = useCallback(() => {
+    setShowTools((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(LS_SHOW_TOOLS, String(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }, [])
+
+  const togglePin = useCallback((val: string) => {
+    const key = bareId(val)
+    setPinnedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      try {
+        localStorage.setItem(LS_PINNED, JSON.stringify(Array.from(next)))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }, [])
+
   // Reset the cursor and the last write when the pane content changes under it.
   useEffect(() => {
     setSelected(undefined)
@@ -510,6 +731,15 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
           >
             <Icon name="refresh" size={13} className={store.loading ? 'spin' : undefined} />
           </button>
+          <div className="divider-v" />
+          <button
+            className={`btn ${showInfo ? 'is-active' : ''}`}
+            onClick={toggleShowInfo}
+            title={isRu ? 'Панель информации и превью мода' : 'Mod details & preview pane'}
+          >
+            <Icon name="eye" size={13} />
+            {isRu ? 'Инфо' : 'Info'}
+          </button>
         </div>
 
         <div className="toolbar__row toolbar__row--filters">
@@ -596,7 +826,10 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             query={query}
             onQuery={setQuery}
             onAdd={add}
+            onRemove={removeValue}
             onAddAll={addAll}
+            onInspect={(val) => setInspectedModId(val)}
+            inspectedValue={inspectedModId ?? undefined}
             emptyLabel={active === 'maps' ? t('lo.noMaps') : t('lo.noCandidates')}
             emptyHint={active === 'maps' ? t('lo.noMapsHint') : t('lo.noCandidatesHint')}
             disabled={busy}
@@ -632,9 +865,44 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
               placeholder={t(`lo.manual.${active}` as TKey)}
               disabled={busy}
             />
-            <div className="toolbar__spacer" />
             {active === 'mods' && (
-              <>
+              <button
+                className={`btn btn--tiny lotools__toggle-btn ${showTools ? 'is-active' : ''}`}
+                onClick={toggleShowTools}
+                title={
+                  isRu
+                    ? 'Панель действий и инструментов (MLOS, аудит, коллизии, разделители, очистка)'
+                    : 'Actions & tools panel (MLOS, audit, conflicts, separators, cleanup)'
+                }
+              >
+                <Icon name="wrench" size={11} />
+                {isRu ? 'Действия' : 'Actions'}
+                {validationResult.issues.length > 0 && (
+                  <span className="lomlos-badge-count">{validationResult.issues.length}</span>
+                )}
+                <Icon name={showTools ? 'chevron-down' : 'chevron-right'} size={10} />
+              </button>
+            )}
+
+            <div className="toolbar__spacer" />
+
+            {kind === 'server' && active === 'workshop' && (
+              <button
+                className="btn btn--tiny"
+                onClick={fillWorkshopIds}
+                disabled={busy || store.lists.mods.length === 0}
+                title={t('lo.fillTitle')}
+              >
+                <Icon name="download" size={11} />
+                {t('lo.fill')}
+              </button>
+            )}
+          </div>
+
+          {showTools && active === 'mods' && (
+            <div className="lotools-panel">
+              <div className="lotools-panel__group">
+                <span className="lotools-panel__label">{isRu ? 'Порядок:' : 'Order:'}</span>
                 <button
                   className="btn btn--tiny is-primary"
                   onClick={sortMLOS}
@@ -649,20 +917,97 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
                   {isRu ? 'Сортировка MLOS' : 'MLOS Sort'}
                 </button>
                 <button
-                  className={`btn btn--tiny ${validationResult.issues.length > 0 ? 'btn--warn' : ''}`}
-                  onClick={() => setShowValidationModal(true)}
+                  className="btn btn--tiny"
+                  onClick={() => setShowAddSepModal(true)}
+                  title={isRu ? 'Добавить категорию / визуальный разделитель' : 'Add category separator'}
+                >
+                  <Icon name="plus" size={11} />
+                  {isRu ? 'Разделитель' : 'Separator'}
+                </button>
+                <button
+                  className={`btn btn--tiny ${autoResolve ? 'is-active' : ''}`}
+                  onClick={() => setAutoResolve(!autoResolve)}
                   title={
                     isRu
-                      ? 'Диагностика порядка, зависимостей и правил сортировки'
-                      : 'Order diagnostics, requirements and sorting rules'
+                      ? 'Автоматически подключать недостающие зависимости при добавлении мода'
+                      : 'Automatically resolve dependencies when adding a mod'
+                  }
+                >
+                  <Icon
+                    name={autoResolve ? 'check' : 'link'}
+                    size={11}
+                    color={autoResolve ? '#10b981' : undefined}
+                  />
+                  {isRu ? 'Авто-зависимости' : 'Auto-Deps'}
+                </button>
+                {pinnedIds.size > 0 && (
+                  <button
+                    className="btn btn--tiny"
+                    onClick={() => {
+                      setPinnedIds(new Set())
+                      try {
+                        localStorage.removeItem(LS_PINNED)
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    title={isRu ? `Снять фиксацию со всех (${pinnedIds.size}) модов` : `Unpin all (${pinnedIds.size}) mods`}
+                  >
+                    <Icon name="lock" size={10} color="#f59e0b" />
+                    {isRu ? `Снять замки (${pinnedIds.size})` : `Unpin (${pinnedIds.size})`}
+                  </button>
+                )}
+              </div>
+
+              <div className="divider-v" />
+
+              <div className="lotools-panel__group">
+                <span className="lotools-panel__label">{isRu ? 'Анализ & Синхр:' : 'Audit & Sync:'}</span>
+                <button
+                  className={`btn btn--tiny ${validationResult.issues.length > 0 ? 'btn--warn' : ''}`}
+                  onClick={() => setShowIntegrityModal(true)}
+                  title={
+                    isRu
+                      ? 'Глубокий аудит порядка, зависимостей, циклов и правил MLOS'
+                      : 'Deep integrity audit: requirements, cycles, order inversions & rules'
                   }
                 >
                   <Icon name={validationResult.valid ? 'check' : 'alert'} size={11} />
-                  {isRu ? 'Диагностика' : 'Diagnostics'}
+                  {isRu ? 'Аудит порядка' : 'Integrity Audit'}
                   {validationResult.issues.length > 0 && (
                     <span className="lomlos-badge-count">{validationResult.issues.length}</span>
                   )}
                 </button>
+                <button
+                  className="btn btn--tiny"
+                  onClick={() => setShowMapConflictModal(true)}
+                  title={
+                    isRu
+                      ? 'Инспектор коллизий и пересечений чанков карт'
+                      : 'Map conflict and chunk overlap inspector'
+                  }
+                >
+                  <Icon name="map" size={11} color="var(--blue-light, #38bdf8)" />
+                  {isRu ? 'Карты и коллизии' : 'Map Conflicts'}
+                </button>
+                <button
+                  className="btn btn--tiny"
+                  onClick={() => setShowServerSyncModal(true)}
+                  title={
+                    isRu
+                      ? 'Экспорт и прямая синхронизация с конфигурацией сервера (server.ini)'
+                      : 'Export & direct sync with server INI config'
+                  }
+                >
+                  <Icon name="server" size={11} color="var(--ember)" />
+                  {isRu ? 'Сервер INI' : 'Server INI'}
+                </button>
+              </div>
+
+              <div className="divider-v" />
+
+              <div className="lotools-panel__group">
+                <span className="lotools-panel__label">{isRu ? 'Список:' : 'List:'}</span>
                 <button
                   className="btn btn--tiny"
                   onClick={() => void handleCopyOrder()}
@@ -672,50 +1017,67 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
                   <Icon name="copy" size={11} />
                   {isRu ? 'Копировать' : 'Copy'}
                 </button>
-              </>
-            )}
-            {kind === 'server' && active === 'workshop' && (
+                <button
+                  className="btn btn--tiny"
+                  onClick={() => setShowReportModal(true)}
+                  title={
+                    isRu
+                      ? 'Сформировать красивый отчет о сборке для Discord / форума / модпака'
+                      : 'Generate formatted modpack report for Discord / forums / server'
+                  }
+                >
+                  <Icon name="book" size={11} color="var(--rust-light)" />
+                  {isRu ? 'Отчет сборки' : 'Build Report'}
+                </button>
+                <button
+                  className="btn btn--tiny"
+                  onClick={dedupe}
+                  disabled={busy || duplicateCount === 0}
+                  title={t('lo.dedupeTitle')}
+                >
+                  <Icon name="copy" size={11} />
+                  {t('lo.dedupe')}
+                  {duplicateCount > 0 && (
+                    <span className="loprofile__n mono">{formatCount(duplicateCount)}</span>
+                  )}
+                </button>
+                <button
+                  className="btn btn--tiny"
+                  onClick={pruneMissing}
+                  disabled={busy || missingCount === 0}
+                  title={t('lo.pruneTitle')}
+                >
+                  <Icon name="trash" size={11} />
+                  {t('lo.prune')}
+                  {missingCount > 0 && (
+                    <span className="loprofile__n mono">{formatCount(missingCount)}</span>
+                  )}
+                </button>
+                <button
+                  className="btn btn--tiny"
+                  onClick={() => {
+                    setValues([])
+                    setSelected(undefined)
+                  }}
+                  disabled={busy || values.length === 0}
+                  title={t('lo.clearTitle')}
+                >
+                  <Icon name="close" size={11} />
+                  {t('lo.clear')}
+                </button>
+              </div>
+
+              <div className="toolbar__spacer" />
+
               <button
-                className="btn btn--tiny"
-                onClick={fillWorkshopIds}
-                disabled={busy || store.lists.mods.length === 0}
-                title={t('lo.fillTitle')}
+                className="btn btn-icon btn--tiny lotools-panel__close"
+                onClick={toggleShowTools}
+                title={isRu ? 'Скрыть панель действий' : 'Hide actions panel'}
               >
-                <Icon name="download" size={11} />
-                {t('lo.fill')}
+                <Icon name="close" size={11} />
               </button>
-            )}
-            <button
-              className="btn btn--tiny"
-              onClick={dedupe}
-              disabled={busy || duplicateCount === 0}
-              title={t('lo.dedupeTitle')}
-            >
-              <Icon name="copy" size={11} />
-              {t('lo.dedupe')}
-            </button>
-            <button
-              className="btn btn--tiny"
-              onClick={pruneMissing}
-              disabled={busy || missingCount === 0}
-              title={t('lo.pruneTitle')}
-            >
-              <Icon name="trash" size={11} />
-              {t('lo.prune')}
-            </button>
-            <button
-              className="btn btn--tiny"
-              onClick={() => {
-                setValues([])
-                setSelected(undefined)
-              }}
-              disabled={busy || values.length === 0}
-              title={t('lo.clearTitle')}
-            >
-              <Icon name="close" size={11} />
-              {t('lo.clear')}
-            </button>
-          </div>
+            </div>
+          )}
 
           {noUserDir && (
             <div className="lonotice">
@@ -740,7 +1102,12 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
           <OrderList
             entries={entries}
             selected={selected}
-            onSelect={setSelected}
+            onSelect={(idx) => {
+              setSelected(idx)
+              if (idx !== undefined && values[idx]) {
+                setInspectedModId(values[idx])
+              }
+            }}
             onMove={move}
             onRemove={remove}
             onEditRule={(modId) => setRulesModId(modId)}
@@ -748,8 +1115,37 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             emptyLabel={t('lo.emptyList')}
             emptyHint={t('lo.emptyListHint')}
             disabled={busy}
+            overwritesSummary={overwritesSummary}
+            pinnedIds={pinnedIds}
+            onTogglePin={togglePin}
           />
         </section>
+
+        {showInfo && (
+          <>
+            <Splitter onDrag={dragRight} onDoubleClick={() => setRightW(340)} />
+            <section
+              className="pane pane--right"
+              style={{ width: rightW, flex: `0 0 ${rightW}px` }}
+            >
+              <ModDetailPanel
+                mod={inspectedMod}
+                rule={
+                  inspectedMod?.modId
+                    ? store.rules[bareId(inspectedMod.modId)]
+                    : undefined
+                }
+                onEditRule={(id) => setRulesModId(id)}
+                onClose={toggleShowInfo}
+                activeMods={store.lists.mods}
+                onAddRequirement={(reqId) => {
+                  add(reqId)
+                }}
+                overwritesSummary={overwritesSummary}
+              />
+            </section>
+          </>
+        )}
       </div>
 
       <footer className="statusbar mono">
@@ -876,6 +1272,154 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             sortMLOS()
           }}
           onClose={() => setShowValidationModal(false)}
+        />
+      )}
+
+      {showAddSepModal && (
+        <div className="lomodal-backdrop" onClick={() => setShowAddSepModal(false)}>
+          <div className="lomodal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="lomodal__head">
+              <div className="lomodal__titlebox">
+                <Icon name="plus" size={14} color="var(--rust-hot)" />
+                <h3 className="lomodal__title stencil">
+                  {isRu ? 'Новый разделитель категории' : 'New Category Separator'}
+                </h3>
+              </div>
+              <button className="btn btn-icon" onClick={() => setShowAddSepModal(false)}>
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+            <div className="lomodal__body" style={{ padding: '16px 20px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--ash)', marginBottom: 6 }}>
+                {isRu ? 'Название категории / группы:' : 'Category Name / Group:'}
+              </label>
+              <input
+                className="input"
+                style={{ width: '100%', padding: '7px 10px', background: '#14181e', color: 'var(--bone)', border: '1px solid #28313e', borderRadius: '4px', textTransform: 'uppercase' }}
+                value={sepTitle}
+                placeholder="e.g. 01. LIBRARIES & FRAMEWORKS"
+                autoFocus
+                onChange={(e) => setSepTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddSeparator(sepTitle, sepColor)
+                }}
+              />
+
+              {/* Quick Preset Buttons */}
+              <div style={{ marginTop: 10 }}>
+                <span style={{ fontSize: '10.5px', color: 'var(--ash-faint)', display: 'block', marginBottom: 5 }}>
+                  {isRu ? 'Быстрые шаблоны категорий:' : 'Quick Presets:'}
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {['LIBRARIES', 'MAPS', 'VEHICLES', 'WEAPONS', 'CLOTHING', 'ITEMS', 'TWEAKS', 'UI', 'AUDIO', 'MISC'].map((cat) => (
+                    <button
+                      key={cat}
+                      className="btn btn--tiny"
+                      onClick={() => setSepTitle(cat)}
+                      style={{ fontSize: '10px' }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color Accents */}
+              <div style={{ marginTop: 12 }}>
+                <span style={{ fontSize: '10.5px', color: 'var(--ash-faint)', display: 'block', marginBottom: 5 }}>
+                  {isRu ? 'Цвет полосы акцента:' : 'Accent Color:'}
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[
+                    { color: '#3b82f6', label: 'Blue' },
+                    { color: '#10b981', label: 'Emerald' },
+                    { color: '#f59e0b', label: 'Amber' },
+                    { color: '#ef4444', label: 'Crimson' },
+                    { color: '#a855f7', label: 'Purple' },
+                    { color: '#06b6d4', label: 'Cyan' },
+                    { color: '#64748b', label: 'Slate' }
+                  ].map((c) => (
+                    <button
+                      key={c.color}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        background: c.color,
+                        border: sepColor === c.color ? '2px solid #fff' : '2px solid transparent',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setSepColor(c.color)}
+                      title={c.label}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="lomodal__foot">
+              <button className="btn" onClick={() => setShowAddSepModal(false)}>
+                {isRu ? 'Отмена' : 'Cancel'}
+              </button>
+              <div className="toolbar__spacer" />
+              <button
+                className="btn is-primary"
+                onClick={() => handleAddSeparator(sepTitle, sepColor)}
+              >
+                <Icon name="check" size={12} />
+                {isRu ? 'Добавить разделитель' : 'Add Separator'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showIntegrityModal && (
+        <IntegrityModal
+          activeList={values}
+          byModId={byModId}
+          rules={store.rules}
+          luaDeps={store.luaDeps}
+          onApplyFixed={(fixed) => {
+            setValues(fixed)
+            setSelected(undefined)
+          }}
+          onClose={() => setShowIntegrityModal(false)}
+        />
+      )}
+
+      {showMapConflictModal && (
+        <MapConflictModal
+          activeModIds={store.lists.mods}
+          currentMaps={store.lists.maps}
+          onApplyMapOrder={(newMaps) => {
+            store.patch({ maps: newMaps })
+            notify(isRu ? 'Порядок карт обновлён' : 'Map order updated', 'ok')
+          }}
+          onClose={() => setShowMapConflictModal(false)}
+        />
+      )}
+
+      {showServerSyncModal && (
+        <ServerSyncModal
+          activeMods={store.lists.mods}
+          activeMaps={store.lists.maps}
+          byModId={byModId}
+          serverFiles={store.files.filter((f) => f.kind === 'server')}
+          onSyncComplete={() => {
+            void store.reload()
+          }}
+          onClose={() => setShowServerSyncModal(false)}
+        />
+      )}
+
+      {showReportModal && (
+        <BuildReportModal
+          activeList={values}
+          byModId={byModId}
+          targetFile={target}
+          overwritesSummary={overwritesSummary}
+          onClose={() => setShowReportModal(false)}
         />
       )}
     </div>

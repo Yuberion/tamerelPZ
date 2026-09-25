@@ -44,6 +44,8 @@ export const IPC = {
   loGamePresetsGet: 'lo:game-presets-get',
   loGamePresetsSave: 'lo:game-presets-save',
   loLuaDeps: 'lo:lua-deps',
+  loFileOverwrites: 'lo:file-overwrites',
+  loMapCells: 'lo:map-cells',
 
   /* Ledger — read-only log reader; main resolves the paths itself. */
   logList: 'log:list',

@@ -89,14 +89,15 @@ export function Stalker({ onExit }: { onExit: () => void }) {
     setFiltersState((prev) => ({ ...prev, ...patch }))
   }, [])
 
-  const { rows, matched, indexByKey, categoryCounts } = useModRows({
+  const { rows, matched, indexByKey, categoryCounts, favoriteCount, allUserTags } = useModRows({
     mods,
     sources,
     issues,
     filters,
     group,
     sort,
-    collapsed
+    collapsed,
+    annotations: settings?.modAnnotations
   })
 
   const duplicateKeys = useMemo(() => {
@@ -166,6 +167,22 @@ export function Stalker({ onExit }: { onExit: () => void }) {
     setTab('file')
   }, [])
 
+  const toggleFavorite = useCallback(
+    (modKey: string) => {
+      const current = settings?.modAnnotations ?? {}
+      const isFav = Boolean(current[modKey]?.favorite)
+      const next = {
+        ...current,
+        [modKey]: {
+          ...current[modKey],
+          favorite: !isFav
+        }
+      }
+      void saveSettings({ modAnnotations: next })
+    },
+    [settings, saveSettings]
+  )
+
   const jumpToMod = useCallback(
     (key: string) => {
       const target = byKey.get(key)
@@ -176,7 +193,9 @@ export function Stalker({ onExit }: { onExit: () => void }) {
         sourceKinds: new Set(),
         categories: new Set(),
         builds: new Set(),
-        issue: 'all'
+        issue: 'all',
+        favoritesOnly: false,
+        userTags: new Set()
       })
       setCollapsed(new Set())
       selectMod(target)
@@ -269,6 +288,8 @@ export function Stalker({ onExit }: { onExit: () => void }) {
           categoryCounts={categoryCounts}
           issueCounts={issueCounts}
           buildCounts={buildCounts}
+          favoriteCount={favoriteCount}
+          allUserTags={allUserTags}
           group={group}
           sort={sort}
           onGroup={onGroup}
@@ -315,8 +336,10 @@ export function Stalker({ onExit }: { onExit: () => void }) {
               duplicateKeys={duplicateKeys}
               missingKeys={missingKeys}
               indexByKey={indexByKey}
+              annotations={settings?.modAnnotations}
               onSelect={selectMod}
               onToggleGroup={toggleGroup}
+              onToggleFavorite={toggleFavorite}
             />
           </section>
 

@@ -252,11 +252,39 @@ export function sortModsMLOS(
   modIds: string[],
   byModId: Map<string, ModEntry>,
   rules: Record<string, SortingRule> = {},
-  luaDeps: Record<string, string[]> = {}
+  luaDeps: Record<string, string[]> = {},
+  pinnedIds?: Set<string> | string[]
 ): { sorted: string[]; cycles: string[][] } {
   if (modIds.length <= 1) return { sorted: [...modIds], cycles: [] }
 
-  const contexts = buildSortContexts(modIds, byModId, rules, luaDeps)
+  const pinnedSet = new Set(
+    Array.isArray(pinnedIds)
+      ? pinnedIds.map(bareId)
+      : Array.from(pinnedIds ?? []).map(bareId)
+  )
+
+  // Extract visual separators AND pinned mods to preserve their exact slot
+  const seps: Array<{ index: number; value: string }> = []
+  const pinnedEntries: Array<{ index: number; value: string }> = []
+  const cleanMods: string[] = []
+
+  for (let i = 0; i < modIds.length; i++) {
+    const item = modIds[i]
+    if (item.startsWith('__SEP__:')) {
+      seps.push({ index: i, value: item })
+    } else if (pinnedSet.has(bareId(item))) {
+      pinnedEntries.push({ index: i, value: item })
+    } else {
+      cleanMods.push(item)
+    }
+  }
+
+  // If all mods are pinned or no unpinned mods exist
+  if (cleanMods.length === 0) {
+    return { sorted: [...modIds], cycles: [] }
+  }
+
+  const contexts = buildSortContexts(cleanMods, byModId, rules, luaDeps)
   const ordered = Array.from(contexts.values()).sort(initialSortCompare)
 
   const sortedResult: string[] = []
@@ -309,7 +337,20 @@ export function sortModsMLOS(
     visit(ctx, false)
   }
 
-  return { sorted: sortedResult, cycles }
+  // Re-insert pinned mods strictly at their original positions!
+  const finalSorted = [...sortedResult]
+  for (const pinned of pinnedEntries.sort((a, b) => a.index - b.index)) {
+    const targetIdx = Math.min(pinned.index, finalSorted.length)
+    finalSorted.splice(targetIdx, 0, pinned.value)
+  }
+
+  // Re-insert separators proportionally
+  for (const sep of seps.sort((a, b) => a.index - b.index)) {
+    const targetIdx = Math.min(sep.index, finalSorted.length)
+    finalSorted.splice(targetIdx, 0, sep.value)
+  }
+
+  return { sorted: finalSorted, cycles }
 }
 
 /**
@@ -321,10 +362,11 @@ export function validateOrder(
   rules: Record<string, SortingRule> = {}
 ): OrderValidationResult {
   const issues: OrderIssue[] = []
-  const enabledSet = new Set(modIds.map(bareId))
+  const cleanMods = modIds.filter((m) => !m.startsWith('__SEP__:'))
+  const enabledSet = new Set(cleanMods.map(bareId))
   const checkedSet = new Set<string>()
 
-  for (const rawId of modIds) {
+  for (const rawId of cleanMods) {
     const key = bareId(rawId)
     const entry = byModId.get(key)
     const rule = rules[key] ?? rules[rawId]

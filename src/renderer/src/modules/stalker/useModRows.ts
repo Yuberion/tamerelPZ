@@ -6,7 +6,8 @@ import type {
   ModSource,
   ModSourceKind,
   ScanIssues,
-  SortMode
+  SortMode,
+  UserModAnnotation
 } from '@shared/types'
 import type { IconName } from '@renderer/components/Icon'
 import { useI18n } from '@renderer/i18n'
@@ -27,6 +28,8 @@ export interface ModFilters {
   categories: Set<ModCategory>
   builds: Set<string>
   issue: IssueFilter
+  favoritesOnly?: boolean
+  userTags?: Set<string>
 }
 
 export type ModRow =
@@ -49,6 +52,7 @@ interface Params {
   group: GroupMode
   sort: SortMode
   collapsed: Set<string>
+  annotations?: Record<string, UserModAnnotation>
 }
 
 export interface ModRowsResult {
@@ -59,6 +63,10 @@ export interface ModRowsResult {
   indexByKey: Map<string, number>
   /** Counts per category across the source-filtered set, for the filter bar. */
   categoryCounts: Map<ModCategory, number>
+  /** Count of mods marked as favorite. */
+  favoriteCount: number
+  /** All unique custom user tags present across all mods. */
+  allUserTags: string[]
 }
 
 function sortMods(
@@ -102,7 +110,8 @@ export function useModRows({
   filters,
   group,
   sort,
-  collapsed
+  collapsed,
+  annotations
 }: Params): ModRowsResult {
   const { t } = useI18n()
   return useMemo(() => {
@@ -111,6 +120,17 @@ export function useModRows({
     for (const keys of Object.values(issues?.duplicateIds ?? {})) for (const k of keys) dupKeys.add(k)
     const missingKeys = new Set(Object.keys(issues?.missingRequires ?? {}))
     const noInfoKeys = new Set(issues?.missingInfo ?? [])
+
+    const tagSet = new Set<string>()
+    let favoriteCount = 0
+    for (const m of mods) {
+      const ann = annotations?.[m.key]
+      if (ann?.favorite) favoriteCount++
+      if (ann?.tags) {
+        for (const t of ann.tags) tagSet.add(t)
+      }
+    }
+    const allUserTags = Array.from(tagSet).sort()
 
     const bySource = mods.filter(
       (m) => filters.sourceKinds.size === 0 || filters.sourceKinds.has(m.sourceKind)
@@ -124,6 +144,11 @@ export function useModRows({
 
     const scored: Array<{ mod: ModEntry; indices: number[]; score: number }> = []
     for (const m of bySource) {
+      if (filters.favoritesOnly && !annotations?.[m.key]?.favorite) continue
+      if (filters.userTags && filters.userTags.size > 0) {
+        const mTags = annotations?.[m.key]?.tags ?? []
+        if (![...filters.userTags].some((t) => mTags.includes(t))) continue
+      }
       if (filters.categories.size && !m.categories.some((c) => filters.categories.has(c))) continue
       if (filters.builds.size && !m.builds.some((b) => filters.builds.has(b))) continue
       if (filters.issue === 'duplicates' && !dupKeys.has(m.key)) continue
@@ -136,12 +161,16 @@ export function useModRows({
         continue
       }
       const nameHit = fuzzyMatch(filters.query, m.name)
+      const qLower = filters.query.toLowerCase()
+      const tagHit = annotations?.[m.key]?.tags?.some((t) => t.toLowerCase().includes(qLower))
+      const noteHit = annotations?.[m.key]?.notes?.toLowerCase().includes(qLower)
       const altHit =
         nameHit ??
         fuzzyMatch(filters.query, m.modId ?? '') ??
         fuzzyMatch(filters.query, m.folderName) ??
         fuzzyMatch(filters.query, m.authors ?? '') ??
-        (m.workshopId ? fuzzyMatch(filters.query, m.workshopId) : null)
+        (m.workshopId ? fuzzyMatch(filters.query, m.workshopId) : null) ??
+        (tagHit || noteHit ? { score: 15, indices: [] } : null)
       if (!altHit) continue
       scored.push({ mod: m, indices: nameHit ? nameHit.indices : [], score: altHit.score })
     }
@@ -242,6 +271,6 @@ export function useModRows({
       if (r.kind === 'mod') indexByKey.set(r.mod.key, i)
     })
 
-    return { rows, matched, indexByKey, categoryCounts }
-  }, [mods, sources, issues, filters, group, sort, collapsed, t])
+    return { rows, matched, indexByKey, categoryCounts, favoriteCount, allUserTags }
+  }, [mods, sources, issues, filters, group, sort, collapsed, annotations, t])
 }

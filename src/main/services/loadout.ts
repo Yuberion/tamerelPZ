@@ -5,7 +5,12 @@ import type {
   LoadoutApplyOptions,
   LoadoutApplyResult,
   LoadoutFile,
+  MapCellInfo,
+  MapConflict,
+  MapScanResult,
   ModEntry,
+  ModFileOverwrite,
+  ModOverwritesSummary,
   SortingRule
 } from '../../shared/types'
 import { exists, isDir, readdirSafe, readTextSafe } from './fsx'
@@ -65,6 +70,14 @@ export function parseClientList(text: string): { mods: string[]; maps: string[];
     if (!block) continue
 
     if (block === 'mods') {
+      if (t.startsWith('//') || t.startsWith('#')) {
+        const comment = t.replace(/^\/\/\s*|#\s*/, '').trim()
+        if (comment.startsWith('__SEP__:') || comment.startsWith('---')) {
+          const sep = comment.startsWith('__SEP__:') ? comment : `__SEP__:${comment.replace(/^-+\s*|\s*-+$/g, '')}`
+          mods.push(sep)
+        }
+        continue
+      }
       const m = /^\s*mod\s*=\s*(.*?)\s*,?\s*$/i.exec(t)
       const token = (m ? m[1] : t.replace(/,$/, '')).trim().replace(/^\\/, '')
       if (token) mods.push(token)
@@ -80,7 +93,13 @@ export function parseClientList(text: string): { mods: string[]; maps: string[];
 
 export function renderClientList(mods: string[], maps: string[], version?: string): string {
   const out: string[] = [version ?? 'VERSION = 1,', '', 'mods', '{']
-  for (const m of mods) out.push(`    mod = ${m},`)
+  for (const m of mods) {
+    if (m.startsWith('__SEP__:')) {
+      out.push(`    // ${m}`)
+    } else {
+      out.push(`    mod = ${m},`)
+    }
+  }
   out.push('}', '', 'maps', '{')
   for (const m of maps) out.push(`    map = ${m},`)
   out.push('}', '')
@@ -176,11 +195,13 @@ export async function listLoadoutFiles(settings: AppSettings): Promise<LoadoutFi
       const path = join(serversDir, name)
       const text = await readTextSafe(path)
       const mods: string[] = []
+      const maps: string[] = []
       const workshopItems: string[] = []
       for (const line of parseIniLines(text ?? '')) {
         if (line.kind !== 'pair') continue
         if (line.key === 'mods') mods.push(...splitIniList(line.value))
         else if (line.key === 'workshopitems') workshopItems.push(...splitIniList(line.value))
+        else if (line.key === 'map') maps.push(...splitIniList(line.value))
       }
       const base = name.replace(/\.ini$/i, '')
       files.push({
@@ -190,7 +211,7 @@ export async function listLoadoutFiles(settings: AppSettings): Promise<LoadoutFi
         exists: true,
         serverName: base,
         mods,
-        maps: [],
+        maps,
         workshopItems
       })
     }
@@ -261,8 +282,12 @@ export async function applyLoadout(
       if (!wrote) kept.push(line)
       body.splice(0, body.length, ...kept)
     }
-    setKey('Mods', opts.mods)
+    const cleanMods = opts.mods.filter((m) => !m.startsWith('__SEP__:'))
+    setKey('Mods', cleanMods)
     setKey('WorkshopItems', opts.workshopItems ?? [])
+    if (opts.maps && opts.maps.length > 0) {
+      setKey('Map', opts.maps)
+    }
     while (body.length > 0 && body[body.length - 1].trim() === '') body.pop()
     next = `${body.join('\r\n')}\r\n`
   }
@@ -596,4 +621,178 @@ export async function scanLuaSoftDeps(mods?: ModEntry[]): Promise<Record<string,
   }
 
   return results
+}
+
+/* =========================================================================
+   File Overwrite Matrix (module 02 - Point 7)
+   ========================================================================= */
+
+async function collectMediaRelativeFiles(
+  modPath: string,
+  maxFiles = 2500,
+  maxDepth = 7
+): Promise<string[]> {
+  const result: string[] = []
+  const prefixes = [
+    { base: join(modPath, 'media'), relPrefix: 'media' },
+    { base: join(modPath, 'common', 'media'), relPrefix: 'media' },
+    { base: join(modPath, '42', 'media'), relPrefix: 'media' }
+  ]
+
+  for (const { base, relPrefix } of prefixes) {
+    if (!(await isDir(base))) continue
+    const queue: Array<{ dir: string; rel: string; depth: number }> = [{ dir: base, rel: relPrefix, depth: 0 }]
+    while (queue.length > 0 && result.length < maxFiles) {
+      const item = queue.shift()!
+      const entries = await readdirSafe(item.dir)
+      for (const e of entries) {
+        if (result.length >= maxFiles) break
+        const childPath = join(item.dir, e.name)
+        const childRel = `${item.rel}/${e.name}`.toLowerCase().replace(/\\/g, '/')
+        if (e.isFile()) {
+          result.push(childRel)
+        } else if (e.isDirectory() && item.depth < maxDepth && !e.name.startsWith('.')) {
+          queue.push({ dir: childPath, rel: childRel, depth: item.depth + 1 })
+        }
+      }
+    }
+  }
+  return result
+}
+
+export async function scanFileOverwrites(activeModIds: string[]): Promise<ModOverwritesSummary> {
+  const allMods = getCachedMods()
+  const modMap = new Map<string, ModEntry>()
+  for (const m of allMods) {
+    if (m.modId) modMap.set(m.modId.toLowerCase(), m)
+    if (m.rawModId) modMap.set(m.rawModId.toLowerCase(), m)
+    if (m.folderName) modMap.set(m.folderName.toLowerCase(), m)
+  }
+
+  const cleanIds = activeModIds.filter((id) => !id.startsWith('__SEP__:'))
+  const filesByRel = new Map<string, string[]>()
+  const overwritesOthers: Record<string, number> = {}
+  const overwrittenByOthers: Record<string, number> = {}
+
+  for (const rawId of cleanIds) {
+    const norm = rawId.trim().toLowerCase().replace(/^\d+\//, '')
+    const mod = modMap.get(norm)
+    if (!mod || !mod.path) continue
+
+    const files = await collectMediaRelativeFiles(mod.path)
+    for (const rel of files) {
+      const list = filesByRel.get(rel) ?? []
+      if (!list.includes(rawId)) {
+        list.push(rawId)
+        filesByRel.set(rel, list)
+      }
+    }
+  }
+
+  const collisions: ModFileOverwrite[] = []
+
+  for (const [relPath, providers] of filesByRel.entries()) {
+    if (providers.length <= 1) continue
+    const winner = providers[providers.length - 1]
+    collisions.push({ relPath, providers, winner })
+
+    overwritesOthers[winner] = (overwritesOthers[winner] ?? 0) + 1
+    for (let i = 0; i < providers.length - 1; i++) {
+      const prev = providers[i]
+      overwrittenByOthers[prev] = (overwrittenByOthers[prev] ?? 0) + 1
+    }
+  }
+
+  return { overwritesOthers, overwrittenByOthers, collisions }
+}
+
+/* =========================================================================
+   Map Conflicts & Cells Inspector (module 02 - Point 6)
+   ========================================================================= */
+
+const LOTPACK_RE = /^(?:world_)?(\d+)_(\d+)\.lotpack$/i
+
+export async function scanMapCells(activeModIds: string[]): Promise<MapScanResult> {
+  const allMods = getCachedMods()
+  const modMap = new Map<string, ModEntry>()
+  for (const m of allMods) {
+    if (m.modId) modMap.set(m.modId.toLowerCase(), m)
+    if (m.rawModId) modMap.set(m.rawModId.toLowerCase(), m)
+    if (m.folderName) modMap.set(m.folderName.toLowerCase(), m)
+  }
+
+  const cleanIds = activeModIds.filter((id) => !id.startsWith('__SEP__:'))
+  const maps: MapCellInfo[] = []
+
+  for (const rawId of cleanIds) {
+    const norm = rawId.trim().toLowerCase().replace(/^\d+\//, '')
+    const mod = modMap.get(norm)
+    if (!mod || !mod.path) continue
+
+    const mapCandidates = [
+      join(mod.path, 'media', 'maps'),
+      join(mod.path, 'common', 'media', 'maps'),
+      join(mod.path, '42', 'media', 'maps')
+    ]
+
+    for (const candidate of mapCandidates) {
+      if (!(await isDir(candidate))) continue
+      const mapFolders = await readdirSafe(candidate)
+      for (const mf of mapFolders) {
+        if (!mf.isDirectory() || mf.name.startsWith('.')) continue
+        const mapFolder = join(candidate, mf.name)
+        const mapInfoText = await readTextSafe(join(mapFolder, 'map.info'), 16 * 1024)
+
+        let title: string | undefined
+        let lots: string | undefined
+        if (mapInfoText) {
+          for (const line of mapInfoText.split(/\r?\n/)) {
+            const tm = /^\s*title\s*=\s*(.*?)\s*$/i.exec(line)
+            if (tm) title = tm[1]
+            const lm = /^\s*lots\s*=\s*(.*?)\s*$/i.exec(line)
+            if (lm) lots = lm[1]
+          }
+        }
+
+        const files = await readdirSafe(mapFolder)
+        const cellsSet = new Set<string>()
+        for (const f of files) {
+          const m = LOTPACK_RE.exec(f.name)
+          if (m) {
+            cellsSet.add(`${m[1]}_${m[2]}`)
+          }
+        }
+
+        const cells = Array.from(cellsSet).sort()
+        maps.push({
+          mapName: mf.name,
+          folderName: mf.name,
+          modId: rawId,
+          cells,
+          title: title ?? mf.name,
+          lots
+        })
+      }
+    }
+  }
+
+  // Detect cell overlaps
+  const cellUsage = new Map<string, Array<{ mapName: string; modId: string; title?: string }>>()
+  for (const map of maps) {
+    for (const cell of map.cells) {
+      const list = cellUsage.get(cell) ?? []
+      list.push({ mapName: map.mapName, modId: map.modId, title: map.title })
+      cellUsage.set(cell, list)
+    }
+  }
+
+  const conflicts: MapConflict[] = []
+  for (const [cell, sharing] of cellUsage.entries()) {
+    if (sharing.length > 1) {
+      const winningMap = sharing[sharing.length - 1].mapName
+      conflicts.push({ cell, maps: sharing, winningMap })
+    }
+  }
+
+  return { maps, conflicts }
 }

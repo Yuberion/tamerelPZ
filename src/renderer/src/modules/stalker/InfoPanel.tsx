@@ -7,7 +7,8 @@ import type {
   ModSource,
   ModStats,
   ModWarning,
-  ScanIssues
+  ScanIssues,
+  UserModAnnotation
 } from '@shared/types'
 import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
@@ -16,6 +17,9 @@ import { useI18n, type TKey } from '@renderer/i18n'
 import { categoryMeta, fileColor, fileIcon, sourceLabel, SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText, formatBytes, formatCount, formatDate } from '@renderer/lib/format'
 import { highlight } from '@renderer/lib/highlight'
+import { useAppStore } from '@renderer/state/store'
+import { AudioPreview } from './AudioPreview'
+import { ItemInspector } from './ItemInspector'
 
 const MAX_PREVIEW_LINES = 1200
 
@@ -107,9 +111,27 @@ function ModInfo({
 }: Omit<InfoPanelProps, 'node' | 'tab' | 'onTab'>) {
   const { notify } = useToast()
   const { t, p } = useI18n()
+  const { settings, saveSettings } = useAppStore()
   const [stats, setStats] = useState<ModStats>()
   const [posterFailed, setPosterFailed] = useState(false)
   const req = useRef(0)
+
+  const annotation = settings?.modAnnotations?.[mod?.key ?? ''] ?? {}
+  const isFavorite = Boolean(annotation.favorite)
+
+  const toggleFavorite = () => {
+    if (!mod) return
+    const current = settings?.modAnnotations ?? {}
+    const next = {
+      ...current,
+      [mod.key]: {
+        ...current[mod.key],
+        favorite: !isFavorite
+      }
+    }
+    void saveSettings({ modAnnotations: next })
+    notify(isFavorite ? 'Удалено из избранного' : 'Добавлено в избранное', 'ok')
+  }
 
   useEffect(() => {
     setStats(undefined)
@@ -173,7 +195,17 @@ function ModInfo({
         )}
       </div>
 
-      <h2 className="info__name">{mod.name}</h2>
+      <div className="info__title-row">
+        <h2 className="info__name truncate">{mod.name}</h2>
+        <button
+          type="button"
+          className={`btn btn-icon info__fav-btn ${isFavorite ? 'is-fav' : ''}`}
+          onClick={toggleFavorite}
+          title={isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
+        >
+          <Icon name="star" size={16} color={isFavorite ? '#f59e0b' : undefined} />
+        </button>
+      </div>
 
       <div className="info__cats">
         {mod.categories.map((c) => {
@@ -401,13 +433,152 @@ function ModInfo({
           </div>
         </Section>
       )}
+
+      <ModAnnotationsSection modKey={mod.key} />
     </div>
+  )
+}
+
+function ModAnnotationsSection({ modKey }: { modKey: string }) {
+  const { settings, saveSettings } = useAppStore()
+  const annotation = settings?.modAnnotations?.[modKey] ?? {}
+  const [tagInput, setTagInput] = useState('')
+  const [notes, setNotes] = useState(annotation.notes ?? '')
+  const [savedFeedback, setSavedFeedback] = useState(false)
+  const saveTimeout = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    setNotes(annotation.notes ?? '')
+  }, [annotation.notes, modKey])
+
+  const update = (patch: Partial<UserModAnnotation>) => {
+    const current = settings?.modAnnotations ?? {}
+    const next = {
+      ...current,
+      [modKey]: {
+        ...current[modKey],
+        ...patch
+      }
+    }
+    void saveSettings({ modAnnotations: next })
+    setSavedFeedback(true)
+    window.clearTimeout(saveTimeout.current)
+    saveTimeout.current = window.setTimeout(() => setSavedFeedback(false), 1500)
+  }
+
+  const addTag = (tagToAdd: string) => {
+    const clean = tagToAdd.trim().replace(/^#/, '')
+    if (!clean) return
+    const currentTags = annotation.tags ?? []
+    if (!currentTags.includes(clean)) {
+      update({ tags: [...currentTags, clean] })
+    }
+    setTagInput('')
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    const currentTags = annotation.tags ?? []
+    update({ tags: currentTags.filter((t) => t !== tagToRemove) })
+  }
+
+  const onNotesBlur = () => {
+    if (notes !== (annotation.notes ?? '')) {
+      update({ notes })
+    }
+  }
+
+  const QUICK_TAGS = ['B42 Port', 'Verified', 'Glitchy', 'Server', 'Testing', 'Custom']
+
+  return (
+    <Section title="Метки и заметки">
+      <div className="user-annotations">
+        <div className="user-tags">
+          <div className="user-tags__list">
+            {(annotation.tags ?? []).map((t) => (
+              <span key={t} className="user-tag-chip mono">
+                #{t}
+                <button
+                  type="button"
+                  className="user-tag-chip__del"
+                  onClick={() => removeTag(t)}
+                  title="Удалить тег"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {(!annotation.tags || annotation.tags.length === 0) && (
+              <span className="is-dim" style={{ fontSize: 11 }}>
+                Нет пользовательских меток
+              </span>
+            )}
+          </div>
+
+          <div className="user-tags__input-row">
+            <input
+              type="text"
+              className="user-tags__input mono"
+              placeholder="+ Новый тег..."
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addTag(tagInput)
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => addTag(tagInput)}
+              disabled={!tagInput.trim()}
+            >
+              <Icon name="plus" size={12} />
+              Добавить
+            </button>
+          </div>
+
+          <div className="user-tags__suggestions">
+            <span className="label is-dim" style={{ fontSize: 10, alignSelf: 'center' }}>
+              Быстрые:
+            </span>
+            {QUICK_TAGS.filter((qt) => !(annotation.tags ?? []).includes(qt)).slice(0, 4).map((qt) => (
+              <button
+                key={qt}
+                type="button"
+                className="chip chip--sm"
+                onClick={() => addTag(qt)}
+              >
+                +{qt}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="user-notes">
+          <div className="user-notes__head">
+            <span className="label">Личные заметки</span>
+            {savedFeedback && <span className="user-notes__saved mono">✓ Сохранено</span>}
+          </div>
+          <textarea
+            className="user-notes__textarea mono"
+            placeholder="Заметки разработчика, статус адаптации, баги, ID предметов, настройки..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={onNotesBlur}
+            rows={3}
+          />
+        </div>
+      </div>
+    </Section>
   )
 }
 
 function FileInfo({ node }: { node: FsNode | undefined }) {
   const [preview, setPreview] = useState<FilePreview>()
   const [error, setError] = useState<string>()
+  const [textViewMode, setTextViewMode] = useState<'cards' | 'code'>('cards')
   const req = useRef(0)
   const { notify } = useToast()
   const { t } = useI18n()
@@ -415,6 +586,7 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
   useEffect(() => {
     setPreview(undefined)
     setError(undefined)
+    setTextViewMode('cards')
     if (!node || node.dir) return
     const id = ++req.current
     void window.pz.fs
@@ -426,6 +598,13 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
         if (id === req.current) setError(e instanceof Error ? e.message : String(e))
       })
   }, [node])
+
+  const isPzScript = useMemo(() => {
+    if (preview?.kind !== 'text' || !preview.text) return false
+    return /\bitem\s+[\w-]+\s*\{|\brecipe\s+[\w\s-]+\s*\{|\bcraftRecipe\s+[\w\s-]+\s*\{/i.test(
+      preview.text
+    )
+  }, [preview])
 
   const tokens = useMemo(() => {
     if (preview?.kind !== 'text' || !preview.text) return []
@@ -513,28 +692,60 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
         </Section>
       )}
 
+      {preview?.kind === 'audio' && (
+        <Section title="Аудио · Воспроизведение">
+          <AudioPreview path={preview.path} size={preview.size} />
+        </Section>
+      )}
+
       {preview?.kind === 'text' && (
         <Section
           title={`${t('ip.preview')}${preview.truncated ? ` · ${t('ip.truncated')}` : ''}`}
+          extra={
+            isPzScript ? (
+              <div className="view-mode-toggle">
+                <button
+                  type="button"
+                  className={`btn btn-sm ${textViewMode === 'cards' ? 'is-active' : ''}`}
+                  onClick={() => setTextViewMode('cards')}
+                >
+                  <Icon name="package" size={12} />
+                  Карточки
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${textViewMode === 'code' ? 'is-active' : ''}`}
+                  onClick={() => setTextViewMode('code')}
+                >
+                  <Icon name="code" size={12} />
+                  Код
+                </button>
+              </div>
+            ) : undefined
+          }
         >
-          <div className="code">
-            <div className="code__gutter mono">
-              {Array.from({ length: lineCount }).map((_, i) => (
-                <span key={i}>{i + 1}</span>
-              ))}
+          {isPzScript && textViewMode === 'cards' ? (
+            <ItemInspector text={preview.text ?? ''} />
+          ) : (
+            <div className="code">
+              <div className="code__gutter mono">
+                {Array.from({ length: lineCount }).map((_, i) => (
+                  <span key={i}>{i + 1}</span>
+                ))}
+              </div>
+              <pre className="code__body mono">
+                {tokens.map((t, i) =>
+                  t.cls ? (
+                    <span key={i} className={`tk-${t.cls}`}>
+                      {t.text}
+                    </span>
+                  ) : (
+                    <span key={i}>{t.text}</span>
+                  )
+                )}
+              </pre>
             </div>
-            <pre className="code__body mono">
-              {tokens.map((t, i) =>
-                t.cls ? (
-                  <span key={i} className={`tk-${t.cls}`}>
-                    {t.text}
-                  </span>
-                ) : (
-                  <span key={i}>{t.text}</span>
-                )
-              )}
-            </pre>
-          </div>
+          )}
         </Section>
       )}
 
@@ -552,11 +763,20 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  extra,
+  children
+}: {
+  title: string
+  extra?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
     <section className="isect">
       <div className="isect__head">
         <span className="label">{title}</span>
+        {extra}
         <span className="isect__rule" />
       </div>
       {children}

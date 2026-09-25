@@ -273,6 +273,7 @@ export async function walkStats(root: string): Promise<ModStats> {
 }
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg'])
+const AUDIO_EXTS = new Set(['ogg', 'wav', 'mp3', 'flac', 'aac'])
 const TEXT_EXTS = new Set([
   'lua', 'txt', 'info', 'xml', 'json', 'ini', 'cfg', 'md', 'csv', 'yml', 'yaml',
   'bat', 'sh', 'ps1', 'py', 'js', 'ts', 'html', 'css', 'log', 'properties',
@@ -330,6 +331,10 @@ export async function readPreview(path: string): Promise<FilePreview> {
       await handle.close()
     }
     return { ...base, kind: 'image', ...imageSize(head) }
+  }
+
+  if (AUDIO_EXTS.has(ext)) {
+    return { ...base, kind: 'audio' }
   }
 
   const readLen = Math.min(st.size, PREVIEW_MAX)

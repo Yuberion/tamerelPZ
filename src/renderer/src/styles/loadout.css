@@ -33,6 +33,11 @@
   gap: 6px;
 }
 
+.loadout .toolbar__row--filters .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* ---------------- profiles strip ---------------- */
 
 .loname {
@@ -49,6 +54,10 @@
   flex-wrap: wrap;
   gap: 5px;
   min-width: 0;
+  max-width: 440px;
+  max-height: 52px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .loprofiles__empty {
   max-width: none;
@@ -63,6 +72,7 @@
   border-radius: 11px;
   background: #171b21;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .loprofile:hover {
   border-color: var(--edge-hot);
@@ -106,31 +116,109 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 7px;
+  gap: 6px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--edge-soft);
   background: #12161a;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.lotools .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .loadd {
   display: flex;
   align-items: center;
   gap: 5px;
-  min-width: 0;
+  flex-shrink: 0;
 }
 .loadd__input {
-  width: 190px;
+  width: 170px;
+  min-width: 120px;
   height: 24px;
-  padding: 0 7px;
+  padding: 0 8px;
   font-size: 11px;
   background: var(--void);
   border: 1px solid var(--edge);
   border-radius: var(--radius);
   color: var(--bone);
+  flex-shrink: 0;
 }
 .loadd__input:focus {
   border-color: var(--rust-dim);
   box-shadow: 0 0 0 1px #a8613a33;
+}
+
+/* ---------------- lotools actions panel ---------------- */
+
+.lotools__toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lotools__toggle-btn.is-active {
+  background: var(--rust-deep);
+  border-color: var(--rust);
+  color: var(--bone);
+  box-shadow: 0 0 8px rgba(168, 97, 58, 0.25);
+}
+
+.lotools-panel {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, #161a22, #111419);
+  border-bottom: 1px solid var(--edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: lotoolsFade 120ms ease-out;
+}
+
+@keyframes lotoolsFade {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lotools-panel__group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.lotools-panel__label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ash-faint);
+  margin-right: 2px;
+  font-family: var(--font-display);
+  user-select: none;
+}
+
+.lotools-panel .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.lotools-panel__close {
+  color: var(--ash-faint);
+}
+.lotools-panel__close:hover {
+  color: var(--bone);
+  background: var(--void);
 }
 
 .lonotice {
@@ -258,30 +346,171 @@
   border-color: #55492a;
   background: #1b1813;
 }
+.lopill--overwrite {
+  color: #67e8f9;
+  border-color: #164e63;
+  background: #083344;
+  font-weight: 600;
+}
+.lopill--overwritten {
+  color: #fdba74;
+  border-color: #7c2d12;
+  background: #431407;
+  font-weight: 600;
+}
+.lopill--sep-count {
+  color: var(--ash-faint);
+  border-color: #2b333c;
+  background: #171b20;
+}
+
+/* ---------------- Separator & Safe-Drop styles ---------------- */
+
+.lorow--sep {
+  background: #151a20;
+  border-top: 1px solid #232c37;
+  border-bottom: 1px solid #1a222c;
+  margin-top: 4px;
+  height: 32px;
+}
+.lorow--sep:hover {
+  background: #192028;
+}
+.lorow__sep-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  margin-right: 6px;
+  flex: 0 0 auto;
+}
+.lorow__sep-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--bone);
+  letter-spacing: 0.08em;
+  margin-right: 8px;
+}
+.lorow__collapse-btn {
+  background: none;
+  border: none;
+  color: var(--ash-faint);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  margin-right: 4px;
+}
+.lorow__collapse-btn:hover {
+  color: var(--bone);
+  background: #252e39;
+}
+
+.lorow.is-safe-drop {
+  border-top: 2px solid #10b981 !important;
+  background: rgba(16, 185, 129, 0.08) !important;
+}
+.lorow.is-unsafe-drop {
+  border-top: 2px solid #ef4444 !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+
+.lorow__drop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  font-size: 9.5px;
+  font-weight: 600;
+  border-radius: 4px;
+  white-space: nowrap;
+  animation: fadeIn 0.15s ease;
+}
+.lorow__drop-badge.is-safe {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid #059669;
+}
+.lorow__drop-badge.is-unsafe {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid #dc2626;
+}
 
 /* ---------------- candidate rows ---------------- */
 
 .locand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   height: 30px;
   padding: 0 8px 0 7px;
   color: var(--ash);
   text-align: left;
   border-bottom: 1px solid #171b20;
+  cursor: pointer;
+  transition: background 0.1s ease;
 }
-.locand:hover:not(:disabled) {
+.locand:hover {
   background: #1d232a;
   color: var(--bone);
 }
 .locand.is-used {
-  color: var(--ash-faint);
-  cursor: default;
+  background: rgba(16, 185, 129, 0.04);
 }
-.locand:disabled {
-  cursor: default;
+.locand.is-active {
+  background: #252e38;
+}
+
+.locand__checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border-radius: 3px;
+  border: 1px solid var(--edge-hot);
+  background: #0d1014;
+  color: #10b981;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+.locand__checkbox:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+.locand__checkbox.is-checked {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.22);
+}
+
+.locand__go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ash-dim);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.locand__go:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--bone);
+}
+.locand__go.is-used {
+  color: #ef4444;
+}
+.locand__go.is-used:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
 }
 .locand__src {
   flex: 0 0 12px;
@@ -738,5 +967,314 @@
 .btn--warn:hover {
   background: rgba(255, 184, 108, 0.1);
   border-color: #ffb86c;
+}
+
+/* ---------------- ModDetailPanel (right pane) ---------------- */
+
+.lodetail-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  background: #14171b;
+}
+
+.lodetail-body {
+  padding: 0 !important;
+}
+
+.lodetail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.lodetail-poster {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--edge);
+  background: #0d1014;
+  overflow: hidden;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.lodetail-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lodetail-poster-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ash-faint);
+}
+
+.lodetail-poster-badges {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.lodetail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lodetail-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--bone);
+  line-height: 1.3;
+}
+
+.lodetail-author {
+  color: var(--bone);
+  font-weight: 500;
+}
+
+.lodetail-meta-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #12161c;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+}
+
+.lodetail-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.lodetail-meta-val {
+  color: var(--bone);
+  font-weight: 500;
+}
+
+.lodetail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lodetail-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lodetail-reqs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lodetail-req-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #111419;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.lodetail-req-name {
+  flex: 1 1 auto;
+  color: var(--bone);
+}
+
+.lodetail-req-status {
+  font-size: 9.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+.lodetail-req-status.is-ok {
+  color: var(--moss);
+  background: rgba(90, 247, 142, 0.12);
+}
+.lodetail-req-status.is-warn {
+  color: var(--ember);
+  background: rgba(255, 85, 85, 0.12);
+}
+
+.lodetail-rule-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: #141920;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+}
+
+.lodetail-rule-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+}
+.lodetail-rule-line.is-danger {
+  color: #ff5555;
+}
+
+.lodetail-desc {
+  padding: 8px 10px;
+  background: #11151a;
+  border-left: 2px solid var(--rust-dim);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ash);
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------------- Pin / Lock Position ---------------- */
+
+.lorow__pin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ash-faint);
+  background: transparent;
+  opacity: 0.35;
+  transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.lorow:hover .lorow__pin-btn {
+  opacity: 0.85;
+}
+.lorow__pin-btn:hover {
+  opacity: 1;
+  color: #fbbf24;
+  background: #252b34;
+}
+.lorow__pin-btn.is-pinned {
+  opacity: 1;
+  color: #f59e0b;
+}
+.lorow.is-pinned {
+  border-left: 2px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.04);
+}
+
+/* ---------------- Build Report Modal ---------------- */
+
+.lomodal--report {
+  width: 760px;
+  max-width: 95vw;
+}
+
+.loreport-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 8px 14px;
+  background: #111419;
+  border-bottom: 1px solid var(--edge-soft);
+  overflow-x: auto;
+}
+
+.loreport-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ash);
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.loreport-tab:hover {
+  color: var(--bone);
+  background: #171c24;
+}
+.loreport-tab.is-active {
+  color: var(--bone);
+  background: var(--rust-deep);
+  border-color: var(--rust);
+}
+
+.loreport-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 8px 14px;
+  background: #13171e;
+  border-bottom: 1px solid var(--edge-soft);
+  font-size: 11px;
+}
+
+.loreport-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ash);
+  cursor: pointer;
+  user-select: none;
+}
+.loreport-option:hover {
+  color: var(--bone);
+}
+.loreport-option input[type="checkbox"] {
+  accent-color: var(--rust);
+  cursor: pointer;
+}
+
+.loreport-body {
+  padding: 10px 14px;
+  max-height: 480px;
+}
+
+.loreport-textarea {
+  width: 100%;
+  height: 380px;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  background: #0d1014;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  color: var(--bone);
+  resize: vertical;
+  outline: none;
+  scrollbar-width: thin;
+}
+.loreport-textarea:focus {
+  border-color: var(--rust-dim);
 }
 

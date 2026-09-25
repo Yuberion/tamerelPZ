@@ -26,7 +26,10 @@ interface AvailablePanelProps {
   query: string
   onQuery(query: string): void
   onAdd(value: string): void
+  onRemove?(value: string): void
   onAddAll(values: string[]): void
+  onInspect?(value: string): void
+  inspectedValue?: string
   emptyLabel: string
   emptyHint: string
   disabled?: boolean
@@ -46,7 +49,10 @@ export function AvailablePanel({
   query,
   onQuery,
   onAdd,
+  onRemove,
   onAddAll,
+  onInspect,
+  inspectedValue,
   emptyLabel,
   emptyHint,
   disabled,
@@ -171,14 +177,41 @@ export function AvailablePanel({
                   ? segmentByIndices(candidate.label, indices)
                   : null
                 return (
-                  <button
+                  <div
                     key={`${candidate.value}:${candidate.mod?.key ?? ''}`}
-                    className={`locand ${isUsed ? 'is-used' : ''}`}
+                    className={`locand ${isUsed ? 'is-used' : ''} ${inspectedValue === candidate.value ? 'is-active' : ''}`}
                     style={{ height: ROW_H }}
-                    disabled={disabled || isUsed}
-                    onClick={() => onAdd(candidate.value)}
+                    onClick={() => onInspect?.(candidate.value)}
+                    onDoubleClick={() => {
+                      if (disabled) return
+                      if (isUsed) onRemove?.(candidate.value)
+                      else onAdd(candidate.value)
+                    }}
+                    onMouseEnter={() => onInspect?.(candidate.value)}
                     title={candidate.mod?.path ?? candidate.value}
                   >
+                    <button
+                      type="button"
+                      className={`locand__checkbox ${isUsed ? 'is-checked' : ''}`}
+                      disabled={disabled}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (isUsed) {
+                          onRemove?.(candidate.value)
+                        } else {
+                          onInspect?.(candidate.value)
+                          onAdd(candidate.value)
+                        }
+                      }}
+                      title={
+                        isUsed
+                          ? (isRu ? 'Отключить мод (убрать из порядка)' : 'Disable mod')
+                          : (isRu ? 'Включить мод (добавить в порядок)' : 'Enable mod')
+                      }
+                    >
+                      {isUsed && <Icon name="check" size={11} />}
+                    </button>
+
                     <span
                       className="locand__src mono"
                       style={src ? { color: src.color } : undefined}
@@ -209,10 +242,23 @@ export function AvailablePanel({
                         {isRu ? catMeta.labelRu : catMeta.labelEn}
                       </span>
                     )}
-                    <span className="locand__go">
-                      <Icon name={isUsed ? 'check' : 'plus'} size={11} />
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      className={`locand__go ${isUsed ? 'is-used' : ''}`}
+                      disabled={disabled}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (isUsed) onRemove?.(candidate.value)
+                        else {
+                          onInspect?.(candidate.value)
+                          onAdd(candidate.value)
+                        }
+                      }}
+                      title={isUsed ? (isRu ? 'Отключить' : 'Remove') : (isRu ? 'Добавить' : 'Add')}
+                    >
+                      <Icon name={isUsed ? 'close' : 'plus'} size={11} />
+                    </button>
+                  </div>
                 )
               })}
             </div>

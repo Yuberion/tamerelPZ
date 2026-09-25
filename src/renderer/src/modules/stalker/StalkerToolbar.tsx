@@ -32,6 +32,8 @@ interface ToolbarProps {
     warnings: number
   }
   buildCounts: Map<string, number>
+  favoriteCount?: number
+  allUserTags?: string[]
   group: GroupMode
   sort: SortMode
   onGroup: (g: GroupMode) => void
@@ -51,6 +53,8 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
     categoryCounts,
     issueCounts,
     buildCounts,
+    favoriteCount,
+    allUserTags,
     group,
     sort,
     onGroup,
@@ -84,12 +88,23 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
     setFilters({ builds: next })
   }
 
+  const toggleUserTag = (tag: string): void => {
+    const next = new Set(filters.userTags ?? [])
+    if (next.has(tag)) next.delete(tag)
+    else next.add(tag)
+    setFilters({ userTags: next })
+  }
+
   const setIssue = (issue: IssueFilter): void => {
     setFilters({ issue: filters.issue === issue ? 'all' : issue })
   }
 
   const activeFilters =
-    filters.categories.size + filters.builds.size + (filters.issue !== 'all' ? 1 : 0)
+    filters.categories.size +
+    filters.builds.size +
+    (filters.issue !== 'all' ? 1 : 0) +
+    (filters.favoritesOnly ? 1 : 0) +
+    (filters.userTags?.size ?? 0)
 
   return (
     <div className="toolbar">
@@ -156,6 +171,21 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
           {scanning ? t('tb.scanning') : t('tb.rescan')}
         </button>
         <Hint title={t('tb.rescan')} body={t('help.tb.rescan')} />
+
+        <button
+          className={`btn ${filters.favoritesOnly ? 'is-active' : ''}`}
+          onClick={() => setFilters({ favoritesOnly: !filters.favoritesOnly })}
+          title="Показать только избранные моды"
+          style={filters.favoritesOnly ? { color: '#f59e0b', borderColor: '#f59e0b' } : undefined}
+        >
+          <Icon name="star" size={13} color={filters.favoritesOnly ? '#f59e0b' : undefined} />
+          <span>Избранное</span>
+          {favoriteCount !== undefined && favoriteCount > 0 && (
+            <span className="chip__n mono" style={{ marginLeft: 3 }}>
+              {favoriteCount}
+            </span>
+          )}
+        </button>
 
         <div className="toolbar__spacer" />
 
@@ -275,13 +305,39 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
             <span className="chip__n mono">{issueCounts.noinfo}</span>
           </button>
 
+          {allUserTags && allUserTags.length > 0 && (
+            <>
+              <div className="divider-v" />
+              <span className="label toolbar__legend">Теги</span>
+              {allUserTags.map((tag) => {
+                const on = filters.userTags?.has(tag)
+                return (
+                  <button
+                    key={tag}
+                    className={`chip ${on ? 'is-on' : ''}`}
+                    onClick={() => toggleUserTag(tag)}
+                  >
+                    <Icon name="tag" size={11} />
+                    #{tag}
+                  </button>
+                )
+              })}
+            </>
+          )}
+
           {activeFilters > 0 && (
             <>
               <div className="toolbar__spacer" />
               <button
                 className="btn"
                 onClick={() =>
-                  setFilters({ categories: new Set(), builds: new Set(), issue: 'all' })
+                  setFilters({
+                    categories: new Set(),
+                    builds: new Set(),
+                    issue: 'all',
+                    favoritesOnly: false,
+                    userTags: new Set()
+                  })
                 }
               >
                 <Icon name="close" size={12} />

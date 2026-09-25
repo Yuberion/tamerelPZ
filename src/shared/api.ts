@@ -14,6 +14,8 @@ import type {
   LoadoutApplyOptions,
   LoadoutApplyResult,
   LoadoutFile,
+  MapScanResult,
+  ModOverwritesSummary,
   SortingRule,
   LogReadResult,
   LogSource,
@@ -109,6 +111,8 @@ export interface PzApi {
     getGamePresets(): Promise<Record<string, string[]>>
     saveGamePresets(presets: Record<string, string[]>): Promise<boolean>
     getLuaDeps(): Promise<Record<string, string[]>>
+    getFileOverwrites(activeModIds: string[]): Promise<ModOverwritesSummary>
+    getMapCells(activeModIds: string[]): Promise<MapScanResult>
   }
   /**
    * Crash logs and console output. Read-only: there is no write counterpart, and

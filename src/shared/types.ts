@@ -170,7 +170,7 @@ export interface ModStats {
 
 export interface FilePreview {
   path: string
-  kind: 'text' | 'image' | 'binary'
+  kind: 'text' | 'image' | 'audio' | 'binary'
   size: number
   mtime: number
   /** Present for `text`. */
@@ -182,6 +182,12 @@ export interface FilePreview {
   height?: number
   /** Detected language token for highlighting, e.g. `lua`. */
   lang?: string
+}
+
+export interface UserModAnnotation {
+  favorite?: boolean
+  tags?: string[]
+  notes?: string
 }
 
 export interface PathsReport {
@@ -209,6 +215,8 @@ export interface AppSettings {
   lastSourceFilter?: string
   /** Named load orders saved from the Loadout module, newest first. */
   loadoutProfiles: LoadoutProfile[]
+  /** User-defined tags, notes, and favorites per mod key. */
+  modAnnotations?: Record<string, UserModAnnotation>
   /**
    * Output container for the Tools converter.
    *
@@ -595,6 +603,44 @@ export interface OrderValidationResult {
   issues: OrderIssue[]
   cycles: string[][]
   issuesByMod?: Map<string, OrderIssue[]>
+}
+
+export interface ModFileOverwrite {
+  relPath: string
+  /** Mod IDs that provide this file, in active load order */
+  providers: string[]
+  /** The winning mod ID that actually takes effect */
+  winner: string
+}
+
+export interface ModOverwritesSummary {
+  /** Map of modId -> count of files this mod overwrites from earlier mods */
+  overwritesOthers: Record<string, number>
+  /** Map of modId -> count of files of this mod that are overwritten by later mods */
+  overwrittenByOthers: Record<string, number>
+  /** Detailed collision list */
+  collisions: ModFileOverwrite[]
+}
+
+export interface MapCellInfo {
+  mapName: string
+  folderName: string
+  modId: string
+  cells: string[]
+  title?: string
+  lots?: string
+}
+
+export interface MapConflict {
+  cell: string
+  /** Maps sharing this cell in active order */
+  maps: Array<{ mapName: string; modId: string; title?: string }>
+  winningMap: string
+}
+
+export interface MapScanResult {
+  maps: MapCellInfo[]
+  conflicts: MapConflict[]
 }
 
 export interface LoadoutApplyOptions {
