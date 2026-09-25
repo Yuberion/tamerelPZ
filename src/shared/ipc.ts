@@ -50,6 +50,12 @@ export const IPC = {
   /* Ledger — read-only log reader; main resolves the paths itself. */
   logList: 'log:list',
   logRead: 'log:read',
+  logProbe: 'log:probe',
+  logClean: 'log:clean',
+  logResolveSource: 'log:resolve-source',
+  logSnippet: 'log:snippet',
+  logDecompile: 'log:decompile',
+  logDiff: 'log:diff',
 
   /* Tools — the FBX forge. Inputs are user-picked; the output dir lives in settings. */
   toolsPick: 'tools:pick',

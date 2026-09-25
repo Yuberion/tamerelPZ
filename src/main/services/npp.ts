@@ -481,6 +481,7 @@ export async function openInNpp(settings: AppSettings, path: string, line?: numb
   const found = await locateExe(settings)
   if (!found) throw new Error('Notepad++ was not found on this machine')
   if (!(await exists(path))) throw new Error(`File no longer exists: ${path}`)
+  if (await isDir(path)) throw new Error(`Cannot open a folder in editor: ${path}`)
 
   const args: string[] = []
   if (line && line > 0) args.push(`-n${Math.trunc(line)}`)

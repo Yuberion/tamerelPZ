@@ -117,7 +117,17 @@ const PATHS = {
   'check-circle': ['M12 3.2a8.8 8.8 0 1 0 0 17.6 8.8 8.8 0 0 0 0-17.6z', 'M8 12.2l2.8 2.8L16.4 9.4'],
   'x-circle': ['M12 3.2a8.8 8.8 0 1 0 0 17.6 8.8 8.8 0 0 0 0-17.6z', 'M9 9l6 6', 'M15 9l-6 6'],
   'alert-circle': ['M12 3.2a8.8 8.8 0 1 0 0 17.6 8.8 8.8 0 0 0 0-17.6z', 'M12 7.6v5', 'M12 15.4h.01'],
-  trash: ['M4.5 6.5h15', 'M9 6.5V4.5h6v2', 'M6.5 6.5 7.5 20h9l1-13.5', 'M10 10v6', 'M14 10v6']
+  trash: ['M4.5 6.5h15', 'M9 6.5V4.5h6v2', 'M6.5 6.5 7.5 20h9l1-13.5', 'M10 10v6', 'M14 10v6'],
+  share: [
+    'M18 5a3 3 0 1 0 0 .01',
+    'M6 12a3 3 0 1 0 0 .01',
+    'M18 19a3 3 0 1 0 0 .01',
+    'M8.6 13.5l6.8 4',
+    'M15.4 6.5l-6.8 4'
+  ],
+  coffee: ['M18 8h1a4 4 0 0 1 0 8h-1', 'M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z', 'M6 1v3', 'M10 1v3', 'M14 1v3'],
+  diff: ['M16 3h5v5', 'M21 3l-7 7', 'M8 21H3v-5', 'M3 21l7-7'],
+  timeline: ['M4 6h16', 'M4 12h16', 'M4 18h16', 'M8 4v4', 'M14 10v4', 'M10 16v4']
 } satisfies Record<string, string[]>
 
 export type IconName = keyof typeof PATHS
@@ -142,6 +152,7 @@ export function Icon({
   style,
   title
 }: IconProps) {
+  const paths = PATHS[name] ?? []
   return (
     <svg
       className={className}
@@ -157,7 +168,7 @@ export function Icon({
       aria-hidden={title ? undefined : 'true'}
     >
       {title && <title>{title}</title>}
-      {PATHS[name].map((d, i) => (
+      {paths.map((d, i) => (
         <path key={i} d={d} />
       ))}
     </svg>

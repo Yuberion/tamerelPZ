@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { LogReadResult, LogSource } from '@shared/types'
+import type { LogCleanResult, LogReadResult, LogSource } from '@shared/types'
 
 /**
  * Data plumbing for the Ledger module.
@@ -25,6 +25,14 @@ export interface LogStore {
   error: string | undefined
   /** Re-enumerate and re-read the current selection (F5). */
   reload(): Promise<void>
+  /** Whether full log read is enabled (up to 50MB instead of 1MB tail). */
+  full: boolean
+  setFull(full: boolean): void
+  /** Whether live auto-monitoring is active. */
+  live: boolean
+  setLive(live: boolean): void
+  /** Delete archived logs older than keepCount. */
+  cleanArchive(keepCount?: number): Promise<LogCleanResult>
 }
 
 function preferredId(sources: LogSource[], previous: string): string {
@@ -41,11 +49,14 @@ export function useLogs(): LogStore {
   const [loading, setLoading] = useState(true)
   const [reading, setReading] = useState(false)
   const [error, setError] = useState<string>()
+  const [full, setFull] = useState(false)
+  const [live, setLive] = useState(false)
 
   const listRun = useRef(0)
   const readRun = useRef(0)
   /** Bumped by `reload` so the read effect re-runs for an unchanged selection. */
   const [readNonce, setReadNonce] = useState(0)
+  const lastKnown = useRef<{ size: number; mtime: number } | undefined>(undefined)
 
   const list = useCallback(async (): Promise<void> => {
     const run = ++listRun.current
@@ -77,7 +88,7 @@ export function useLogs(): LogStore {
     setReading(true)
     void (async () => {
       try {
-        const read = await window.pz.logs.read(sourceId)
+        const read = await window.pz.logs.read(sourceId, full)
         if (run !== readRun.current) return
         setContent(read)
         setError(undefined)
@@ -89,12 +100,50 @@ export function useLogs(): LogStore {
         if (run === readRun.current) setReading(false)
       }
     })()
-  }, [sourceId, readNonce])
+  }, [sourceId, readNonce, full])
+
+  useEffect(() => {
+    if (content) {
+      lastKnown.current = { size: content.size, mtime: content.mtime }
+    }
+  }, [content])
+
+  // Live tail polling: probe file size & mtime every 1500ms
+  useEffect(() => {
+    if (!live || !sourceId) return
+    const timer = setInterval(async () => {
+      try {
+        const probe = await window.pz.logs.probe(sourceId)
+        if (!probe) return
+        if (
+          !lastKnown.current ||
+          lastKnown.current.size !== probe.size ||
+          lastKnown.current.mtime !== probe.mtime
+        ) {
+          lastKnown.current = probe
+          setReadNonce((n) => n + 1)
+        }
+      } catch {
+        // Ignore probe errors during gameplay file lock
+      }
+    }, 1500)
+
+    return () => clearInterval(timer)
+  }, [live, sourceId])
 
   const reload = useCallback(async (): Promise<void> => {
     await list()
     setReadNonce((n) => n + 1)
   }, [list])
+
+  const cleanArchive = useCallback(
+    async (keepCount = 10): Promise<LogCleanResult> => {
+      const res = await window.pz.logs.cleanArchive(keepCount)
+      await list()
+      return res
+    },
+    [list]
+  )
 
   const source = useMemo(() => sources.find((s) => s.id === sourceId), [sources, sourceId])
 
@@ -108,8 +157,25 @@ export function useLogs(): LogStore {
       loading,
       reading,
       error,
-      reload
+      reload,
+      full,
+      setFull,
+      live,
+      setLive,
+      cleanArchive
     }),
-    [sources, sourceId, source, content, loading, reading, error, reload]
+    [
+      sources,
+      sourceId,
+      source,
+      content,
+      loading,
+      reading,
+      error,
+      reload,
+      full,
+      live,
+      cleanArchive
+    ]
   )
 }

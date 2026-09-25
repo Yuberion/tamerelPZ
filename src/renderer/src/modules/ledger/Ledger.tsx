@@ -7,12 +7,18 @@ import { useToast } from '@renderer/components/Toast'
 import { useI18n } from '@renderer/i18n'
 import { copyText, formatBytes, formatCount, formatDate, fuzzyMatch, shortenPath } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/state/store'
+import type { LaunchStageId } from '@shared/types'
+import { ExportModal } from './ExportModal'
+import { LaunchTimeline } from './LaunchTimeline'
 import { LogDetail } from './LogDetail'
+import { LogDiagnostics } from './LogDiagnostics'
+import { LogDiffModal } from './LogDiffModal'
 import { LEVEL_ICON, LEVEL_KEY, LogList, type LogRow } from './LogList'
-import { buildModIndex, parseLog, type LogLevel } from './parseLog'
+import { buildModIndex, deduplicateIncidents, parseLog, resolveSourcePath, type LogIncident, type LogLevel } from './parseLog'
 import { useLogs } from './useLogs'
 
 const LS_RIGHT = 'pz.ledger.rightWidth'
+const LS_DEDUPE = 'pz.ledger.dedupe'
 
 /** Chip order, loudest first — the reason anyone opens this module. */
 const LEVELS: LogLevel[] = ['error', 'warn', 'info', 'debug']
@@ -23,16 +29,28 @@ function readWidth(fallback: number): number {
 }
 
 export function Ledger({ onExit }: { onExit: () => void }) {
-  const { scan } = useAppStore()
+  const { scan, paths } = useAppStore()
   const { t, p } = useI18n()
   const { notify } = useToast()
   const store = useLogs()
+
+  const gameDir = paths?.gameDir
 
   const [query, setQuery] = useState('')
   const [muted, setMuted] = useState<Set<LogLevel>>(() => new Set())
   const [selectedId, setSelectedId] = useState<number>()
   const [rightW, setRightW] = useState(() => readWidth(420))
+  const [dedupe, setDedupe] = useState<boolean>(() => localStorage.getItem(LS_DEDUPE) !== 'false')
+  const [follow, setFollow] = useState<boolean>(false)
+  const [selectedMod, setSelectedMod] = useState<string>('')
+  const [selectedDiagId, setSelectedDiagId] = useState<string>()
+  const [showExport, setShowExport] = useState<boolean>(false)
+  const [showDiff, setShowDiff] = useState<boolean>(false)
+  const [selectedStageId, setSelectedStageId] = useState<LaunchStageId | undefined>(undefined)
+  const [diffFilterQueries, setDiffFilterQueries] = useState<string[] | undefined>(undefined)
+
   const searchRef = useRef<HTMLInputElement>(null)
+  const prevErrorCount = useRef(0)
 
   const modIndex = useMemo(() => buildModIndex(scan?.mods ?? []), [scan])
   const parsed = useMemo(
@@ -40,24 +58,91 @@ export function Ledger({ onExit }: { onExit: () => void }) {
     [store.content, modIndex]
   )
 
+  // Notify on new errors during live tailing
+  useEffect(() => {
+    if (store.live && parsed.counts.error > prevErrorCount.current && prevErrorCount.current > 0) {
+      notify(t('led.newErrorsToast', { n: parsed.counts.error - prevErrorCount.current }), 'warn')
+    }
+    prevErrorCount.current = parsed.counts.error
+  }, [parsed.counts.error, store.live, notify, t])
+
+  // Automatically enable follow mode when activating live mode
+  const toggleLive = useCallback(() => {
+    store.setLive(!store.live)
+    if (!store.live) {
+      setFollow(true)
+    }
+  }, [store])
+
+  const toggleDedupe = useCallback(() => {
+    setDedupe((v) => {
+      const next = !v
+      localStorage.setItem(LS_DEDUPE, String(next))
+      return next
+    })
+  }, [])
+
+  // Deduplicate entries if option is active
+  const effectiveIncidents = useMemo(() => {
+    if (!dedupe) return parsed.incidents
+    return deduplicateIncidents(parsed.incidents)
+  }, [parsed.incidents, dedupe])
+
+  const activeDiagnosis = useMemo(
+    () => parsed.diagnoses.find((d) => d.id === selectedDiagId),
+    [parsed.diagnoses, selectedDiagId]
+  )
+
+  const coreCount = useMemo(
+    () => parsed.incidents.filter((i) => !i.modName).length,
+    [parsed.incidents]
+  )
+
   /**
-   * Visible rows.
-   *
-   * Filtering and searching run over the already parsed entries, so neither one
-   * costs an IPC round trip or a re-parse. The search looks at the body too — the
-   * mod name in a stack frame is exactly what you want to grep for — but only the
-   * head carries highlight positions, because that is the only part on screen.
+   * Visible rows with all active filters applied:
+   * 1. Muted levels
+   * 2. Selected diagnosis
+   * 3. Selected mod
+   * 4. Search query
    */
   const rows = useMemo<LogRow[]>(() => {
     const needle = query.trim()
     const deep = needle.toLowerCase()
+    const matchingDiagSet = activeDiagnosis ? new Set(activeDiagnosis.matchingIncidentIds) : null
+    const stage = selectedStageId ? parsed.stages.find((s) => s.id === selectedStageId) : null
+
     const out: LogRow[] = []
-    for (const incident of parsed.incidents) {
+    for (const incident of effectiveIncidents) {
       if (muted.has(incident.level)) continue
+
+      if (stage && (incident.line < stage.startLine || incident.line > stage.endLine)) {
+        continue
+      }
+
+      if (diffFilterQueries && diffFilterQueries.length > 0) {
+        const matchDiff = diffFilterQueries.some((q) =>
+          incident.head.toLowerCase().includes(q.toLowerCase())
+        )
+        if (!matchDiff) continue
+      }
+
+      if (matchingDiagSet && !matchingDiagSet.has(incident.id)) {
+        continue
+      }
+
+      if (selectedMod) {
+        if (selectedMod === '__core__') {
+          if (incident.modName) continue
+        } else if (incident.modName !== selectedMod) {
+          continue
+        }
+      }
+
       if (!needle) {
         out.push({ incident, indices: [] })
         continue
       }
+
       const hit = fuzzyMatch(needle, incident.head)
       if (hit) {
         out.push({ incident, indices: hit.indices })
@@ -68,7 +153,7 @@ export function Ledger({ onExit }: { onExit: () => void }) {
       }
     }
     return out
-  }, [parsed, muted, query])
+  }, [effectiveIncidents, muted, activeDiagnosis, selectedMod, query, selectedStageId, diffFilterQueries, parsed.stages])
 
   const selected = useMemo(
     () => parsed.incidents.find((x) => x.id === selectedId),
@@ -87,7 +172,6 @@ export function Ledger({ onExit }: { onExit: () => void }) {
   const jumpFirstError = useCallback(() => {
     const first = parsed.incidents[parsed.firstError]
     if (!first) return
-    // A muted or filtered-out error cannot be scrolled to, so clear what hides it.
     setMuted((prev) => {
       if (!prev.has('error')) return prev
       const next = new Set(prev)
@@ -95,6 +179,8 @@ export function Ledger({ onExit }: { onExit: () => void }) {
       return next
     })
     setQuery('')
+    setSelectedMod('')
+    setSelectedDiagId(undefined)
     setSelectedId(first.id)
   }, [parsed])
 
@@ -104,6 +190,70 @@ export function Ledger({ onExit }: { onExit: () => void }) {
     notify((await copyText(path)) ? t('led.pathCopied') : t('led.copyFailed'), 'ok')
   }, [store.source, notify, t])
 
+  const handleCleanArchive = useCallback(async () => {
+    if (!window.confirm(t('led.cleanConfirm'))) return
+    try {
+      const res = await store.cleanArchive(10)
+      notify(
+        t('led.cleanedResult', {
+          count: res.deleted,
+          bytes: formatBytes(res.freedBytes)
+        }),
+        'ok'
+      )
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), 'warn')
+    }
+  }, [store, notify, t])
+
+  const handleOpenSource = useCallback(
+    async (incident: LogIncident) => {
+      const candidate =
+        incident.callSite?.file ||
+        incident.origin ||
+        (incident.level === 'error' || incident.level === 'warn' ? incident.head : undefined)
+
+      if (!candidate) {
+        notify(t('led.noScriptInLog'), 'info')
+        return
+      }
+
+      const res = await window.pz.logs.resolveSource(
+        candidate,
+        incident.modPath,
+        gameDir,
+        incident.callSite?.line
+      )
+
+      const targetPath =
+        res?.path ??
+        (incident.callSite?.file
+          ? resolveSourcePath(incident.callSite.file, incident.modPath, gameDir)
+          : undefined)
+      const targetLine = res?.line ?? incident.callSite?.line
+
+      if (!targetPath) {
+        notify(t('led.fileNotFound'), 'warn')
+        return
+      }
+
+      try {
+        await window.pz.npp.open(targetPath, targetLine)
+        notify(t('led.openedInNpp'), 'ok')
+        return
+      } catch {
+        // Fallback to default shell open for single file
+      }
+      try {
+        await window.pz.shell.open(targetPath)
+        notify(t('led.openedInEditor'), 'ok')
+      } catch {
+        notify(t('led.fileNotFound'), 'warn')
+      }
+    },
+    [gameDir, notify, t]
+  )
+
   const dragRight = useCallback((dx: number) => {
     setRightW((w) => {
       const next = Math.min(Math.max(w - dx, 280), 720)
@@ -112,8 +262,7 @@ export function Ledger({ onExit }: { onExit: () => void }) {
     })
   }, [])
 
-  // The selected entry belongs to one parse of one file; keep nothing across a
-  // reload or a source switch, or the detail pane would show a stale trace.
+  // Clear selection across reload or source switch
   useEffect(() => {
     setSelectedId(undefined)
   }, [store.content])
@@ -139,6 +288,7 @@ export function Ledger({ onExit }: { onExit: () => void }) {
   const noUserDir = !store.loading && store.sources.length === 0
   const missing = Boolean(source) && !source?.exists
   const busy = store.loading || store.reading
+  const foldedCount = parsed.incidents.length - effectiveIncidents.length
 
   return (
     <div className="ledger">
@@ -180,6 +330,72 @@ export function Ledger({ onExit }: { onExit: () => void }) {
             </select>
           </div>
           <Hint title={t('led.source')} body={t('help.led.source')} />
+
+          <div className="divider-v" />
+
+          {/* Live Tail Toggle */}
+          <button
+            className={`btn ${store.live ? 'btn--active ledlive-btn' : ''}`}
+            onClick={toggleLive}
+            title={t('led.liveTitle')}
+          >
+            <span className={`ledlive-dot ${store.live ? 'is-live' : ''}`} />
+            {t('led.live')}
+          </button>
+
+          {/* Follow Scroll Toggle */}
+          <button
+            className={`btn btn--tiny ${follow ? 'btn--active' : ''}`}
+            onClick={() => setFollow(!follow)}
+            title={t('led.followTitle')}
+          >
+            <Icon name="arrow-down" size={12} />
+            {t('led.follow')}
+          </button>
+
+          {/* Full log read toggle */}
+          {(store.content?.truncated || store.full) && (
+            <button
+              className={`btn btn--tiny ${store.full ? 'btn--active' : ''}`}
+              onClick={() => store.setFull(!store.full)}
+              title={store.full ? t('led.tailOnlyTitle') : t('led.loadFullTitle')}
+            >
+              <Icon name="book" size={11} />
+              {store.full ? t('led.fullLoaded') : t('led.loadFull')}
+            </button>
+          )}
+
+          {/* Export Report */}
+          <button
+            className="btn btn--tiny"
+            onClick={() => setShowExport(true)}
+            title={t('led.exportBtnTitle')}
+          >
+            <Icon name="share" size={12} />
+            {t('led.exportBtn')}
+          </button>
+
+          {/* Log Diff */}
+          <button
+            className="btn btn--tiny"
+            onClick={() => setShowDiff(true)}
+            title={t('led.compareSessionsTitle')}
+          >
+            <Icon name="diff" size={12} />
+            {t('led.compareSessions')}
+          </button>
+
+          {/* Clean Archive (shown if there are archived logs) */}
+          {store.sources.filter((s) => s.kind === 'log').length > 5 && (
+            <button
+              className="btn btn--tiny"
+              onClick={() => void handleCleanArchive()}
+              title={t('led.cleanArchiveTitle')}
+            >
+              <Icon name="trash" size={11} />
+              {t('led.cleanArchive')}
+            </button>
+          )}
 
           <div className="toolbar__spacer" />
 
@@ -245,6 +461,54 @@ export function Ledger({ onExit }: { onExit: () => void }) {
             {t('led.firstError')}
           </button>
 
+          <div className="divider-v" />
+
+          {/* Deduplicate Toggle */}
+          <button
+            className={`chip ledchip ${dedupe ? 'is-on' : ''}`}
+            onClick={toggleDedupe}
+            title={t('led.dedupeTitle')}
+          >
+            <Icon name="copy" size={10} />
+            {t('led.dedupe')}
+            {foldedCount > 0 && <span className="chip__n mono">-{foldedCount}</span>}
+          </button>
+
+          {/* Mod Filter Dropdown */}
+          <div className="pick">
+            <select
+              className="ledmodpick"
+              value={selectedMod}
+              onChange={(e) => setSelectedMod(e.target.value)}
+              title={t('led.filterModTitle')}
+            >
+              <option value="">{t('led.allMods')} ({parsed.incidents.length})</option>
+              {coreCount > 0 && (
+                <option value="__core__">
+                  {t('led.coreEngine')} ({coreCount})
+                </option>
+              )}
+              {parsed.modAttributions.map((m) => (
+                <option key={m.modName} value={m.modName}>
+                  {m.modName} ({m.errors ? `${m.errors} err` : `${m.warnings} warn`})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {diffFilterQueries && diffFilterQueries.length > 0 && (
+            <button
+              className="chip ledchip is-on"
+              onClick={() => setDiffFilterQueries(undefined)}
+              title={t('led.clearDiffFilterTitle')}
+              style={{ borderColor: 'var(--amber)', color: 'var(--amber)' }}
+            >
+              <Icon name="diff" size={10} />
+              {t('led.onlyNewErrors')} ({diffFilterQueries.length})
+              <Icon name="close" size={10} />
+            </button>
+          )}
+
           <div className="toolbar__spacer" />
 
           <div className="minisearch">
@@ -263,6 +527,15 @@ export function Ledger({ onExit }: { onExit: () => void }) {
             )}
           </div>
         </div>
+
+        {/* Launch Stages Timeline */}
+        {parsed.stages && parsed.stages.length > 0 && (
+          <LaunchTimeline
+            stages={parsed.stages}
+            selectedStageId={selectedStageId}
+            onSelectStage={setSelectedStageId}
+          />
+        )}
       </div>
 
       <div className="ledger__body">
@@ -276,13 +549,32 @@ export function Ledger({ onExit }: { onExit: () => void }) {
                 / {formatCount(parsed.incidents.length)}
               </span>
             )}
+
             <div className="pane__head-spacer" />
-            {store.content?.truncated && (
+
+            {store.live && (
+              <span className="ledpill ledpill--live mono" title={t('led.liveActiveTitle')}>
+                LIVE
+              </span>
+            )}
+            {store.full && (
+              <span className="ledpill ledpill--full mono">
+                {t('led.fullLoaded')}
+              </span>
+            )}
+            {store.content?.truncated && !store.full && (
               <span className="ledpill ledpill--tail" title={t('led.truncatedTitle')}>
                 {t('led.truncated')}
               </span>
             )}
           </div>
+
+          {/* Smart Diagnostics Banner */}
+          <LogDiagnostics
+            diagnoses={parsed.diagnoses}
+            selectedDiagId={selectedDiagId}
+            onSelectDiag={setSelectedDiagId}
+          />
 
           {(noUserDir || missing || store.error) && (
             <div className="lednotice">
@@ -304,6 +596,8 @@ export function Ledger({ onExit }: { onExit: () => void }) {
             rows={rows}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            autoScrollBottom={follow}
+            onOpenSource={handleOpenSource}
             emptyIcon={parsed.incidents.length === 0 ? 'book' : 'filter'}
             emptyLabel={parsed.incidents.length === 0 ? t('led.empty') : t('led.noMatches')}
             emptyHint={parsed.incidents.length === 0 ? t('led.emptyHint') : t('led.noMatchesHint')}
@@ -319,7 +613,11 @@ export function Ledger({ onExit }: { onExit: () => void }) {
             <div className="pane__head-spacer" />
             <Hint title={t('led.paneDetail')} body={t('help.led.detail')} />
           </div>
-          <LogDetail incident={selected} />
+          <LogDetail
+            incident={selected}
+            gameDir={gameDir}
+            onFilterMod={(name) => setSelectedMod(name)}
+          />
         </section>
       </div>
 
@@ -336,6 +634,12 @@ export function Ledger({ onExit }: { onExit: () => void }) {
         <span className={parsed.counts.warn ? 'is-warn' : 'is-dim'}>
           {t('led.sbWarns', { n: formatCount(parsed.counts.warn) })}
         </span>
+        {dedupe && foldedCount > 0 && (
+          <>
+            <span className="statusbar__sep">·</span>
+            <span className="is-dim">{t('led.sbFolded', { n: formatCount(foldedCount) })}</span>
+          </>
+        )}
         {source && source.size > 0 && (
           <>
             <span className="statusbar__sep">·</span>
@@ -349,10 +653,41 @@ export function Ledger({ onExit }: { onExit: () => void }) {
           </>
         )}
         <span className="statusbar__spacer" />
+        {store.live && (
+          <>
+            <span className="ledlive-dot is-live" />
+            <span className="statusbar__live">{t('led.liveActive')}</span>
+            <span className="statusbar__sep">·</span>
+          </>
+        )}
         <span className="statusbar__path" title={source?.path}>
           {source?.path ? shortenPath(source.path, 4) : '—'}
         </span>
       </footer>
+
+      {/* Export Report Modal */}
+      <ExportModal
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        sourceName={source?.name ?? 'console.txt'}
+        sourcePath={source?.path}
+        incidents={parsed.incidents}
+        diagnoses={parsed.diagnoses}
+        modAttributions={parsed.modAttributions}
+      />
+
+      {/* Log Diff Modal */}
+      {showDiff && (
+        <LogDiffModal
+          currentSourceId={store.sourceId}
+          sources={store.sources}
+          onClose={() => setShowDiff(false)}
+          onApplyNewErrorsFilter={(sigs) => {
+            setDiffFilterQueries(sigs)
+            setShowDiff(false)
+          }}
+        />
+      )}
     </div>
   )
 }

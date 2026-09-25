@@ -120,6 +120,26 @@
   border-radius: 1px;
 }
 
+.ledrow__openbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  color: var(--ash-dim);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ledrow:hover .ledrow__openbtn {
+  opacity: 1;
+}
+.ledrow__openbtn:hover {
+  background: #2b3542;
+  color: #79a8d4;
+}
+
 /* ---------------- pills ---------------- */
 
 .ledpill {
@@ -146,6 +166,20 @@
   color: #b18f6b;
   text-transform: none;
   letter-spacing: 0.02em;
+}
+.ledpill--file {
+  border-color: #2b4559;
+  background: #111a24;
+  color: #79a8d4;
+  max-width: 170px;
+  font-size: 9.5px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ledpill--vanilla {
+  border-color: #384552;
+  background: #151a20;
+  color: #8da1b5;
 }
 .ledpill--tail {
   border-color: #55492a;
@@ -252,4 +286,719 @@
   align-items: center;
   gap: 5px;
   flex-wrap: wrap;
+}
+
+/* ---------------- source & mod action card ---------------- */
+
+.ledsource {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px;
+  background: #14181f;
+  border: 1px solid #232c38;
+  border-left: 3px solid var(--rust);
+  border-radius: var(--radius);
+}
+
+.ledsource__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ledsource__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ledsource__modname {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--bone);
+}
+
+.ledsource__file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #0f1318;
+  border: 1px solid #1f2732;
+  border-radius: var(--radius-sm);
+  color: #8bbbe0;
+  font-size: 11px;
+}
+
+.ledcallsite__icon {
+  flex-shrink: 0;
+  color: #5c97c9;
+}
+
+.ledsource__filename {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.ledsource__pathrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ledsource__path {
+  font-size: 10.5px;
+  color: var(--ash-dim);
+  user-select: text;
+}
+
+.ledsource__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+/* ---------------- live dot & live mode ---------------- */
+
+.ledlive-btn {
+  border-color: #2e593a !important;
+  color: #78c991 !important;
+  background: #122117 !important;
+}
+
+.ledlive-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #475461;
+}
+
+.ledlive-dot.is-live {
+  background: #42d36c;
+  box-shadow: 0 0 6px #42d36c;
+  animation: led-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes led-pulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+.statusbar__live {
+  color: #78c991;
+  font-weight: 500;
+}
+
+/* ---------------- extra pills ---------------- */
+
+.ledpill--live {
+  border-color: #2e593a;
+  background: #122117;
+  color: #78c991;
+  font-weight: bold;
+}
+
+.ledpill--full {
+  border-color: #2b4f59;
+  background: #111e24;
+  color: #72bfd1;
+}
+
+.ledpill--repeat {
+  border-color: #614620;
+  background: #241a0e;
+  color: #e0a353;
+  font-weight: bold;
+  font-size: 9.5px;
+}
+
+/* ---------------- mod picker ---------------- */
+
+.ledmodpick {
+  min-width: 170px;
+  max-width: 250px;
+}
+
+/* ---------------- diagnostics banner ---------------- */
+
+.leddiag {
+  background: #13171d;
+  border-bottom: 1px solid var(--edge);
+  font-size: 11px;
+}
+
+.leddiag__bar {
+  display: flex;
+  align-items: center;
+  padding: 5px 9px;
+  background: #161b22;
+  border-bottom: 1px solid #1f252d;
+}
+
+.leddiag__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--bone);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.leddiag__toggle:hover {
+  color: #fff;
+}
+
+.leddiag__title {
+  font-size: 10.5px;
+  color: var(--rust-light);
+  letter-spacing: 0.05em;
+}
+
+.leddiag__count {
+  font-size: 10px;
+  color: var(--ash);
+  padding: 1px 5px;
+  background: #1c222b;
+  border-radius: 4px;
+}
+
+.leddiag__body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.leddiag__cards {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+
+.ledcard {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 9px;
+  background: #181d24;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+.ledcard:hover {
+  background: #1d232c;
+  border-color: var(--edge-hot);
+}
+.ledcard.is-selected {
+  background: #25201b;
+  border-color: var(--rust);
+  box-shadow: 0 0 0 1px var(--rust-dim);
+}
+
+.ledcard--error {
+  border-left: 3px solid #b8776a;
+}
+.ledcard--warn {
+  border-left: 3px solid #c2ab74;
+}
+
+.ledcard__head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ledcard__title {
+  flex: 1 1 auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bone);
+}
+
+.ledcard__count {
+  font-size: 10px;
+  color: var(--ash-dim);
+  background: #121519;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.ledcard__desc {
+  font-size: 10.5px;
+  color: var(--ash);
+  line-height: 1.35;
+}
+
+.ledcard__foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.ledcard__site {
+  font-size: 9.5px;
+  color: var(--steel);
+}
+
+.ledcard__hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  color: var(--ash-faint);
+  margin-top: 2px;
+}
+
+.leddiag__active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: #221d18;
+  border: 1px solid #4a3625;
+  border-radius: var(--radius);
+  color: #dfbfa5;
+  font-size: 10.5px;
+}
+
+/* ---------------- call site header ---------------- */
+
+.ledcallsite {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #171d24;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.ledcallsite__icon {
+  color: var(--steel);
+}
+
+.ledcallsite__file {
+  font-size: 11px;
+  color: #92b8d0;
+  font-weight: 500;
+}
+
+/* ---------------- export modal ---------------- */
+
+.ledexport {
+  width: 640px;
+  max-width: 90vw;
+}
+
+.ledexport__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ledexport__opts {
+  display: flex;
+  gap: 16px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--edge);
+}
+
+.ledexport__opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--bone);
+  cursor: pointer;
+}
+
+.ledexport__preview {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 48vh;
+  overflow: auto;
+  background: var(--void);
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ash);
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+/* ---------------- inline code snippet ---------------- */
+
+.ledsnippet {
+  margin: 8px 0;
+  background: #12161b;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ledsnippet__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: #171d24;
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.ledsnippet__body {
+  max-height: 320px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ledsnippet__loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--ash-faint);
+}
+
+.ledsnippet__line {
+  display: flex;
+  align-items: flex-start;
+  padding: 1px 8px 1px 0;
+  border-left: 3px solid transparent;
+}
+
+.ledsnippet__line:hover {
+  background: #171d24;
+}
+
+.ledsnippet__line.is-target {
+  background: rgba(168, 97, 58, 0.18);
+  border-left-color: var(--rust);
+}
+
+.ledsnippet__num {
+  flex: 0 0 46px;
+  padding-right: 12px;
+  text-align: right;
+  color: var(--ash-faint);
+  user-select: none;
+}
+
+.ledsnippet__line.is-target .ledsnippet__num {
+  color: var(--rust-light);
+  font-weight: bold;
+}
+
+.ledsnippet__text {
+  flex: 1 1 auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+/* ---------------- java decompiler modal ---------------- */
+
+.javamodal {
+  width: 780px;
+  max-width: 92vw;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.javamodal__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.javamodal__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #161b21;
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.javamodal__search {
+  flex: 1 1 auto;
+}
+
+.javamodal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  background: var(--void);
+}
+
+.javamodal__code {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #c9d5e0;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.javamodal__loading,
+.javamodal__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 200px;
+  color: var(--ash);
+}
+
+/* ---------------- log diff modal ---------------- */
+
+.logdiff-modal {
+  width: 760px;
+  max-width: 92vw;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.logdiff-modal__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.logdiff-modal__selectors {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #161b21;
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.logdiff-modal__side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.logdiff-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px 12px;
+  background: #14181e;
+  border-bottom: 1px solid var(--edge);
+}
+
+.logdiff-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: #171d24;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.logdiff-stat:hover {
+  background: #1d252e;
+}
+
+.logdiff-stat.is-active.is-new {
+  border-color: #b8776a;
+  background: #2a1b18;
+}
+
+.logdiff-stat.is-active.is-resolved {
+  border-color: #5b9e73;
+  background: #14251a;
+}
+
+.logdiff-stat.is-active.is-recurring {
+  border-color: var(--steel);
+  background: #1c232c;
+}
+
+.logdiff-stat__num {
+  font-size: 16px;
+  font-weight: bold;
+  font-family: var(--font-mono);
+}
+
+.logdiff-stat.is-new .logdiff-stat__num {
+  color: #e08c7c;
+}
+
+.logdiff-stat.is-resolved .logdiff-stat__num {
+  color: #79c595;
+}
+
+.logdiff-stat.is-recurring .logdiff-stat__num {
+  color: var(--ash);
+}
+
+.logdiff-stat__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--ash-faint);
+  letter-spacing: 0.5px;
+}
+
+.logdiff-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  background: var(--void);
+}
+
+.logdiff-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.logdiff-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #181d24;
+  font-size: 11px;
+}
+
+.logdiff-row:hover {
+  background: #161c23;
+}
+
+.logdiff-row__head {
+  flex: 1 1 auto;
+  color: var(--bone);
+}
+
+.logdiff-modal__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 200px;
+  color: var(--ash);
+}
+
+/* ---------------- launch timeline ---------------- */
+
+.ledtimeline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: #13171c;
+  border-bottom: 1px solid #1a2028;
+  font-size: 11px;
+}
+
+.ledtimeline__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ash-faint);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 0 0 auto;
+}
+
+.ledtimeline__segments {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  overflow-x: auto;
+}
+
+.ledtimeline__seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: #192028;
+  border: 1px solid var(--edge-soft);
+  color: var(--ash);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ledtimeline__seg:hover {
+  background: #202833;
+  color: var(--bone);
+}
+
+.ledtimeline__seg.is-selected {
+  background: #2a2018;
+  border-color: var(--rust);
+  color: var(--rust-light);
+  font-weight: 500;
+}
+
+.ledtimeline__seg.has-error {
+  border-left: 3px solid #b8776a;
+}
+
+.ledtimeline__seg.has-warn {
+  border-left: 3px solid var(--ember);
+}
+
+.ledtimeline__seg.is-clean {
+  border-left: 3px solid #4a6858;
+}
+
+.ledtimeline__name {
+  font-size: 11px;
+}
+
+.ledtimeline__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font-size: 9.5px;
+  font-weight: bold;
+}
+
+.ledtimeline__count--error {
+  background: #441e1a;
+  color: #e08c7c;
+}
+
+.ledtimeline__count--warn {
+  background: #3b2c14;
+  color: #dfba68;
+}
+
+.ledtimeline__reset {
+  margin-left: 4px;
 }

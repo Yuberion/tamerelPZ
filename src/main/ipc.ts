@@ -29,6 +29,7 @@ import {
   rememberPickedFiles
 } from './services/convert'
 import { assertPathAllowed, invalidateGuard } from './services/guard'
+import { buildTree, exists, isDir, listDir, readPreview, walkStats } from './services/fsx'
 import {
   applyLoadout,
   listLoadoutFiles,
@@ -40,8 +41,16 @@ import {
   scanLuaSoftDeps,
   scanMapCells
 } from './services/loadout'
-import { buildTree, exists, isDir, listDir, readPreview, walkStats } from './services/fsx'
-import { listLogSources, readLog } from './services/logs'
+import {
+  cleanArchivedLogs,
+  decompileJavaClass,
+  diffLogs,
+  listLogSources,
+  probeLog,
+  readLog,
+  readSourceSnippet,
+  resolveLogSourceFile
+} from './services/logs'
 import {
   installNppPack,
   looksLikeNpp,
@@ -338,7 +347,31 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.logList, async () => listLogSources(await getSettings()))
 
-  ipcMain.handle(IPC.logRead, async (_e, id: string) => readLog(await getSettings(), id))
+  ipcMain.handle(IPC.logRead, async (_e, id: string, full?: boolean) =>
+    readLog(await getSettings(), id, full)
+  )
+
+  ipcMain.handle(IPC.logProbe, async (_e, id: string) => probeLog(await getSettings(), id))
+
+  ipcMain.handle(IPC.logClean, async (_e, keepCount?: number) =>
+    cleanArchivedLogs(await getSettings(), keepCount)
+  )
+
+  ipcMain.handle(IPC.logResolveSource, async (_e, file: string, modPath?: string, gameDir?: string, line?: number) =>
+    resolveLogSourceFile(file, modPath, gameDir, line)
+  )
+
+  ipcMain.handle(IPC.logSnippet, async (_e, path: string, targetLine: number, radius?: number) =>
+    readSourceSnippet(path, targetLine, radius)
+  )
+
+  ipcMain.handle(IPC.logDecompile, async (_e, className: string, methodName?: string) =>
+    decompileJavaClass(await getSettings(), className, methodName)
+  )
+
+  ipcMain.handle(IPC.logDiff, async (_e, baseId: string, targetId: string) =>
+    diffLogs(await getSettings(), baseId, targetId)
+  )
 
   // --- Tools (module 07): the FBX forge --------------------------------------
   // The dialog handlers are the only way a path outside the mod roots enters the

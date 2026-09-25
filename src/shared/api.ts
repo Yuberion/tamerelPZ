@@ -17,6 +17,7 @@ import type {
   MapScanResult,
   ModOverwritesSummary,
   SortingRule,
+  LogCleanResult,
   LogReadResult,
   LogSource,
   ModInfoDraft,
@@ -31,6 +32,10 @@ import type {
   ScaffoldResult,
   ScanProgress,
   ScanResult,
+  SourceResolution,
+  SourceSnippetResult,
+  JavaDecompileResult,
+  LogDiffResult,
   ValidateOptions,
   ValidationReport,
   WorkbenchProgress,
@@ -122,8 +127,20 @@ export interface PzApi {
   logs: {
     /** console.txt plus every Logs\*.txt, freshest first. */
     list(): Promise<LogSource[]>
-    /** Read the tail of one source by its opaque id. */
-    read(id: string): Promise<LogReadResult>
+    /** Read one source by its opaque id. If full=true, reads up to 50MB instead of 1MB tail. */
+    read(id: string, full?: boolean): Promise<LogReadResult>
+    /** Quick stat probe for live tail / auto-refresh monitoring. */
+    probe(id: string): Promise<{ size: number; mtime: number } | undefined>
+    /** Remove archived logs older than keepCount (default 10). */
+    cleanArchive(keepCount?: number): Promise<LogCleanResult>
+    /** Resolve a log call-site file or symbol to an actual verified path on disk in a mod or game directory, with line number. */
+    resolveSource(file: string, modPath?: string, gameDir?: string, line?: number): Promise<SourceResolution | undefined>
+    /** Read a snippet of code around targetLine for inline viewing. */
+    readSnippet(path: string, targetLine: number, radius?: number): Promise<SourceSnippetResult | undefined>
+    /** Decompile a Java class from projectzomboid.jar. */
+    decompileJava(className: string, methodName?: string): Promise<JavaDecompileResult>
+    /** Compare error signatures between two log sources. */
+    diff(baseId: string, targetId: string): Promise<LogDiffResult>
   }
   /**
    * The FBX forge.

@@ -81,7 +81,17 @@ const api: PzApi = {
   },
   logs: {
     list: () => ipcRenderer.invoke(IPC.logList),
-    read: (id: string) => ipcRenderer.invoke(IPC.logRead, id)
+    read: (id: string, full?: boolean) => ipcRenderer.invoke(IPC.logRead, id, full),
+    probe: (id: string) => ipcRenderer.invoke(IPC.logProbe, id),
+    cleanArchive: (keepCount?: number) => ipcRenderer.invoke(IPC.logClean, keepCount),
+    resolveSource: (file: string, modPath?: string, gameDir?: string, line?: number) =>
+      ipcRenderer.invoke(IPC.logResolveSource, file, modPath, gameDir, line),
+    readSnippet: (path: string, targetLine: number, radius?: number) =>
+      ipcRenderer.invoke(IPC.logSnippet, path, targetLine, radius),
+    decompileJava: (className: string, methodName?: string) =>
+      ipcRenderer.invoke(IPC.logDecompile, className, methodName),
+    diff: (baseId: string, targetId: string) =>
+      ipcRenderer.invoke(IPC.logDiff, baseId, targetId)
   },
   tools: {
     pick: () => ipcRenderer.invoke(IPC.toolsPick),

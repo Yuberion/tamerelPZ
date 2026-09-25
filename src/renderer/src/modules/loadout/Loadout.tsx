@@ -1022,12 +1022,12 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
                   onClick={() => setShowReportModal(true)}
                   title={
                     isRu
-                      ? 'Сформировать красивый отчет о сборке для Discord / форума / модпака'
-                      : 'Generate formatted modpack report for Discord / forums / server'
+                      ? 'Поделиться сборкой: экспорт для Discord / форума / сервера'
+                      : 'Share modpack: export for Discord / forums / server'
                   }
                 >
                   <Icon name="book" size={11} color="var(--rust-light)" />
-                  {isRu ? 'Отчет сборки' : 'Build Report'}
+                  {isRu ? 'Поделиться' : 'Share'}
                 </button>
                 <button
                   className="btn btn--tiny"

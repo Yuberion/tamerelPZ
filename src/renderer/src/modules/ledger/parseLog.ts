@@ -1,4 +1,4 @@
-import type { ModEntry } from '@shared/types'
+import type { LaunchStage, ModEntry } from '@shared/types'
 
 /**
  * Log parsing for the Ledger module.
@@ -17,6 +17,37 @@ export type LogLevel = 'error' | 'warn' | 'info' | 'debug'
 
 /** Ordered so a soft signal can only ever raise a line's level, never lower it. */
 const RANK: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 }
+
+export interface LogCallSite {
+  file: string
+  line?: number
+  isLua: boolean
+  isJava: boolean
+  raw: string
+}
+
+export interface Diagnosis {
+  id: string
+  category: 'compat' | 'lua' | 'script' | 'asset' | 'memory' | 'world' | 'generic'
+  title: string
+  desc: string
+  hint: string
+  severity: 'error' | 'warn'
+  count: number
+  modName?: string
+  modId?: string
+  callSite?: string
+  matchingIncidentIds: number[]
+}
+
+export interface ModAttribution {
+  modName: string
+  modId?: string
+  modKey?: string
+  modPath?: string
+  errors: number
+  warnings: number
+}
 
 /**
  * One logical entry: a leading line plus everything that continues it.
@@ -44,6 +75,10 @@ export interface LogIncident {
   modName?: string
   modId?: string
   modPath?: string
+  /** Count of consecutive identical occurrences when deduplicated. */
+  repeatCount?: number
+  /** Parsed file and line number if found in head or stack frames. */
+  callSite?: LogCallSite
 }
 
 export interface ParsedLog {
@@ -53,13 +88,22 @@ export interface ParsedLog {
   firstError: number
   /** Physical lines the tail held. */
   lines: number
+  /** Smart diagnosed issues found in the log. */
+  diagnoses: Diagnosis[]
+  /** Attribution breakdown by mod. */
+  modAttributions: ModAttribution[]
+  /** Launch stages detected across the log session. */
+  stages: LaunchStage[]
 }
 
 export const EMPTY_PARSE: ParsedLog = {
   incidents: [],
   counts: { error: 0, warn: 0, info: 0, debug: 0 },
   firstError: -1,
-  lines: 0
+  lines: 0,
+  diagnoses: [],
+  modAttributions: [],
+  stages: []
 }
 
 /* ------------------------------------------------------------- line shapes -- */
@@ -117,7 +161,8 @@ const ERROR_SIGNAL =
   /\bjava\.[\w.$]*(?:Exception|Error)\b|\b(?:LuaException|NullPointerException|StackOverflowError|OutOfMemoryError|ClassNotFoundException|NoSuchMethodError|IllegalStateException)\b|^Caused by:|\bstack traceback\b|\battempted (?:to (?:call|index)|index)\b|\ba nil value\b/i
 
 /** Continuation of an unprefixed block: stack frames and dumps. */
-const RAW_CONTINUATION = /^(?:\s+\S|at\s|java\.[\w.$]|Caused by:|\.{3}\s*\d+\s*more\b|\t)/
+const RAW_CONTINUATION =
+  /^(?:\s+\S|at\s|java\.[\w.$]|Caused by:|\.{3}\s*\d+\s*more\b|\t|-{5,}|={5,}|STACK TRACE|Lua\(|\[File\s)/i
 
 /**
  * Continuation *inside* PZ's prefixed stream.
@@ -126,7 +171,7 @@ const RAW_CONTINUATION = /^(?:\s+\S|at\s|java\.[\w.$]|Caused by:|\.{3}\s*\d+\s*m
  * so the fence and the frame lines are folded into the incident that opened it.
  */
 const LUA_CONTINUATION =
-  /^(?:-{5,}|={5,}|function:\s|at\s|stack traceback|callframe|\[File\s|Object dump|Lua\s+stack)/i
+  /^(?:-{5,}|={5,}|function:\s|at\s|stack traceback|callframe|\[File\s|Object dump|Lua\s+stack|dumping Lua)/i
 
 interface Line {
   raw: string
@@ -257,7 +302,8 @@ export function buildModIndex(mods: ModEntry[]): ModIndex {
   return { byFolder, byName, byId, idScan }
 }
 
-const MOD_TAG_RE = /\bMOD:\s*([^|\r\n]+)/i
+const MOD_TAG_RE = /\bMOD:\s*([^|)\]\r\n]+)/i
+const BRACKET_TAG_RE = /\[([A-Za-z0-9_.-]{3,40})\]/
 const MODS_PATH_RE = /[\\/]mods[\\/]([^\\/\r\n"']+)/i
 const MEDIA_PATH_RE = /[\\/]([^\\/\r\n"']+)[\\/]media[\\/]/i
 
@@ -272,6 +318,13 @@ function linkMod(text: string, index: ModIndex, deep: boolean): ModEntry | undef
   const tag = MOD_TAG_RE.exec(text)
   if (tag) {
     const hit = index.byName.get((tag[1] as string).trim().toLowerCase())
+    if (hit) return hit
+  }
+
+  const bracket = BRACKET_TAG_RE.exec(text)
+  if (bracket) {
+    const rawTag = bracket[1]!.trim().toLowerCase()
+    const hit = index.byId.get(rawTag) ?? index.byFolder.get(rawTag) ?? index.byName.get(rawTag)
     if (hit) return hit
   }
 
@@ -328,7 +381,7 @@ export function parseLog(text: string, index: ModIndex): ParsedLog {
           line.category === open.category &&
           !signalled &&
           LUA_CONTINUATION.test(line.text)
-        : RAW_CONTINUATION.test(raw) || signalled
+        : RAW_CONTINUATION.test(raw) || LUA_CONTINUATION.test(raw) || signalled
       if (continues) {
         open.body.push(raw)
         if (signalled && RANK[open.level] < RANK.error) {
@@ -368,17 +421,431 @@ export function parseLog(text: string, index: ModIndex): ParsedLog {
         ? incident.raw
         : [incident.raw, ...incident.body].join('\n').slice(0, LINK_SCAN_MAX)
     const mod = linkMod(haystack, index, deep)
-    if (!mod) continue
-    incident.modKey = mod.key
-    incident.modName = mod.name
-    incident.modId = mod.modId
-    incident.modPath = mod.path
+    if (mod) {
+      incident.modKey = mod.key
+      incident.modName = mod.name
+      incident.modId = mod.modId
+      incident.modPath = mod.path
+    }
+    incident.callSite = extractCallSite(haystack, incident.origin)
   }
+
+  const diagnoses = diagnoseLog(incidents)
+  const modAttributions = buildModAttributions(incidents)
+  const stages = detectLaunchStages(incidents, rows.length)
 
   return {
     incidents,
     counts,
     firstError: incidents.findIndex((x) => x.level === 'error'),
-    lines: rows.length
+    lines: rows.length,
+    diagnoses,
+    modAttributions,
+    stages
   }
+}
+
+/* -------------------------------------------------------- call-site helper -- */
+
+const SCRIPT_CALLSITE_PATTERNS = [
+  /\[File[:\s]+([A-Za-z0-9_./\\-]+\.(?:lua|txt|xml|json))[^\]\r\n]*?(?:line\s*[:#\s]*|:\s*)(\d+)?/i,
+  /\b(?:file|script)[:\s]+([A-Za-z0-9_./\\-]+\.(?:lua|txt|xml|json))[^\r\n]*?(?:line\s*[:#\s]*|:\s*)(\d+)?/i,
+  /callframe\s+at:\s*([A-Za-z0-9_./\\-]+\.(?:lua|txt)):(\d+)/i,
+  /([A-Za-z0-9_./\\-]*media[\\/]lua[\\/][A-Za-z0-9_./\\-]+\.lua)(?::(\d+))?/i,
+  /([A-Za-z0-9_./\\-]*media[\\/]scripts[\\/][A-Za-z0-9_./\\-]+\.txt)(?::(\d+))?/i,
+  /\b([A-Za-z0-9_./\\-]+\.lua):(\d+)/i,
+  /require\s*["']([A-Za-z0-9_./\\-]+)["']/i,
+  /\b([A-Za-z0-9_./\\-]*media[\\/][A-Za-z0-9_./\\-]+\.(?:lua|txt|xml|json|png|ogg|wav))\b/i,
+  // Scripted objects, e.g. "Invalid SpriteConfig object! scripted object = Wooden_Windows"
+  /\bscripted\s+object\s*=\s*([A-Za-z0-9_]+)/i,
+  // Container type, e.g. "ItemPickInfo -> cannot get ID for container: inventoryfemale"
+  /\bcontainer:\s*([A-Za-z0-9_]+)/i,
+  // Entity declaration, e.g. "entity Wooden_Windows"
+  /\bentity\s+([A-Za-z0-9_]+)/i,
+  // Specific item/vehicle/recipe references, e.g. "Vehicle script not found: Base.SportsCar"
+  /\b(?:item|vehicle|recipe)\s+(?:script\s+not\s+found:\s*)?([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)?)/i,
+  // Plain .lua or .txt file mentioned without line number
+  /\b([A-Za-z0-9_-]+\.(?:lua|txt))\b/i
+]
+
+const JAVA_CALLSITE_RE =
+  /(?:at\s+)?([A-Za-z0-9_$.]+)\.([A-Za-z0-9_$]+)\(([A-Za-z0-9_$.]+\.java):(\d+)\)/i
+
+export function extractCallSite(haystack: string, _origin?: string): LogCallSite | undefined {
+  for (const re of SCRIPT_CALLSITE_PATTERNS) {
+    const match = re.exec(haystack)
+    if (match) {
+      let cleanFile = (match[1] as string).replace(/\\/g, '/').replace(/^[./\\]+/, '')
+      // Only append .lua for require "foo" syntax
+      if (re.source.startsWith('require') && !cleanFile.includes('.')) {
+        cleanFile += '.lua'
+      }
+      const lineNum = match[2] ? Number(match[2]) : undefined
+      const isLua = cleanFile.toLowerCase().endsWith('.lua')
+      return {
+        file: cleanFile,
+        line: Number.isFinite(lineNum) && (lineNum as number) > 0 ? lineNum : undefined,
+        isLua,
+        isJava: false,
+        raw: match[0] as string
+      }
+    }
+  }
+
+  const javaMatch = JAVA_CALLSITE_RE.exec(haystack)
+  if (javaMatch) {
+    const lineNum = Number(javaMatch[4])
+    return {
+      file: javaMatch[3] as string,
+      line: Number.isFinite(lineNum) && lineNum > 0 ? lineNum : undefined,
+      isLua: false,
+      isJava: true,
+      raw: `${javaMatch[1]}.${javaMatch[2]}(${javaMatch[3]}:${javaMatch[4]})`
+    }
+  }
+
+  // Pure Java origins (e.g. at KahluaThread.flushErrorMessage) are engine methods,
+  // not source files on disk. Do not synthesize a fake file.
+  return undefined
+}
+
+export function resolveSourcePath(
+  callSiteFile: string,
+  modPath?: string,
+  gameDir?: string
+): string | undefined {
+  if (!callSiteFile) return undefined
+  const base = callSiteFile.split(/[\\/]/).pop() ?? ''
+  if (!base.includes('.') || !/\.(lua|txt|xml|json)$/i.test(base)) {
+    return undefined
+  }
+  if (/^[A-Za-z]:[\\/]/.test(callSiteFile)) {
+    return callSiteFile.replace(/\\/g, '/')
+  }
+  const clean = callSiteFile.replace(/\\/g, '/').replace(/^[./\\]+/, '')
+
+  // 1. Mod file
+  if (modPath) {
+    const normMod = modPath.replace(/\\/g, '/').replace(/\/+$/, '')
+    if (clean.toLowerCase().startsWith('media/')) {
+      return `${normMod}/${clean}`
+    }
+    return `${normMod}/media/lua/${clean}`
+  }
+
+  // 2. Vanilla game file
+  if (gameDir) {
+    const normGame = gameDir.replace(/\\/g, '/').replace(/\/+$/, '')
+    if (clean.toLowerCase().startsWith('media/')) {
+      return `${normGame}/${clean}`
+    }
+    return `${normGame}/media/lua/${clean}`
+  }
+
+  return undefined
+}
+
+/* ---------------------------------------------------- deduplication helper -- */
+
+export function deduplicateIncidents(incidents: LogIncident[]): LogIncident[] {
+  if (incidents.length === 0) return []
+  const out: LogIncident[] = []
+  let last: LogIncident | undefined
+
+  for (const inc of incidents) {
+    if (
+      last &&
+      last.level === inc.level &&
+      last.head === inc.head &&
+      last.category === inc.category &&
+      last.modId === inc.modId
+    ) {
+      last.repeatCount = (last.repeatCount ?? 1) + 1
+      continue
+    }
+    const copy: LogIncident = { ...inc, repeatCount: 1 }
+    out.push(copy)
+    last = copy
+  }
+  return out
+}
+
+/* --------------------------------------------------- diagnostics analyzer -- */
+
+export function diagnoseLog(incidents: LogIncident[]): Diagnosis[] {
+  const diagMap = new Map<string, Diagnosis>()
+
+  for (const inc of incidents) {
+    if (inc.level !== 'error' && inc.level !== 'warn') continue
+    const text = [inc.head, ...inc.body].join('\n')
+
+    // 1. Compatibility B41 / B42 (missing Java methods / classes)
+    if (
+      /NoSuchMethodError|ClassNotFoundException|NoClassDefFoundError|NoSuchFieldError|SwipeStatePlayer|getJoypadBind|IsoPlayer\.getJoypad|ItemContainer\.AddItem/i.test(
+        text
+      )
+    ) {
+      const key = `compat:${inc.modName ?? 'core'}`
+      const existing = diagMap.get(key)
+      if (existing) {
+        existing.count++
+        existing.matchingIncidentIds.push(inc.id)
+      } else {
+        diagMap.set(key, {
+          id: key,
+          category: 'compat',
+          title: 'led.diag.compatTitle',
+          desc: inc.modName
+            ? `Мод "${inc.modName}" вызывает Java-методы или классы, отсутствующие в Build 42.`
+            : 'Обнаружен вызов отсутствующего метода или класса Java (несовместимость версий игры).',
+          hint: 'led.diag.compatHint',
+          severity: 'error',
+          count: 1,
+          modName: inc.modName,
+          modId: inc.modId,
+          callSite: inc.callSite?.file,
+          matchingIncidentIds: [inc.id]
+        })
+      }
+      continue
+    }
+
+    // 2. Lua nil dereference
+    if (
+      /attempt to (?:index|call|perform arithmetic on)\s+(?:field|method)?\s*['"]?([A-Za-z0-9_.]*)['"]?\s*\(a nil value\)|attempted to call a nil value/i.test(
+        text
+      )
+    ) {
+      const key = `lua-nil:${inc.modName ?? 'core'}`
+      const existing = diagMap.get(key)
+      if (existing) {
+        existing.count++
+        existing.matchingIncidentIds.push(inc.id)
+      } else {
+        diagMap.set(key, {
+          id: key,
+          category: 'lua',
+          title: 'led.diag.luaNilTitle',
+          desc: inc.modName
+            ? `В коде мода "${inc.modName}" произошло обращение к nil-переменной или вызов nil-функции.`
+            : 'Попытка обращения к несуществующему полю или вызов nil в скрипте Lua.',
+          hint: 'led.diag.luaNilHint',
+          severity: 'error',
+          count: 1,
+          modName: inc.modName,
+          modId: inc.modId,
+          callSite: inc.callSite?.file,
+          matchingIncidentIds: [inc.id]
+        })
+      }
+      continue
+    }
+
+    // 3. Item / Recipe Script syntax
+    if (
+      /Failed to find item|failed to find base:|Duplicate item ID|Unknown item|unknown fluid|SCRIPT:\s*error/i.test(
+        text
+      )
+    ) {
+      const key = `script:${inc.modName ?? 'core'}`
+      const existing = diagMap.get(key)
+      if (existing) {
+        existing.count++
+        existing.matchingIncidentIds.push(inc.id)
+      } else {
+        diagMap.set(key, {
+          id: key,
+          category: 'script',
+          title: 'led.diag.scriptTitle',
+          desc: 'Ошибка скрипта предметов, рецептов или жидкостей (media/scripts).',
+          hint: 'led.diag.scriptHint',
+          severity: 'error',
+          count: 1,
+          modName: inc.modName,
+          modId: inc.modId,
+          matchingIncidentIds: [inc.id]
+        })
+      }
+      continue
+    }
+
+    // 4. Missing Texture or 3D Model Asset
+    if (
+      /Could not (?:find|load) texture|Model not found|Animation track|No texture found|FAILED TO LOAD TEXTURE|Texture\.load/i.test(
+        text
+      )
+    ) {
+      const key = `asset:${inc.modName ?? 'core'}`
+      const existing = diagMap.get(key)
+      if (existing) {
+        existing.count++
+        existing.matchingIncidentIds.push(inc.id)
+      } else {
+        diagMap.set(key, {
+          id: key,
+          category: 'asset',
+          title: 'led.diag.assetTitle',
+          desc: 'Движок не смог загрузить текстуру, 3D-модель или файл анимации.',
+          hint: 'led.diag.assetHint',
+          severity: 'warn',
+          count: 1,
+          modName: inc.modName,
+          modId: inc.modId,
+          matchingIncidentIds: [inc.id]
+        })
+      }
+      continue
+    }
+
+    // 5. Java JVM Out of Memory
+    if (/OutOfMemoryError|Direct buffer memory|Java heap space/i.test(text)) {
+      const key = 'jvm-oom'
+      const existing = diagMap.get(key)
+      if (existing) {
+        existing.count++
+        existing.matchingIncidentIds.push(inc.id)
+      } else {
+        diagMap.set(key, {
+          id: key,
+          category: 'memory',
+          title: 'led.diag.oomTitle',
+          desc: 'Нехватка выделенной оперативной памяти JVM (Java heap space / direct memory).',
+          hint: 'led.diag.oomHint',
+          severity: 'error',
+          count: 1,
+          matchingIncidentIds: [inc.id]
+        })
+      }
+      continue
+    }
+
+    // 6. Map / World cell conflicts
+    if (/WorldDictionary|LotHeader|cell does not exist|Chunk does not exist|IsoChunk/i.test(text)) {
+      const key = `world:${inc.modName ?? 'core'}`
+      const existing = diagMap.get(key)
+      if (existing) {
+        existing.count++
+        existing.matchingIncidentIds.push(inc.id)
+      } else {
+        diagMap.set(key, {
+          id: key,
+          category: 'world',
+          title: 'led.diag.worldTitle',
+          desc: 'Конфликт или ошибка загрузки файлов карты / ячеек мира.',
+          hint: 'led.diag.worldHint',
+          severity: 'warn',
+          count: 1,
+          modName: inc.modName,
+          modId: inc.modId,
+          matchingIncidentIds: [inc.id]
+        })
+      }
+      continue
+    }
+  }
+
+  return [...diagMap.values()].sort((a, b) => b.count - a.count)
+}
+
+/* ---------------------------------------------------- mod attribution -- */
+
+export function buildModAttributions(incidents: LogIncident[]): ModAttribution[] {
+  const map = new Map<string, ModAttribution>()
+  for (const inc of incidents) {
+    if (!inc.modName) continue
+    const key = inc.modKey ?? inc.modName.toLowerCase()
+    let attr = map.get(key)
+    if (!attr) {
+      attr = {
+        modName: inc.modName,
+        modId: inc.modId,
+        modKey: inc.modKey,
+        modPath: inc.modPath,
+        errors: 0,
+        warnings: 0
+      }
+      map.set(key, attr)
+    }
+    if (inc.level === 'error') attr.errors++
+    else if (inc.level === 'warn') attr.warnings++
+  }
+  return [...map.values()].sort(
+    (a, b) => b.errors - a.errors || b.warnings - a.warnings || a.modName.localeCompare(b.modName)
+  )
+}
+
+/* ---------------------------------------------------- launch stage timeline -- */
+
+export function detectLaunchStages(incidents: LogIncident[], totalLines: number): LaunchStage[] {
+  if (incidents.length === 0) return []
+
+  const STAGE_DEFS: Array<{ id: LaunchStage['id']; label: string; pattern: RegExp }> = [
+    { id: 'engine', label: 'Engine Init', pattern: /logger|opengl|fmod|display|desktop\s+resolution|jvm/i },
+    { id: 'scripts', label: 'Scripts & Items', pattern: /loading\s+scripts|reading\s+scripts|parsed\s+scripts|item\s+script/i },
+    { id: 'mods', label: 'Mods & Lua', pattern: /loading\s+mods|loading:\s*media\/lua|require\s*["']|active\s+mods/i },
+    { id: 'world', label: 'Map & World', pattern: /loading\s+map|worlddictionary|spawnregions|generating\s+world|cell\s+\d+/i },
+    { id: 'game', label: 'In-Game Active', pattern: /player\s+\d+\s+is|gamewindow\.logic|start\s+game|virtualvehiclemanager/i }
+  ]
+
+  const stageStarts: Record<string, number> = {
+    engine: 1,
+    scripts: Math.round(totalLines * 0.2),
+    mods: Math.round(totalLines * 0.4),
+    world: Math.round(totalLines * 0.7),
+    game: Math.round(totalLines * 0.85)
+  }
+
+  for (const inc of incidents) {
+    const text = `${inc.head} ${inc.origin ?? ''}`
+    for (const def of STAGE_DEFS) {
+      if (def.pattern.test(text)) {
+        if (stageStarts[def.id] === undefined || inc.line < stageStarts[def.id]!) {
+          stageStarts[def.id] = inc.line
+        }
+      }
+    }
+  }
+
+  const sortedKeys: LaunchStage['id'][] = ['engine', 'scripts', 'mods', 'world', 'game']
+  let currentStart = 1
+  for (const k of sortedKeys) {
+    if ((stageStarts[k] ?? 1) < currentStart) {
+      stageStarts[k] = currentStart
+    } else {
+      currentStart = stageStarts[k]!
+    }
+  }
+
+  const stages: LaunchStage[] = []
+  for (let idx = 0; idx < sortedKeys.length; idx++) {
+    const k = sortedKeys[idx]!
+    const nextK = sortedKeys[idx + 1]
+    const sLine = stageStarts[k]!
+    const eLine = nextK ? Math.max(sLine, stageStarts[nextK]! - 1) : totalLines
+    const def = STAGE_DEFS.find((d) => d.id === k)!
+
+    let incidentCount = 0
+    let errorCount = 0
+    let warnCount = 0
+
+    for (const inc of incidents) {
+      if (inc.line >= sLine && inc.line <= eLine) {
+        incidentCount++
+        if (inc.level === 'error') errorCount++
+        else if (inc.level === 'warn') warnCount++
+      }
+    }
+
+    stages.push({
+      id: k,
+      label: def.label,
+      startLine: sLine,
+      endLine: eLine,
+      incidentCount,
+      errorCount,
+      warnCount
+    })
+  }
+
+  return stages
 }

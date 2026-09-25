@@ -717,13 +717,80 @@ export interface LogSource {
 export interface LogReadResult {
   id: string
   path: string
-  /** Text of the tail, at most `LOG_TAIL_MAX` bytes worth. */
+  /** Text of the tail, at most `LOG_TAIL_MAX` bytes worth (or up to 50MB if full read requested). */
   text: string
   /** Full size on disk, which may be far larger than `text`. */
   size: number
   mtime: number
   /** True when the head of the file was skipped and only the tail is shown. */
   truncated: boolean
+  /** True if this was read as a full log rather than a tail. */
+  isFull?: boolean
+}
+
+export interface LogCleanResult {
+  deleted: number
+  freedBytes: number
+}
+
+export interface SourceResolution {
+  path: string
+  line?: number
+}
+
+export interface SourceSnippetLine {
+  num: number
+  text: string
+  isTarget: boolean
+}
+
+export interface SourceSnippetResult {
+  path: string
+  targetLine: number
+  startLine: number
+  endLine: number
+  lines: SourceSnippetLine[]
+  lang: 'lua' | 'txt' | 'json' | 'plain'
+}
+
+export interface JavaDecompileResult {
+  className: string
+  fullClassName?: string
+  bytecode?: string
+  decompiled: string
+  methodsCount?: number
+  error?: string
+}
+
+export interface LogDiffItem {
+  id: string
+  level: 'error' | 'warn'
+  head: string
+  callSite?: string
+  modName?: string
+  count: number
+}
+
+export interface LogDiffResult {
+  baseId: string
+  targetId: string
+  newErrors: LogDiffItem[]
+  resolvedErrors: LogDiffItem[]
+  recurringErrors: LogDiffItem[]
+  newErrorsCount: number
+  resolvedErrorsCount: number
+}
+
+export type LaunchStageId = 'engine' | 'scripts' | 'mods' | 'world' | 'game'
+
+export interface LaunchStage {
+  id: LaunchStageId
+  label: string
+  startLine: number
+  endLine: number
+  incidentCount: number
+  errorCount: number
+  warnCount: number
 }
 
 /* =========================================================================

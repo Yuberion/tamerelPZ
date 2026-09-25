@@ -266,7 +266,7 @@ export function BuildReportModal({
         <div className="lomodal__head">
           <Icon name="book" size={15} color="var(--rust)" />
           <span className="lomodal__title stencil">
-            {isRu ? 'Отчет сборки / Экспорт списка' : 'Build Report & Modpack Share'}
+            {isRu ? 'Поделиться сборкой / Экспорт' : 'Share Modpack / Export'}
           </span>
           <span className="lomodal__badge mono">
             {formatCount(modsList.length)} {isRu ? 'модов' : 'mods'}
