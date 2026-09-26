@@ -6,6 +6,7 @@ import type {
   BatchPackRequest,
   ConvertOptions,
   ConvertProgress,
+  CreateMergePatchRequest,
   LoadoutApplyOptions,
   PackOptions,
   ScaffoldOptions,
@@ -77,7 +78,8 @@ const api: PzApi = {
     saveGamePresets: (presets: Record<string, string[]>) => ipcRenderer.invoke(IPC.loGamePresetsSave, presets),
     getLuaDeps: () => ipcRenderer.invoke(IPC.loLuaDeps),
     getFileOverwrites: (activeModIds: string[]) => ipcRenderer.invoke(IPC.loFileOverwrites, activeModIds),
-    getMapCells: (activeModIds: string[]) => ipcRenderer.invoke(IPC.loMapCells, activeModIds)
+    getMapCells: (activeModIds: string[]) => ipcRenderer.invoke(IPC.loMapCells, activeModIds),
+    createMergePatch: (req: CreateMergePatchRequest) => ipcRenderer.invoke(IPC.loCreateMergePatch, req)
   },
   logs: {
     list: () => ipcRenderer.invoke(IPC.logList),

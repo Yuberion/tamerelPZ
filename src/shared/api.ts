@@ -8,6 +8,8 @@ import type {
   ConvertOptions,
   ConvertProgress,
   ConvertResult,
+  CreateMergePatchRequest,
+  CreateMergePatchResult,
   FilePreview,
   ForgeInput,
   FsNode,
@@ -118,6 +120,7 @@ export interface PzApi {
     getLuaDeps(): Promise<Record<string, string[]>>
     getFileOverwrites(activeModIds: string[]): Promise<ModOverwritesSummary>
     getMapCells(activeModIds: string[]): Promise<MapScanResult>
+    createMergePatch(req: CreateMergePatchRequest): Promise<CreateMergePatchResult>
   }
   /**
    * Crash logs and console output. Read-only: there is no write counterpart, and

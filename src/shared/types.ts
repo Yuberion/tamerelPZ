@@ -643,6 +643,37 @@ export interface MapScanResult {
   conflicts: MapConflict[]
 }
 
+export interface MergePatchSelection {
+  /** Relative path of the colliding file, e.g. "media/textures/jacket.png" */
+  relPath: string
+  /** Mod ID chosen as winner for this file, or '__MERGE__' for script merging */
+  winnerModId: string
+}
+
+export type PatchBuildTarget = 'b42' | 'b41' | 'hybrid'
+
+export interface CreateMergePatchRequest {
+  /** Mod ID of the generated patch mod, strictly required to have `_Port` */
+  patchModId?: string
+  /** Display name of the patch */
+  patchName?: string
+  /** Target game build layout: 'b42' (strict B42 layout with 42/ & common/), 'b41', or 'hybrid' */
+  buildTarget?: PatchBuildTarget
+  /** File collision resolution selections */
+  selections: MergePatchSelection[]
+  /** Automatically append the new patch mod to the end of default.txt */
+  addToLoadout?: boolean
+}
+
+export interface CreateMergePatchResult {
+  modPath: string
+  patchModId: string
+  filesCopied: number
+  scriptsMerged: number
+  addedToLoadout: boolean
+  errors?: string[]
+}
+
 export interface LoadoutApplyOptions {
   /** `LoadoutFile.id` of the config to write. */
   targetId: string

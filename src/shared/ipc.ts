@@ -46,6 +46,7 @@ export const IPC = {
   loLuaDeps: 'lo:lua-deps',
   loFileOverwrites: 'lo:file-overwrites',
   loMapCells: 'lo:map-cells',
+  loCreateMergePatch: 'lo:create-merge-patch',
 
   /* Ledger — read-only log reader; main resolves the paths itself. */
   logList: 'log:list',

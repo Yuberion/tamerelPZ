@@ -8,6 +8,7 @@ import type {
   BatchPackRequest,
   ConvertOptions,
   ConvertProgress,
+  CreateMergePatchRequest,
   LoadoutApplyOptions,
   PackOptions,
   ScaffoldOptions,
@@ -60,6 +61,7 @@ import {
   previewNppPack
 } from './services/npp'
 import { packMod } from './services/pack'
+import { createMergePatch } from './services/patcher'
 import { detectPaths } from './services/paths'
 import { scanMods, type ScanOptions } from './services/scanner'
 import { getSettings, setSettings } from './services/settings'
@@ -339,6 +341,10 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.loMapCells, async (_e, activeModIds: string[]) =>
     scanMapCells(activeModIds)
+  )
+
+  ipcMain.handle(IPC.loCreateMergePatch, async (_e, req: CreateMergePatchRequest) =>
+    createMergePatch(await getSettings(), req)
   )
 
   // --- Ledger (module 09): read-only log reader -----------------------------

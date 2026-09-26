@@ -15,6 +15,7 @@ import { RulesModal } from './RulesModal'
 import { PresetsModal } from './PresetsModal'
 import { ValidationModal } from './ValidationModal'
 import { IntegrityModal } from './IntegrityModal'
+import { FileConflictModal } from './FileConflictModal'
 import { MapConflictModal } from './MapConflictModal'
 import { ServerSyncModal } from './ServerSyncModal'
 import { BuildReportModal } from './BuildReportModal'
@@ -167,6 +168,7 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
   const [showPresetsModal, setShowPresetsModal] = useState(false)
   const [showValidationModal, setShowValidationModal] = useState(false)
   const [showIntegrityModal, setShowIntegrityModal] = useState(false)
+  const [showFileConflictModal, setShowFileConflictModal] = useState(false)
   const [showMapConflictModal, setShowMapConflictModal] = useState(false)
   const [showServerSyncModal, setShowServerSyncModal] = useState(false)
   const [showAddSepModal, setShowAddSepModal] = useState(false)
@@ -979,6 +981,21 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
                   )}
                 </button>
                 <button
+                  className={`btn btn--tiny ${(overwritesSummary?.collisions.length ?? 0) > 0 ? 'btn--warn' : ''}`}
+                  onClick={() => setShowFileConflictModal(true)}
+                  title={
+                    isRu
+                      ? 'Инспектор перезаписи файлов: текстуры, текстурпаки (.pack), скрипты и Lua'
+                      : 'File overwrites inspector: textures, pack files, scripts & Lua'
+                  }
+                >
+                  <Icon name="layers" size={11} color="var(--amber, #f59e0b)" />
+                  {isRu ? 'Конфликты файлов' : 'File Conflicts'}
+                  {(overwritesSummary?.collisions.length ?? 0) > 0 && (
+                    <span className="lomlos-badge-count">{overwritesSummary!.collisions.length}</span>
+                  )}
+                </button>
+                <button
                   className="btn btn--tiny"
                   onClick={() => setShowMapConflictModal(true)}
                   title={
@@ -1385,6 +1402,22 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             setSelected(undefined)
           }}
           onClose={() => setShowIntegrityModal(false)}
+        />
+      )}
+
+      {showFileConflictModal && (
+        <FileConflictModal
+          activeModIds={store.lists.mods}
+          byModId={byModId}
+          overwritesSummary={overwritesSummary}
+          onPatchApplied={(patchId) => {
+            if (!values.includes(patchId)) {
+              setValues([...values, patchId])
+              store.patch({ mods: [...store.lists.mods, patchId] })
+            }
+            void refresh()
+          }}
+          onClose={() => setShowFileConflictModal(false)}
         />
       )}
 
