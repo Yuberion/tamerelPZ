@@ -41,6 +41,11 @@ import type {
   ValidateOptions,
   ValidationReport,
   WorkbenchProgress,
+  WorkshopDownloadResult,
+  WorkshopItemDetails,
+  WorkshopSearchQuery,
+  WorkshopSearchResult,
+  WorkshopSyncResult,
   WriteModInfoRequest,
   WriteModInfoResult
 } from './types'
@@ -205,5 +210,18 @@ export interface PzApi {
      * so main resolves them itself instead of taking a path from the renderer.
      */
     reveal(target: 'exe' | 'udl'): Promise<void>
+  }
+  workshop: {
+    query(query: WorkshopSearchQuery): Promise<WorkshopSearchResult>
+    details(publishedFileId: string, forceTranslate?: boolean): Promise<WorkshopItemDetails>
+    subscribe(publishedFileId: string): Promise<{ success: boolean; error?: string }>
+    unsubscribe(publishedFileId: string): Promise<{ success: boolean; error?: string }>
+    isSteamActive(): Promise<boolean>
+    openSteam(publishedFileId: string): Promise<boolean>
+    openFolder(publishedFileId: string): Promise<boolean>
+    download(publishedFileId: string): Promise<WorkshopDownloadResult>
+    syncSteam(): Promise<WorkshopSyncResult>
+    getInstalledCount(): Promise<number>
+    onSyncChanged(cb: (res: WorkshopSyncResult) => void): () => void
   }
 }

@@ -16,8 +16,24 @@ import type {
   SortingRule,
   ValidateOptions,
   WorkbenchProgress,
+  WorkshopSearchQuery,
   WriteModInfoRequest
 } from '../shared/types'
+import {
+  downloadWorkshopItem,
+  getInstalledWorkshopCount,
+  getWorkshopItemDetails,
+  initSteamWorkshopWatcher,
+  openInSteamClient,
+  openWorkshopFolder,
+  queryWorkshop,
+  syncSteamWorkshop
+} from './services/workshop'
+import {
+  isSteamClientActive,
+  subscribeToWorkshopItem,
+  unsubscribeFromWorkshopItem
+} from './services/steamworks'
 import { listAuthoringTargets, readModInfoDraft, scaffoldMod, writeModInfo } from './services/authoring'
 import { assimpStatus, cancelAssimp, looksLikeAssimp, prepareAssimp } from './services/assimp'
 import {
@@ -537,5 +553,57 @@ export function registerIpc(): void {
     const path = await nppPathFor(await getSettings(), target)
     if (target === 'udl') await shell.openPath(path)
     else shell.showItemInFolder(path)
+  })
+
+  // --- Workshop Overview (module 03) -----------------------------------------
+  ipcMain.handle(IPC.wsQuery, async (_e, query: WorkshopSearchQuery) => {
+    return queryWorkshop(await getSettings(), query)
+  })
+
+  ipcMain.handle(IPC.wsDetails, async (_e, publishedFileId: string, forceTranslate?: boolean) => {
+    return getWorkshopItemDetails(await getSettings(), publishedFileId, forceTranslate)
+  })
+
+  ipcMain.handle(IPC.wsSubscribe, async (_e, publishedFileId: string) => {
+    return subscribeToWorkshopItem(publishedFileId)
+  })
+
+  ipcMain.handle(IPC.wsUnsubscribe, async (_e, publishedFileId: string) => {
+    return unsubscribeFromWorkshopItem(publishedFileId)
+  })
+
+  ipcMain.handle(IPC.wsIsSteamActive, async () => {
+    return isSteamClientActive()
+  })
+
+  ipcMain.handle(IPC.wsOpenSteam, async (_e, publishedFileId: string) => {
+    return openInSteamClient(publishedFileId)
+  })
+
+  ipcMain.handle(IPC.wsOpenFolder, async (_e, publishedFileId: string) => {
+    return openWorkshopFolder(await getSettings(), publishedFileId)
+  })
+
+  ipcMain.handle(IPC.wsDownload, async (_e, publishedFileId: string) => {
+    return downloadWorkshopItem(await getSettings(), publishedFileId)
+  })
+
+  ipcMain.handle(IPC.wsSync, async () => {
+    return syncSteamWorkshop(await getSettings())
+  })
+
+  ipcMain.handle(IPC.wsInstalledCount, async () => {
+    return getInstalledWorkshopCount(await getSettings())
+  })
+
+  // Start background live watcher for appworkshop_108600.acf
+  void getSettings().then((settings) => {
+    initSteamWorkshopWatcher(settings, (syncRes) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send(IPC.wsSyncChanged, syncRes)
+        }
+      }
+    })
   })
 }

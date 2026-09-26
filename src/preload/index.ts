@@ -113,6 +113,19 @@ const api: PzApi = {
     preview: () => ipcRenderer.invoke(IPC.nppPreview),
     open: (path: string, line?: number) => ipcRenderer.invoke(IPC.nppOpen, path, line),
     reveal: (target: 'exe' | 'udl') => ipcRenderer.invoke(IPC.nppReveal, target)
+  },
+  workshop: {
+    query: (query) => ipcRenderer.invoke(IPC.wsQuery, query),
+    details: (publishedFileId, forceTranslate) => ipcRenderer.invoke(IPC.wsDetails, publishedFileId, forceTranslate),
+    subscribe: (publishedFileId) => ipcRenderer.invoke(IPC.wsSubscribe, publishedFileId),
+    unsubscribe: (publishedFileId) => ipcRenderer.invoke(IPC.wsUnsubscribe, publishedFileId),
+    isSteamActive: () => ipcRenderer.invoke(IPC.wsIsSteamActive),
+    openSteam: (publishedFileId) => ipcRenderer.invoke(IPC.wsOpenSteam, publishedFileId),
+    openFolder: (publishedFileId) => ipcRenderer.invoke(IPC.wsOpenFolder, publishedFileId),
+    download: (publishedFileId) => ipcRenderer.invoke(IPC.wsDownload, publishedFileId),
+    syncSteam: () => ipcRenderer.invoke(IPC.wsSync),
+    getInstalledCount: () => ipcRenderer.invoke(IPC.wsInstalledCount),
+    onSyncChanged: (cb) => subscribe(IPC.wsSyncChanged, cb)
   }
 }
 

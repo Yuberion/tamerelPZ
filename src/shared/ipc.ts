@@ -76,7 +76,20 @@ export const IPC = {
   nppInstall: 'npp:install',
   nppPreview: 'npp:preview',
   nppOpen: 'npp:open',
-  nppReveal: 'npp:reveal'
+  nppReveal: 'npp:reveal',
+
+  /* Workshop Overview (Module 03) */
+  wsQuery: 'ws:query',
+  wsDetails: 'ws:details',
+  wsSubscribe: 'ws:subscribe',
+  wsUnsubscribe: 'ws:unsubscribe',
+  wsIsSteamActive: 'ws:is-steam-active',
+  wsOpenSteam: 'ws:open-steam',
+  wsOpenFolder: 'ws:open-folder',
+  wsDownload: 'ws:download',
+  wsSync: 'ws:sync',
+  wsSyncChanged: 'ws:sync-changed',
+  wsInstalledCount: 'ws:installed-count'
 } as const
 
 /** Custom protocol used to render local images inside the renderer. */

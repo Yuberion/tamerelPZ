@@ -4,7 +4,7 @@ import type { TKey } from '@renderer/i18n'
 export type ModuleId =
   | 'stalker'
   | 'loadout'
-  | 'signal'
+  | 'workshop'
   | 'workbench'
   | 'triage'
   | 'cartograph'
@@ -24,7 +24,7 @@ export interface ModuleDef {
   status: 'live' | 'sealed'
 }
 
-/** The nine hub tiles. STALKER, LOADOUT, WORKBENCH, TOOLS and LEDGER are wired up in this build. */
+/** The nine hub tiles. STALKER, LOADOUT, WORKSHOP, WORKBENCH, TOOLS and LEDGER are wired up in this build. */
 export const MODULES: ModuleDef[] = [
   {
     id: 'stalker',
@@ -45,13 +45,13 @@ export const MODULES: ModuleDef[] = [
     status: 'live'
   },
   {
-    id: 'signal',
+    id: 'workshop',
     code: '03',
-    name: 'Signal',
-    taglineKey: 'module.signal.tagline',
-    descKey: 'module.signal.desc',
-    icon: 'radio',
-    status: 'sealed'
+    name: 'Workshop Overview',
+    taglineKey: 'module.workshop.tagline',
+    descKey: 'module.workshop.desc',
+    icon: 'download',
+    status: 'live'
   },
   {
     id: 'workbench',

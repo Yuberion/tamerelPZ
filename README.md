@@ -2,6 +2,7 @@
 
 **Project Zomboid mod management suite** — a Windows desktop app that finds every Project Zomboid mod on your drive, parses its metadata, classifies it, and lets you inspect it down to individual files.
 
+**Author & Creator**: **Tamerel**  
 Built with Electron 43, React 19, TypeScript and electron-vite. **Zero runtime dependencies.**
 
 > **Status: early build (v0.1.0).** Five of nine modules are live: **Stalker** (read-only inventory and inspection), **Loadout** (load order and profiles), **Workbench** (mod authoring), **Tools** (an FBX converter and a Notepad++ bridge) and **Ledger** (crash logs and console output, read-only). Only Workbench, Loadout and Tools write to disk, each to a narrow, documented set of files — see [Write model](#write-model). See [Roadmap](#roadmap) for what is and isn't implemented.

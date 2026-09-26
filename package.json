@@ -2,6 +2,7 @@
   "name": "pz-management",
   "version": "0.1.0",
   "description": "PZ MANAGEMENT — Project Zomboid mod management suite",
+  "author": "Tamerel",
   "main": "./out/main/index.js",
   "license": "MIT",
   "private": true,
@@ -25,5 +26,8 @@
     "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^7.3.6"
+  },
+  "dependencies": {
+    "steamworks.js": "^0.4.0"
   }
 }

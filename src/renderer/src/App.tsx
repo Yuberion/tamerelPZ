@@ -10,6 +10,7 @@ import { Loadout } from './modules/loadout/Loadout'
 import { Stalker } from './modules/stalker/Stalker'
 import { Tools } from './modules/tools/Tools'
 import { Workbench } from './modules/workbench/Workbench'
+import { WorkshopOverview } from './modules/workshop/WorkshopOverview'
 import { useAppStore } from './state/store'
 
 type View = 'hub' | ModuleId
@@ -51,6 +52,7 @@ export default function App() {
               {view === 'hub' ? <Hub onOpen={setView} /> : null}
               {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
               {view === 'loadout' ? <Loadout onExit={goHome} /> : null}
+              {view === 'workshop' ? <WorkshopOverview onExit={goHome} /> : null}
               {view === 'workbench' ? <Workbench onExit={goHome} /> : null}
               {view === 'tools' ? <Tools onExit={goHome} /> : null}
               {view === 'ledger' ? <Ledger onExit={goHome} /> : null}

@@ -51,9 +51,9 @@ export const EN = {
   'module.loadout.tagline': 'Load order & profiles',
   'module.loadout.desc':
     'Order mods, build named profiles and push them into the game config.',
-  'module.signal.tagline': 'Workshop sync',
-  'module.signal.desc':
-    'Track Workshop updates, spot stale downloads and re-subscribe broken items.',
+  'module.workshop.tagline': 'Workshop browser & downloader',
+  'module.workshop.desc':
+    'Browse the Steam Workshop, search with B41/B42 filters, inspect details, check for updates, and download mods directly.',
   'module.workbench.tagline': 'Authoring tools',
   'module.workbench.desc':
     'Scaffold mods, edit mod.info, validate scripts and pack builds for upload.',
@@ -1266,9 +1266,9 @@ export const RU: Record<TKey, string> = {
   'module.loadout.tagline': 'Порядок загрузки и профили',
   'module.loadout.desc':
     'Упорядочить моды, собрать именованные профили и записать их в конфиг игры.',
-  'module.signal.tagline': 'Синхронизация с Workshop',
-  'module.signal.desc':
-    'Отслеживать обновления Workshop, находить устаревшие загрузки и переподписывать битые items.',
+  'module.workshop.tagline': 'Обозреватель Workshop',
+  'module.workshop.desc':
+    'Браузер Мастерской Steam. Поиск, фильтры тегов B41/B42, чтение описаний, проверка обновлений и загрузка модов прямо в игру.',
   'module.workbench.tagline': 'Инструменты автора',
   'module.workbench.desc':
     'Создать каркас мода, править mod.info, проверять скрипты и упаковывать сборки для загрузки.',

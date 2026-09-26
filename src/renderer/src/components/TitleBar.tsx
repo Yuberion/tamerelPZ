@@ -31,6 +31,7 @@ export function TitleBar({ section, onHome, busy }: TitleBarProps) {
           <span className="titlebar__mark-text">PZ</span>
         </button>
         <span className="titlebar__name stencil">PZ Management</span>
+        <span className="titlebar__author-tag" title="Project Author: Tamerel">by Tamerel</span>
 
         <LangToggle />
         <HelpToggle />
@@ -125,7 +126,7 @@ function HelpToggle() {
     }
     if (ref.current) {
       help.open(OVERVIEW_ID, ref.current, {
-        title: 'PZ Management',
+        title: 'PZ Management · by Tamerel',
         body: t('help.app'),
         note: t('help.hotkeys')
       })

@@ -1042,3 +1042,68 @@ export interface NppPackPreview {
   text: string
 }
 
+/* =========================================================================
+   Workshop Overview types (Module 03)
+   ========================================================================= */
+
+export type WorkshopViewMode = 'workshop' | 'installed'
+export type WorkshopSearchSort = 'trend' | 'popular' | 'recent' | 'updated'
+
+export interface WorkshopSearchQuery {
+  mode?: WorkshopViewMode
+  search?: string
+  sort?: WorkshopSearchSort
+  days?: number
+  page?: number
+  numPerPage?: number
+  tags?: string[]
+  installedOnly?: boolean
+  updatesOnly?: boolean
+}
+
+export interface WorkshopItemSummary {
+  id: string
+  title: string
+  previewUrl: string
+  posterPath?: string
+  author: string
+  authorId?: string
+  subscriptions: number
+  favorited: number
+  views: number
+  timeCreated: number
+  timeUpdated: number
+  fileSize: number
+  tags: string[]
+  isInstalled: boolean
+  isSubscribed?: boolean
+  localPath?: string
+  needsUpdate?: boolean
+}
+
+export interface WorkshopItemDetails extends WorkshopItemSummary {
+  description: string
+  descriptionRu?: string
+  screenshots: string[]
+  childrenIds: string[]
+}
+
+export interface WorkshopSearchResult {
+  items: WorkshopItemSummary[]
+  total: number
+  page: number
+  hasMore: boolean
+}
+
+export interface WorkshopDownloadResult {
+  ok: boolean
+  message?: string
+  itemId: string
+  localPath?: string
+}
+
+export interface WorkshopSyncResult {
+  installedCount: number
+  updatedCount: number
+  totalBytes: number
+}
