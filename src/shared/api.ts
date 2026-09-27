@@ -58,7 +58,10 @@ import type {
   MemoryReport,
   SetEnvOptionsResult,
   ToggleReadOnlyRequest,
-  ToggleReadOnlyResult
+  ToggleReadOnlyResult,
+  MeshPreviewData,
+  ModGrepMatch,
+  ModGrepRequest
 } from './types'
 
 export interface ScanRequest {
@@ -90,6 +93,11 @@ export interface PzApi {
     list(path: string): Promise<FsNode[]>
     tree(path: string, depth?: number): Promise<FsNode[]>
     preview(path: string): Promise<FilePreview>
+    meshPreview(path: string): Promise<MeshPreviewData>
+  }
+  stalker: {
+    grep(req: ModGrepRequest): Promise<ModGrepMatch[]>
+    vanillaOverwrites(modPath: string): Promise<string[]>
   }
   shell: {
     /** Opens Windows Explorer with the item selected. */

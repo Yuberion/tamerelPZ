@@ -20,6 +20,7 @@ import { InfoPanel } from './InfoPanel'
 import { ModList } from './ModList'
 import { Skeleton } from './Skeleton'
 import { StalkerToolbar } from './StalkerToolbar'
+import { ModGrepModal } from './ModGrepModal'
 import { useModRows, type IssueFilter, type ModFilters } from './useModRows'
 
 const LS_LEFT = 'pz.stalker.leftWidth'
@@ -28,12 +29,10 @@ const LS_RIGHT = 'pz.stalker.rightWidth'
 const SOURCE_BUTTONS: Array<{
   kind: ModSourceKind
   labelKey: TKey
-  icon: 'folder' | 'download' | 'target' | 'wrench'
+  icon: 'folder' | 'download'
 }> = [
   { kind: 'local', labelKey: 'srcLabel.local', icon: 'folder' },
-  { kind: 'workshop', labelKey: 'src.workshop', icon: 'download' },
-  { kind: 'game', labelKey: 'src.game', icon: 'target' },
-  { kind: 'project', labelKey: 'tb.srcProjects', icon: 'wrench' }
+  { kind: 'workshop', labelKey: 'src.workshop', icon: 'download' }
 ]
 
 function readWidth(key: string, fallback: number): number {
@@ -60,6 +59,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
   const [selectedNode, setSelectedNode] = useState<FsNode>()
   const [tab, setTab] = useState<'mod' | 'file'>('mod')
   const [showFilters, setShowFilters] = useState(false)
+  const [isGrepOpen, setIsGrepOpen] = useState(false)
   const [leftW, setLeftW] = useState(() => readWidth(LS_LEFT, 328))
   const [rightW, setRightW] = useState(() => readWidth(LS_RIGHT, 396))
   const searchRef = useRef<HTMLInputElement>(null)
@@ -89,7 +89,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
     setFiltersState((prev) => ({ ...prev, ...patch }))
   }, [])
 
-  const { rows, matched, indexByKey, categoryCounts, favoriteCount, allUserTags } = useModRows({
+  const { rows, matched, indexByKey, categoryCounts, allUserTags } = useModRows({
     mods,
     sources,
     issues,
@@ -244,6 +244,11 @@ export function Stalker({ onExit }: { onExit: () => void }) {
         searchRef.current?.select()
         return
       }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setIsGrepOpen(true)
+        return
+      }
       if (e.key === 'Escape' && typing) {
         setFilters({ query: '' })
         ;(e.target as HTMLElement).blur()
@@ -257,6 +262,31 @@ export function Stalker({ onExit }: { onExit: () => void }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [refresh, setFilters, selectedMod, selectedNode])
+
+  const handleGrepSelect = useCallback(
+    (modKey: string, filePath: string) => {
+      setIsGrepOpen(false)
+      const target = byKey.get(modKey)
+      if (target) {
+        setSelectedKey(modKey)
+        void saveSettings({ lastModKey: modKey })
+        const name = filePath.split(/[/\\]/).pop() || ''
+        const ext = name.includes('.') ? name.split('.').pop() || '' : ''
+        setSelectedNode({
+          path: filePath,
+          name,
+          ext,
+          size: 0,
+          childCount: 0,
+          mtime: Date.now(),
+          dir: false
+        })
+        setTab('file')
+        notify(`Переход к файлу: ${name}`, 'ok')
+      }
+    },
+    [byKey, saveSettings, notify]
+  )
 
   const dragLeft = useCallback((dx: number) => {
     setLeftW((w) => {
@@ -278,7 +308,6 @@ export function Stalker({ onExit }: { onExit: () => void }) {
     <MenuProvider>
       <div className="stalker">
         <StalkerToolbar
-          ref={searchRef}
           onExit={onExit}
           onRescan={() => void refresh(true)}
           scanning={scanning}
@@ -288,7 +317,6 @@ export function Stalker({ onExit }: { onExit: () => void }) {
           categoryCounts={categoryCounts}
           issueCounts={issueCounts}
           buildCounts={buildCounts}
-          favoriteCount={favoriteCount}
           allUserTags={allUserTags}
           group={group}
           sort={sort}
@@ -296,6 +324,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
           onSort={onSort}
           showFilters={showFilters}
           onToggleFilters={() => setShowFilters((v) => !v)}
+          onOpenGrep={() => setIsGrepOpen(true)}
         />
 
         <div className="stalker__body">
@@ -330,6 +359,28 @@ export function Stalker({ onExit }: { onExit: () => void }) {
                 <Icon name="plus" size={13} />
               </button>
             </div>
+
+            <div className="mod-search-bar">
+              <Icon name="search" size={13} color="var(--ash-dim)" />
+              <input
+                ref={searchRef}
+                value={filters.query}
+                onChange={(e) => setFilters({ query: e.target.value })}
+                placeholder="Поиск по названию или ID... (Ctrl+F)"
+                spellCheck={false}
+              />
+              {filters.query && (
+                <button
+                  type="button"
+                  className="search__clear"
+                  onClick={() => setFilters({ query: '' })}
+                  title="Очистить"
+                >
+                  <Icon name="close" size={11} />
+                </button>
+              )}
+            </div>
+
             <ModList
               rows={rows}
               selectedKey={selectedKey}
@@ -380,6 +431,12 @@ export function Stalker({ onExit }: { onExit: () => void }) {
           selectedPath={selectedNode?.path ?? selectedMod?.path}
           t={t}
           p={p}
+        />
+
+        <ModGrepModal
+          isOpen={isGrepOpen}
+          onClose={() => setIsGrepOpen(false)}
+          onSelectMatch={handleGrepSelect}
         />
       </div>
     </MenuProvider>

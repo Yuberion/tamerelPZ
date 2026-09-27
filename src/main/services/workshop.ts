@@ -925,13 +925,12 @@ export async function getWorkshopItemDetails(
    ========================================================================= */
 
 export async function openInSteamClient(publishedFileId: string): Promise<boolean> {
-  const steamUrl = `steam://url/CommunityFilePage/${publishedFileId}`
+  const url = `https://steamcommunity.com/sharedfiles/filedetails/?id=${publishedFileId}`
   try {
-    await shell.openExternal(steamUrl)
+    await shell.openExternal(url)
     return true
   } catch (err) {
-    console.error('[workshop] Failed to open steam:// protocol:', err)
-    await shell.openExternal(`https://steamcommunity.com/sharedfiles/filedetails/?id=${publishedFileId}`)
+    console.error('[workshop] Failed to open external URL:', err)
     return false
   }
 }

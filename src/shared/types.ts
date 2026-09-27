@@ -1286,3 +1286,33 @@ export interface ToggleReadOnlyResult {
   updatedFiles: string[]
   error?: string
 }
+
+/* ----------------------------------------------------------- Stalker Plus -- */
+
+export interface MeshPreviewData {
+  ok: boolean
+  format: string
+  meshName: string
+  vertexCount: number
+  triangleCount: number
+  positions: number[]
+  normals: number[]
+  error?: string
+}
+
+export interface ModGrepRequest {
+  query: string
+  caseSensitive?: boolean
+  fileExtensions?: string[]
+  maxResults?: number
+}
+
+export interface ModGrepMatch {
+  modKey: string
+  modName: string
+  filePath: string
+  relPath: string
+  line: number
+  snippet: string
+}
+

@@ -164,11 +164,28 @@ export function ModList({
                     {
                       label: t('menu.openWorkshop'),
                       icon: 'link',
-                      disabled: !mod.workshopId,
-                      onClick: () =>
-                        void window.pz.shell.external(
-                          `https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.workshopId}`
-                        )
+                      onClick: () => {
+                        const wsId =
+                          mod.workshopId ||
+                          mod.rawModId?.match(/^(\d+)\//)?.[1] ||
+                          mod.url?.match(/[?&]id=(\d+)/)?.[1] ||
+                          mod.path.match(/[\\/]108600[\\/](\d+)[\\/]/)?.[1]
+
+                        if (wsId) {
+                          void window.pz.shell.external(
+                            `https://steamcommunity.com/sharedfiles/filedetails/?id=${wsId}`
+                          )
+                          notify('Открытие страницы в Steam Workshop...', 'ok')
+                        } else if (mod.url && /^https?:\/\//i.test(mod.url)) {
+                          void window.pz.shell.external(mod.url)
+                          notify('Открытие ссылки мода...', 'ok')
+                        } else {
+                          void window.pz.shell.external(
+                            `https://steamcommunity.com/workshop/browse/?appid=108600&searchtext=${encodeURIComponent(mod.name)}`
+                          )
+                          notify('Поиск мода в Steam Workshop...', 'ok')
+                        }
+                      }
                     }
                   ])
                 }}

@@ -16,6 +16,10 @@ export const IPC = {
   fsList: 'fs:list',
   fsTree: 'fs:tree',
   fsPreview: 'fs:preview',
+  fsMeshPreview: 'fs:mesh-preview',
+
+  stalkerGrep: 'stalker:grep',
+  stalkerVanillaOverwrites: 'stalker:vanilla-overwrites',
 
   shellReveal: 'shell:reveal',
   shellOpen: 'shell:open',

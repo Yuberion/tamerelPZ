@@ -8,7 +8,8 @@ import type {
   ModStats,
   ModWarning,
   ScanIssues,
-  UserModAnnotation
+  UserModAnnotation,
+  WorkshopItemDetails
 } from '@shared/types'
 import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
@@ -17,9 +18,12 @@ import { useI18n, type TKey } from '@renderer/i18n'
 import { categoryMeta, fileColor, fileIcon, sourceLabel, SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText, formatBytes, formatCount, formatDate } from '@renderer/lib/format'
 import { highlight } from '@renderer/lib/highlight'
+import { bbcodeToHtml } from '@renderer/lib/bbcode'
 import { useAppStore } from '@renderer/state/store'
 import { AudioPreview } from './AudioPreview'
 import { ItemInspector } from './ItemInspector'
+import { MeshPreview } from './MeshPreview'
+import { MapInspector } from './MapInspector'
 
 const MAX_PREVIEW_LINES = 1200
 
@@ -110,11 +114,131 @@ function ModInfo({
   onJumpToMod
 }: Omit<InfoPanelProps, 'node' | 'tab' | 'onTab'>) {
   const { notify } = useToast()
-  const { t, p } = useI18n()
+  const { t, p, lang } = useI18n()
+  const isRu = lang === 'ru'
   const { settings, saveSettings } = useAppStore()
   const [stats, setStats] = useState<ModStats>()
   const [posterFailed, setPosterFailed] = useState(false)
   const req = useRef(0)
+
+  const [wsDetails, setWsDetails] = useState<WorkshopItemDetails | null>(null)
+  const [loadingDesc, setLoadingDesc] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  const [showOriginalDesc, setShowOriginalDesc] = useState(false)
+  const [localRuHtml, setLocalRuHtml] = useState<string | null>(null)
+
+  useEffect(() => {
+    setWsDetails(null)
+    setLocalRuHtml(null)
+    setShowOriginalDesc(false)
+    if (!mod) return
+
+    let cancelled = false
+    if (mod.workshopId) {
+      setLoadingDesc(true)
+      window.pz.workshop
+        .details(mod.workshopId)
+        .then((details) => {
+          if (!cancelled && details) setWsDetails(details)
+        })
+        .catch((err) => {
+          console.warn('[Stalker] Failed to fetch workshop details:', err)
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingDesc(false)
+        })
+    } else if (isRu && mod.description) {
+      const text = mod.description.trim()
+      const cyrillicCount = (text.match(/[\u0400-\u04FF]/g) || []).length
+      if (cyrillicCount <= text.length * 0.25) {
+        setLoadingDesc(true)
+        window.pz.workshop
+          .translate(mod.modId || mod.key, text, 'ru', false)
+          .then((res) => {
+            if (!cancelled && res?.html) setLocalRuHtml(res.html)
+          })
+          .catch((err) => {
+            console.warn('[Stalker] Local translation failed:', err)
+          })
+          .finally(() => {
+            if (!cancelled) setLoadingDesc(false)
+          })
+      }
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [mod?.key, mod?.workshopId, mod?.description, isRu])
+
+  const handleForceTranslate = async (): Promise<void> => {
+    if (!mod) return
+    setTranslating(true)
+    try {
+      if (mod.workshopId) {
+        const details = await window.pz.workshop.details(mod.workshopId, true)
+        setWsDetails(details)
+        setShowOriginalDesc(false)
+        if (details?.descriptionRu && details.descriptionRu !== details.description) {
+          notify(
+            isRu ? 'Описание успешно переведено на русский' : 'Description translated to Russian',
+            'ok'
+          )
+        } else {
+          notify(
+            isRu
+              ? 'Перевод недоступен или текст уже на русском'
+              : 'Translation unavailable or already in Russian',
+            'warn'
+          )
+        }
+      } else if (mod.description) {
+        const res = await window.pz.workshop.translate(mod.modId || mod.key, mod.description, 'ru', true)
+        if (res?.html && res.text !== mod.description) {
+          setLocalRuHtml(res.html)
+          setShowOriginalDesc(false)
+          notify(
+            isRu ? 'Описание успешно переведено на русский' : 'Description translated to Russian',
+            'ok'
+          )
+        } else {
+          notify(
+            isRu
+              ? 'Перевод недоступен или текст уже на русском'
+              : 'Translation unavailable or already in Russian',
+            'warn'
+          )
+        }
+      }
+    } catch {
+      notify(isRu ? 'Ошибка при переводе описания' : 'Failed to translate description', 'warn')
+    } finally {
+      setTranslating(false)
+    }
+  }
+
+  const origHtml = useMemo(() => {
+    if (wsDetails?.description) return wsDetails.description
+    if (mod?.description) return bbcodeToHtml(mod.description)
+    return ''
+  }, [wsDetails?.description, mod?.description])
+
+  const ruHtml = useMemo(() => {
+    if (wsDetails?.descriptionRu) return wsDetails.descriptionRu
+    if (localRuHtml) return localRuHtml
+    return ''
+  }, [wsDetails?.descriptionRu, localRuHtml])
+
+  const hasRuTranslation = useMemo(() => {
+    return Boolean(ruHtml && ruHtml.trim() && ruHtml !== origHtml)
+  }, [ruHtml, origHtml])
+
+  const displayHtml = useMemo(() => {
+    if (isRu && hasRuTranslation && !showOriginalDesc) {
+      return ruHtml
+    }
+    return origHtml
+  }, [isRu, hasRuTranslation, showOriginalDesc, ruHtml, origHtml])
 
   const annotation = settings?.modAnnotations?.[mod?.key ?? ''] ?? {}
   const isFavorite = Boolean(annotation.favorite)
@@ -249,7 +373,57 @@ function ModInfo({
         </div>
       )}
 
-      {mod.description && <p className="info__desc">{mod.description}</p>}
+      {Boolean(displayHtml || mod.description) && (
+        <Section
+          title={isRu ? 'Описание' : 'Description'}
+          extra={
+            isRu && hasRuTranslation ? (
+              <div className="ws-desc-lang-switch">
+                <button
+                  type="button"
+                  className={`ws-desc-lang-btn ${!showOriginalDesc ? 'is-active' : ''}`}
+                  onClick={() => setShowOriginalDesc(false)}
+                  title="Показать описание на русском языке"
+                >
+                  <Icon name="globe" size={11} />
+                  <span>Русский</span>
+                </button>
+                <button
+                  type="button"
+                  className={`ws-desc-lang-btn ${showOriginalDesc ? 'is-active' : ''}`}
+                  onClick={() => setShowOriginalDesc(true)}
+                  title="Показать оригинальное описание"
+                >
+                  <span>Оригинал (EN)</span>
+                </button>
+              </div>
+            ) : isRu && !loadingDesc && Boolean(mod.description || wsDetails?.description) ? (
+              <button
+                type="button"
+                className="ws-btn-trans-retry"
+                onClick={() => void handleForceTranslate()}
+                disabled={translating}
+                title="Перевести описание на русский язык"
+              >
+                <Icon name="rotate" size={11} className={translating ? 'spin' : ''} />
+                <span>{translating ? 'Переводим…' : 'Перевести (RU)'}</span>
+              </button>
+            ) : undefined
+          }
+        >
+          {loadingDesc && !displayHtml ? (
+            <div className="ws-desc-loading">
+              <Icon name="rotate" size={16} className="spin" />
+              <span>Загрузка описания и перевода…</span>
+            </div>
+          ) : (
+            <div
+              className="info__desc ws-desc-body"
+              dangerouslySetInnerHTML={{ __html: displayHtml || mod.description || '' }}
+            />
+          )}
+        </Section>
+      )}
 
       <Section title={t('ip.identity')}>
         <Field label={t('ip.modId')} value={mod.modId ?? '—'} onCopy={mod.modId ? () => copy(mod.modId as string, 'toast.modIdCopied') : undefined} mono />
@@ -619,6 +793,16 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
     return Math.min(preview.text.split('\n').length, MAX_PREVIEW_LINES)
   }, [preview])
 
+  const MESH_EXTS = useMemo(() => new Set(['x', 'obj', 'stl', 'ply', 'dae', 'gltf', 'glb']), [])
+  const isMesh = Boolean(node && !node.dir && node.ext && MESH_EXTS.has(node.ext.toLowerCase()))
+  const isMapFile = Boolean(
+    node && !node.dir && (
+      node.name.toLowerCase() === 'map.info' ||
+      node.path.toLowerCase().includes('/media/maps/') ||
+      node.path.toLowerCase().includes('\\media\\maps\\')
+    )
+  )
+
   if (!node) {
     return (
       <div className="pane__empty pane__empty--big">
@@ -650,6 +834,30 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
         </button>
         <button
           className="btn"
+          title="Открыть в Notepad++ / Блокноте"
+          onClick={() => {
+            window.pz.npp
+              .open(node.path)
+              .then(() => {
+                notify('Файл открыт в редакторе', 'ok')
+              })
+              .catch((err: unknown) => {
+                window.pz.shell
+                  .open(node.path)
+                  .then(() => {
+                    notify('Файл открыт', 'ok')
+                  })
+                  .catch(() => {
+                    notify(err instanceof Error ? err.message : 'Не удалось открыть файл', 'warn')
+                  })
+              })
+          }}
+        >
+          <Icon name="code" size={12} />
+          Notepad
+        </button>
+        <button
+          className="btn"
           onClick={() => {
             void copyText(node.path)
             notify(t('toast.pathCopied'), 'ok')
@@ -678,6 +886,18 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
           <Icon name="alert" size={13} />
           <span>{error}</span>
         </div>
+      )}
+
+      {isMesh && (
+        <Section title="3D Модель · Вьюпорт">
+          <MeshPreview path={node.path} name={node.name} size={node.size} />
+        </Section>
+      )}
+
+      {isMapFile && (
+        <Section title="Карта · Координаты и сетка ячеек">
+          <MapInspector filePath={node.path} />
+        </Section>
       )}
 
       {preview?.kind === 'image' && (

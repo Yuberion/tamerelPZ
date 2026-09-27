@@ -238,19 +238,27 @@ async function analyzeMod(c: Candidate): Promise<ModEntry | undefined> {
   if (infoFile && !modId) warnings.push('no-id')
   if (fields['poster']?.length && !posterPath) warnings.push('poster-missing')
 
+  const rawUrl = first(fields, 'url')
+  const detectedWorkshopId =
+    c.workshopId ||
+    first(fields, 'workshopid', 'workshop_id', 'workshop') ||
+    rawModId?.match(/^(\d+)\//)?.[1] ||
+    rawUrl?.match(/[?&]id=(\d+)/)?.[1] ||
+    c.path.match(/[\\/]108600[\\/](\d+)[\\/]/)?.[1]
+
   return {
     key: `${c.source.id}::${c.path}`,
     folderName,
     path: c.path,
     sourceId: c.source.id,
     sourceKind: c.source.kind,
-    workshopId: c.workshopId,
+    workshopId: detectedWorkshopId,
     name,
     modId,
     rawModId,
     description: first(fields, 'description'),
     authors: first(fields, 'authors', 'author'),
-    url: first(fields, 'url'),
+    url: rawUrl,
     modVersion: first(fields, 'modversion', 'version'),
     pzVersion,
     posterPath,

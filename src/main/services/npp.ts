@@ -26,6 +26,7 @@ import { promises as fs } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, normalize } from 'node:path'
 import { promisify } from 'node:util'
+import { shell } from 'electron'
 import type { AppSettings, NppInstallResult, NppPackFile, NppPackPreview, NppStatus } from '../../shared/types'
 import { exists, isDir, readTextSafe } from './fsx'
 
@@ -500,22 +501,61 @@ export function previewNppPack(): NppPackPreview[] {
  */
 export async function openInNpp(settings: AppSettings, path: string, line?: number): Promise<void> {
   if (process.platform !== 'win32') throw new Error('Notepad++ is Windows only')
-  const found = await locateExe(settings)
-  if (!found) throw new Error('Notepad++ was not found on this machine')
-  if (!(await exists(path))) throw new Error(`File no longer exists: ${path}`)
-  if (await isDir(path)) throw new Error(`Cannot open a folder in editor: ${path}`)
 
-  const args: string[] = []
-  if (line && line > 0) args.push(`-n${Math.trunc(line)}`)
-  args.push(path)
+  const normPath = normalize(path)
+  if (!(await exists(normPath))) throw new Error(`Файл не найден: ${normPath}`)
+  if (await isDir(normPath)) throw new Error(`Нельзя открыть папку в редакторе: ${normPath}`)
 
-  const child = spawn(found.exePath, args, {
-    cwd: found.dir,
-    detached: true,
-    stdio: 'ignore',
-    windowsHide: false
-  })
-  child.unref()
+  let found = await locateExe(settings)
+  if (!found) {
+    for (const fb of [
+      'C:\\Program Files\\Notepad++\\notepad++.exe',
+      'C:\\Program Files (x86)\\Notepad++\\notepad++.exe',
+      join(process.env['LOCALAPPDATA'] ?? '', 'Programs', 'Notepad++', 'notepad++.exe')
+    ]) {
+      if (fb && (await exists(fb))) {
+        found = { exePath: normalize(fb), dir: dirname(normalize(fb)), source: 'known' }
+        break
+      }
+    }
+  }
+
+  // 1. Try Notepad++ if found
+  if (found) {
+    try {
+      const args: string[] = []
+      if (line && line > 0) args.push(`-n${Math.trunc(line)}`)
+      args.push(normPath)
+
+      const child = spawn(found.exePath, args, {
+        cwd: found.dir,
+        detached: true,
+        stdio: 'ignore'
+      })
+      child.unref()
+      return
+    } catch (e) {
+      console.warn('[openInNpp] Notepad++ spawn failed, falling back:', e)
+    }
+  }
+
+  // 2. Try System Notepad
+  try {
+    const sysNotepad = 'C:\\Windows\\system32\\notepad.exe'
+    if (await exists(sysNotepad)) {
+      const child = spawn(sysNotepad, [normPath], {
+        detached: true,
+        stdio: 'ignore'
+      })
+      child.unref()
+      return
+    }
+  } catch (e) {
+    console.warn('[openInNpp] Notepad spawn failed, falling back to shell:', e)
+  }
+
+  // 3. Fallback to OS shell association
+  await shell.openPath(normPath)
 }
 
 /**
@@ -523,18 +563,45 @@ export async function openInNpp(settings: AppSettings, path: string, line?: numb
  */
 export async function launchNpp(settings: AppSettings): Promise<void> {
   if (process.platform !== 'win32') throw new Error('Notepad++ is Windows only')
-  const found = await locateExe(settings)
+  let found = await locateExe(settings)
   if (!found) {
-    throw new Error('Notepad++ was not found on this machine')
+    for (const fb of [
+      'C:\\Program Files\\Notepad++\\notepad++.exe',
+      'C:\\Program Files (x86)\\Notepad++\\notepad++.exe',
+      join(process.env['LOCALAPPDATA'] ?? '', 'Programs', 'Notepad++', 'notepad++.exe')
+    ]) {
+      if (fb && (await exists(fb))) {
+        found = { exePath: normalize(fb), dir: dirname(normalize(fb)), source: 'known' }
+        break
+      }
+    }
   }
 
-  const child = spawn(found.exePath, [], {
-    cwd: found.dir,
-    detached: true,
-    stdio: 'ignore',
-    windowsHide: false
-  })
-  child.unref()
+  if (found) {
+    try {
+      const child = spawn(found.exePath, [], {
+        cwd: found.dir,
+        detached: true,
+        stdio: 'ignore'
+      })
+      child.unref()
+      return
+    } catch {
+      // Fallback
+    }
+  }
+
+  const sysNotepad = 'C:\\Windows\\system32\\notepad.exe'
+  if (await exists(sysNotepad)) {
+    const child = spawn(sysNotepad, [], {
+      detached: true,
+      stdio: 'ignore'
+    })
+    child.unref()
+    return
+  }
+
+  throw new Error('Текстовый редактор не найден на этом компьютере')
 }
 
 /**

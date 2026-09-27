@@ -1,4 +1,3 @@
-import { forwardRef } from 'react'
 import type { GroupMode, ModCategory, ModSource, ModSourceKind, SortMode } from '@shared/types'
 import { Hint } from '@renderer/components/Hint'
 import { Icon } from '@renderer/components/Icon'
@@ -32,7 +31,6 @@ interface ToolbarProps {
     warnings: number
   }
   buildCounts: Map<string, number>
-  favoriteCount?: number
   allUserTags?: string[]
   group: GroupMode
   sort: SortMode
@@ -40,30 +38,28 @@ interface ToolbarProps {
   onSort: (s: SortMode) => void
   showFilters: boolean
   onToggleFilters: () => void
+  onOpenGrep?: () => void
 }
 
-export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(function StalkerToolbar(
-  {
-    onExit,
-    onRescan,
-    scanning,
-    filters,
-    setFilters,
-    sourceButtons,
-    categoryCounts,
-    issueCounts,
-    buildCounts,
-    favoriteCount,
-    allUserTags,
-    group,
-    sort,
-    onGroup,
-    onSort,
-    showFilters,
-    onToggleFilters
-  },
-  searchRef
-) {
+export function StalkerToolbar({
+  onExit,
+  onRescan,
+  scanning,
+  filters,
+  setFilters,
+  sourceButtons,
+  categoryCounts,
+  issueCounts,
+  buildCounts,
+  allUserTags,
+  group,
+  sort,
+  onGroup,
+  onSort,
+  showFilters,
+  onToggleFilters,
+  onOpenGrep
+}: ToolbarProps) {
   const { openMenu } = useMenu()
   const { t } = useI18n()
 
@@ -103,7 +99,6 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
     filters.categories.size +
     filters.builds.size +
     (filters.issue !== 'all' ? 1 : 0) +
-    (filters.favoritesOnly ? 1 : 0) +
     (filters.userTags?.size ?? 0)
 
   return (
@@ -172,39 +167,18 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
         </button>
         <Hint title={t('tb.rescan')} body={t('help.tb.rescan')} />
 
-        <button
-          className={`btn ${filters.favoritesOnly ? 'is-active' : ''}`}
-          onClick={() => setFilters({ favoritesOnly: !filters.favoritesOnly })}
-          title="Показать только избранные моды"
-          style={filters.favoritesOnly ? { color: '#f59e0b', borderColor: '#f59e0b' } : undefined}
-        >
-          <Icon name="star" size={13} color={filters.favoritesOnly ? '#f59e0b' : undefined} />
-          <span>Избранное</span>
-          {favoriteCount !== undefined && favoriteCount > 0 && (
-            <span className="chip__n mono" style={{ marginLeft: 3 }}>
-              {favoriteCount}
-            </span>
-          )}
-        </button>
+        {onOpenGrep && (
+          <button
+            className="btn"
+            onClick={onOpenGrep}
+            title="Глобальный поиск по коду всех модов (.lua, .txt, .xml, .ini)"
+          >
+            <Icon name="search" size={13} />
+            <span>Поиск по коду</span>
+          </button>
+        )}
 
         <div className="toolbar__spacer" />
-
-        <div className="search">
-          <Icon name="search" size={13} />
-          <input
-            ref={searchRef}
-            value={filters.query}
-            onChange={(e) => setFilters({ query: e.target.value })}
-            placeholder={t('tb.searchPlaceholder')}
-            spellCheck={false}
-          />
-          {filters.query && (
-            <button className="search__clear" onClick={() => setFilters({ query: '' })}>
-              <Icon name="close" size={12} />
-            </button>
-          )}
-        </div>
-        <Hint title={t('tb.searchPlaceholder')} body={t('help.tb.search')} />
 
         <label className="pick">
           <span className="label">{t('tb.group')}</span>
@@ -349,4 +323,4 @@ export const StalkerToolbar = forwardRef<HTMLInputElement, ToolbarProps>(functio
       )}
     </div>
   )
-})
+}

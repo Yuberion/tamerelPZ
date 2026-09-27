@@ -45,7 +45,12 @@ const api: PzApi = {
   fs: {
     list: (path: string) => ipcRenderer.invoke(IPC.fsList, path),
     tree: (path: string, depth?: number) => ipcRenderer.invoke(IPC.fsTree, path, depth),
-    preview: (path: string) => ipcRenderer.invoke(IPC.fsPreview, path)
+    preview: (path: string) => ipcRenderer.invoke(IPC.fsPreview, path),
+    meshPreview: (path: string) => ipcRenderer.invoke(IPC.fsMeshPreview, path)
+  },
+  stalker: {
+    grep: (req) => ipcRenderer.invoke(IPC.stalkerGrep, req),
+    vanillaOverwrites: (modPath: string) => ipcRenderer.invoke(IPC.stalkerVanillaOverwrites, modPath)
   },
   shell: {
     reveal: (path: string) => ipcRenderer.invoke(IPC.shellReveal, path),

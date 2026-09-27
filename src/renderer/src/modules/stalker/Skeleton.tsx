@@ -49,10 +49,22 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
   const [filter, setFilter] = useState('')
   const [busy, setBusy] = useState(false)
   const [deepLoaded, setDeepLoaded] = useState(false)
+  const [vanillaOverwrites, setVanillaOverwrites] = useState<Set<string>>(new Set())
   const requestId = useRef(0)
   const { openMenu } = useMenu()
   const { notify } = useToast()
   const { t, p } = useI18n()
+
+  useEffect(() => {
+    if (!mod?.path) {
+      setVanillaOverwrites(new Set())
+      return
+    }
+    window.pz.stalker
+      .vanillaOverwrites(mod.path)
+      .then((paths) => setVanillaOverwrites(new Set(paths.map((p) => p.toLowerCase()))))
+      .catch(() => setVanillaOverwrites(new Set()))
+  }, [mod?.path])
 
   useEffect(() => {
     setFilter('')
@@ -198,6 +210,28 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
           onClick: () => void window.pz.shell.open(node.path)
         },
         {
+          label: 'Открыть в Notepad++ / Блокноте',
+          icon: 'code',
+          disabled: node.dir,
+          onClick: () => {
+            window.pz.npp
+              .open(node.path)
+              .then(() => {
+                notify('Файл открыт в редакторе', 'ok')
+              })
+              .catch((err: unknown) => {
+                window.pz.shell
+                  .open(node.path)
+                  .then(() => {
+                    notify('Файл открыт', 'ok')
+                  })
+                  .catch(() => {
+                    notify(err instanceof Error ? err.message : 'Не удалось открыть файл', 'warn')
+                  })
+              })
+          }
+        },
+        {
           label: t('menu.openTerminal'),
           icon: 'terminal',
           onClick: () =>
@@ -326,6 +360,14 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
                   </span>
                   <Icon name={icon} size={13} color={color} />
                   <span className="fsrow__name truncate">{node.name}</span>
+                  {!node.dir && vanillaOverwrites.has(node.path.toLowerCase()) && (
+                    <span
+                      className="fsrow__badge fsrow__badge--vanilla"
+                      title="Перезаписывает оригинальный ванильный файл игры Project Zomboid"
+                    >
+                      VANILLA
+                    </span>
+                  )}
                   <span className="fsrow__meta mono">
                     {node.dir ? `${formatCount(node.childCount)}` : formatBytes(node.size)}
                   </span>

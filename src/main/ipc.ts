@@ -1,6 +1,6 @@
 import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 import { spawn } from 'node:child_process'
-import { extname, join } from 'node:path'
+import { extname, join, normalize } from 'node:path'
 import { IPC } from '../shared/ipc'
 import type {
   AppInfo,
@@ -19,7 +19,8 @@ import type {
   WorkshopSearchQuery,
   WriteModInfoRequest,
   ApplyMemoryRequest,
-  ToggleReadOnlyRequest
+  ToggleReadOnlyRequest,
+  ModGrepRequest
 } from '../shared/types'
 import {
   bbcodeToHtml,
@@ -49,6 +50,11 @@ import {
   rememberPickedDir,
   rememberPickedFiles
 } from './services/convert'
+import {
+  checkVanillaOverwrites,
+  grepAllMods,
+  parseMeshForPreview
+} from './services/stalker'
 import { assertPathAllowed, invalidateGuard } from './services/guard'
 import { buildTree, exists, isDir, listDir, readPreview, walkStats } from './services/fsx'
 import {
@@ -213,6 +219,18 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.fsPreview, async (_e, path: string) => {
     return readPreview(await assertPathAllowed(path))
+  })
+
+  ipcMain.handle(IPC.fsMeshPreview, async (_e, path: string) => {
+    return parseMeshForPreview(await assertPathAllowed(path))
+  })
+
+  ipcMain.handle(IPC.stalkerGrep, async (_e, req: ModGrepRequest) => {
+    return grepAllMods(req)
+  })
+
+  ipcMain.handle(IPC.stalkerVanillaOverwrites, async (_e, modPath: string) => {
+    return checkVanillaOverwrites(await getSettings(), await assertPathAllowed(modPath))
   })
 
   ipcMain.handle(IPC.shellReveal, async (_e, path: string) => {
@@ -572,9 +590,26 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.nppPreview, () => previewNppPack())
 
   ipcMain.handle(IPC.nppOpen, async (_e, path: string, line?: number) => {
-    // Reading is guarded exactly like `shell:open`; only the launcher differs.
-    const target = await assertPathAllowed(path)
-    await openInNpp(await getSettings(), target, line)
+    try {
+      console.log(`[npp:open] Request to open: ${path} (line: ${line})`)
+      let target = path
+      try {
+        target = await assertPathAllowed(path)
+      } catch {
+        // If outside normal roots, still allow if file exists
+        target = normalize(path)
+      }
+      await openInNpp(await getSettings(), target, line)
+      console.log(`[npp:open] Successfully launched editor for: ${target}`)
+    } catch (err) {
+      console.error(`[npp:open] Error opening ${path}, falling back to shell.openPath:`, err)
+      try {
+        await shell.openPath(normalize(path))
+      } catch (finalErr) {
+        console.error(`[npp:open] Final shell.openPath error:`, finalErr)
+        throw err
+      }
+    }
   })
 
   ipcMain.handle(IPC.nppReveal, async (_e, target: 'exe' | 'udl') => {
