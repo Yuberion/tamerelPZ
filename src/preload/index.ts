@@ -48,9 +48,13 @@ const api: PzApi = {
     preview: (path: string) => ipcRenderer.invoke(IPC.fsPreview, path),
     meshPreview: (path: string) => ipcRenderer.invoke(IPC.fsMeshPreview, path)
   },
+  explorer: {
+    grep: (req) => ipcRenderer.invoke(IPC.explorerGrep, req),
+    vanillaOverwrites: (modPath: string) => ipcRenderer.invoke(IPC.explorerVanillaOverwrites, modPath)
+  },
   stalker: {
-    grep: (req) => ipcRenderer.invoke(IPC.stalkerGrep, req),
-    vanillaOverwrites: (modPath: string) => ipcRenderer.invoke(IPC.stalkerVanillaOverwrites, modPath)
+    grep: (req) => ipcRenderer.invoke(IPC.explorerGrep, req),
+    vanillaOverwrites: (modPath: string) => ipcRenderer.invoke(IPC.explorerVanillaOverwrites, modPath)
   },
   shell: {
     reveal: (path: string) => ipcRenderer.invoke(IPC.shellReveal, path),

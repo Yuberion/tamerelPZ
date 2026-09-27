@@ -142,7 +142,7 @@ function ModInfo({
           if (!cancelled && details) setWsDetails(details)
         })
         .catch((err) => {
-          console.warn('[Stalker] Failed to fetch workshop details:', err)
+          console.warn('[Explorer] Failed to fetch workshop details:', err)
         })
         .finally(() => {
           if (!cancelled) setLoadingDesc(false)
@@ -158,7 +158,7 @@ function ModInfo({
             if (!cancelled && res?.html) setLocalRuHtml(res.html)
           })
           .catch((err) => {
-            console.warn('[Stalker] Local translation failed:', err)
+            console.warn('[Explorer] Local translation failed:', err)
           })
           .finally(() => {
             if (!cancelled) setLoadingDesc(false)
@@ -793,7 +793,7 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
     return Math.min(preview.text.split('\n').length, MAX_PREVIEW_LINES)
   }, [preview])
 
-  const MESH_EXTS = useMemo(() => new Set(['x', 'obj', 'stl', 'ply', 'dae', 'gltf', 'glb']), [])
+  const MESH_EXTS = useMemo(() => new Set(['x', 'fbx', 'obj', 'stl', 'ply', 'dae', 'gltf', 'glb']), [])
   const isMesh = Boolean(node && !node.dir && node.ext && MESH_EXTS.has(node.ext.toLowerCase()))
   const isMapFile = Boolean(
     node && !node.dir && (

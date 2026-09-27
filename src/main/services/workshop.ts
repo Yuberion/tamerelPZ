@@ -328,6 +328,23 @@ let cachedInstalledList: WorkshopItemSummary[] | null = null
 let cachedInstalledMap = new Map<string, WorkshopItemSummary>()
 let lastInstalledScanTime = 0
 
+// Set of item IDs that were unsubscribed in this session (so they don't reappear before Steam purges files)
+const recentlyUnsubscribedIds = new Set<string>()
+
+export function markWorkshopItemUnsubscribed(publishedFileId: string): void {
+  recentlyUnsubscribedIds.add(publishedFileId)
+  if (cachedInstalledList) {
+    cachedInstalledList = cachedInstalledList.filter((it) => it.id !== publishedFileId)
+  }
+  cachedInstalledMap.delete(publishedFileId)
+  lastInstalledScanTime = Date.now()
+}
+
+export function markWorkshopItemSubscribed(publishedFileId: string): void {
+  recentlyUnsubscribedIds.delete(publishedFileId)
+  lastInstalledScanTime = 0 // force rescan on next query
+}
+
 export async function scanAllInstalledWorkshopItems(
   settings: AppSettings,
   forceRefresh = false
@@ -371,6 +388,7 @@ export async function scanAllInstalledWorkshopItems(
 
     for (const id of entries) {
       if (!/^\d{5,12}$/.test(id)) continue
+      if (recentlyUnsubscribedIds.has(id)) continue
       const itemFolder = join(wsDir, id)
       let mtimeMs = 0
       try {
@@ -613,8 +631,8 @@ export async function queryWorkshop(
   const numPerPage = query.numPerPage ?? 32
   const isInstalledMode = query.mode === 'installed' || query.installedOnly
 
-  // Ensure installed cache is fresh
-  const installedList = await scanAllInstalledWorkshopItems(settings)
+  // Ensure installed cache is fresh (support explicit forceRefresh)
+  const installedList = await scanAllInstalledWorkshopItems(settings, Boolean(query.forceRefresh))
 
   // -----------------------------------------------------------------------
   // MODE: INSTALLED (Local library view of all 392+ items)

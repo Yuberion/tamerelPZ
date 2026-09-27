@@ -28,6 +28,8 @@ import {
   getInstalledWorkshopCount,
   getWorkshopItemDetails,
   initSteamWorkshopWatcher,
+  markWorkshopItemSubscribed,
+  markWorkshopItemUnsubscribed,
   openInSteamClient,
   openWorkshopFolder,
   queryWorkshop,
@@ -54,7 +56,7 @@ import {
   checkVanillaOverwrites,
   grepAllMods,
   parseMeshForPreview
-} from './services/stalker'
+} from './services/explorer'
 import { assertPathAllowed, invalidateGuard } from './services/guard'
 import { buildTree, exists, isDir, listDir, readPreview, walkStats } from './services/fsx'
 import {
@@ -225,11 +227,11 @@ export function registerIpc(): void {
     return parseMeshForPreview(await assertPathAllowed(path))
   })
 
-  ipcMain.handle(IPC.stalkerGrep, async (_e, req: ModGrepRequest) => {
+  ipcMain.handle(IPC.explorerGrep, async (_e, req: ModGrepRequest) => {
     return grepAllMods(req)
   })
 
-  ipcMain.handle(IPC.stalkerVanillaOverwrites, async (_e, modPath: string) => {
+  ipcMain.handle(IPC.explorerVanillaOverwrites, async (_e, modPath: string) => {
     return checkVanillaOverwrites(await getSettings(), await assertPathAllowed(modPath))
   })
 
@@ -674,10 +676,12 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.wsSubscribe, async (_e, publishedFileId: string) => {
+    markWorkshopItemSubscribed(publishedFileId)
     return subscribeToWorkshopItem(publishedFileId)
   })
 
   ipcMain.handle(IPC.wsUnsubscribe, async (_e, publishedFileId: string) => {
+    markWorkshopItemUnsubscribed(publishedFileId)
     return unsubscribeFromWorkshopItem(publishedFileId)
   })
 

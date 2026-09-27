@@ -44,17 +44,29 @@ function mat4Multiply(a: Float32Array, b: Float32Array): Float32Array {
 export function MeshPreview({ path, name, size }: MeshPreviewProps) {
   const displayName = name || path.split(/[/\\]/).pop() || 'model'
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasBoxRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [data, setData] = useState<MeshPreviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [wireframe, setWireframe] = useState(false)
   const [autoRotate, setAutoRotate] = useState(true)
+  const [showTexture, setShowTexture] = useState(true)
+  const [flipV, setFlipV] = useState(false)
+  const [customTextureUrl, setCustomTextureUrl] = useState<string | null>(null)
+  const [customTextureName, setCustomTextureName] = useState<string | null>(null)
 
   // Camera orbit state
   const rotRef = useRef({ x: 0.35, y: 0.75 })
   const zoomRef = useRef(2.5)
   const panRef = useRef({ x: 0, y: 0 })
   const dragRef = useRef<{ startX: number; startY: number; button: number } | null>(null)
+
+  // Reset custom texture on model path change
+  useEffect(() => {
+    setCustomTextureUrl(null)
+    setCustomTextureName(null)
+  }, [path])
 
   useEffect(() => {
     let cancelled = false
@@ -84,12 +96,17 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
     }
   }, [path])
 
+  const activeTextureUrl = customTextureUrl || data?.textureUrl || null
+  const activeTextureName = customTextureName || data?.textureName || null
+
   // WebGL Render loop
   useEffect(() => {
     if (!data || !data.positions.length || !canvasRef.current) return
 
     const canvas = canvasRef.current
-    const gl = canvas.getContext('webgl', { antialias: true, alpha: true })
+    const gl =
+      (canvas.getContext('webgl2', { antialias: true, alpha: true }) as WebGLRenderingContext | null) ||
+      canvas.getContext('webgl', { antialias: true, alpha: true })
     if (!gl) return
 
     // Calculate bounding box and normalize positions to [-1, 1]
@@ -151,17 +168,29 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       }
     }
 
+    // UV coordinates buffer
+    const vertCount = normalizedPos.length / 3
+    const uvBuf = new Float32Array(vertCount * 2)
+    if (data.uvs && data.uvs.length >= vertCount * 2) {
+      for (let i = 0; i < vertCount * 2; i++) {
+        uvBuf[i] = data.uvs[i]
+      }
+    }
+
     // Shader sources
     const vsSource = `
       attribute vec3 aPos;
       attribute vec3 aNormal;
+      attribute vec2 aUv;
       uniform mat4 uMvp;
       uniform mat4 uModel;
       varying vec3 vNormal;
       varying vec3 vPos;
+      varying vec2 vUv;
       void main() {
         vNormal = mat3(uModel) * aNormal;
         vPos = (uModel * vec4(aPos, 1.0)).xyz;
+        vUv = aUv;
         gl_Position = uMvp * vec4(aPos, 1.0);
       }
     `
@@ -169,8 +198,12 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       precision mediump float;
       varying vec3 vNormal;
       varying vec3 vPos;
+      varying vec2 vUv;
       uniform int uWire;
       uniform vec3 uColor;
+      uniform sampler2D uTexture;
+      uniform int uHasTexture;
+      uniform int uFlipV;
       void main() {
         if (uWire == 1) {
           gl_FragColor = vec4(0.95, 0.65, 0.25, 0.95);
@@ -182,8 +215,15 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         vec3 l2 = normalize(vec3(-0.8, -0.4, -0.6));
         float d1 = max(dot(n, l1), 0.0);
         float d2 = max(dot(n, l2), 0.0) * 0.4;
-        vec3 col = uColor * (d1 + d2 + 0.35);
-        gl_FragColor = vec4(col, 1.0);
+        vec4 baseCol = vec4(uColor, 1.0);
+        if (uHasTexture == 1) {
+          vec2 uv = uFlipV == 1 ? vec2(vUv.x, 1.0 - vUv.y) : vUv;
+          vec4 texCol = texture2D(uTexture, uv);
+          if (texCol.a < 0.05) discard;
+          baseCol = texCol;
+        }
+        vec3 col = baseCol.rgb * (d1 + d2 + 0.38);
+        gl_FragColor = vec4(col, baseCol.a);
       }
     `
 
@@ -211,12 +251,58 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
     gl.bindBuffer(gl.ARRAY_BUFFER, normBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, normalBuf, gl.STATIC_DRAW)
 
+    const uvBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, uvBuf, gl.STATIC_DRAW)
+
     const aPosLoc = gl.getAttribLocation(prog, 'aPos')
     const aNormLoc = gl.getAttribLocation(prog, 'aNormal')
+    const aUvLoc = gl.getAttribLocation(prog, 'aUv')
     const uMvpLoc = gl.getUniformLocation(prog, 'uMvp')
     const uModelLoc = gl.getUniformLocation(prog, 'uModel')
     const uWireLoc = gl.getUniformLocation(prog, 'uWire')
     const uColorLoc = gl.getUniformLocation(prog, 'uColor')
+    const uTextureLoc = gl.getUniformLocation(prog, 'uTexture')
+    const uHasTextureLoc = gl.getUniformLocation(prog, 'uHasTexture')
+    const uFlipVLoc = gl.getUniformLocation(prog, 'uFlipV')
+
+    // WebGL Texture loading
+    let glTex: WebGLTexture | null = null
+    let textureReady = false
+
+    if (activeTextureUrl) {
+      const img = new Image()
+      if (activeTextureUrl.startsWith('http://') || activeTextureUrl.startsWith('https://')) {
+        img.crossOrigin = 'anonymous'
+      }
+      img.onload = () => {
+        if (!gl || !canvasRef.current) return
+        glTex = gl.createTexture()
+        gl.bindTexture(gl.TEXTURE_2D, glTex)
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+
+        const isPot = (img.width & (img.width - 1)) === 0 && (img.height & (img.height - 1)) === 0
+        if (isPot) {
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+          gl.generateMipmap(gl.TEXTURE_2D)
+        } else {
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+        }
+        textureReady = true
+      }
+      img.onerror = (err) => {
+        console.warn('[MeshPreview] Failed to load texture image:', err)
+      }
+      img.src = activeTextureUrl
+    }
 
     gl.enable(gl.DEPTH_TEST)
     gl.depthFunc(gl.LEQUAL)
@@ -252,16 +338,15 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       const sy = Math.sin(rotRef.current.y)
 
       const model = mat4Identity()
-      // Y-axis rotation
       model[0] = cy; model[2] = -sy
       model[8] = sy; model[10] = cy
-      // X-axis rotation combined
+
       const rotX = mat4Identity()
       rotX[5] = cx; rotX[6] = sx
       rotX[9] = -sx; rotX[10] = cx
       const rotated = mat4Multiply(rotX, model)
 
-      // View matrix (camera distance)
+      // View matrix
       const view = mat4Identity()
       view[12] = panRef.current.x
       view[13] = panRef.current.y
@@ -278,6 +363,16 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       gl.uniformMatrix4fv(uModelLoc, false, rotated)
       gl.uniform1i(uWireLoc, wireframe ? 1 : 0)
       gl.uniform3f(uColorLoc, 0.78, 0.82, 0.88)
+      gl.uniform1i(uFlipVLoc, flipV ? 1 : 0)
+
+      if (showTexture && textureReady && glTex) {
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, glTex)
+        gl.uniform1i(uTextureLoc, 0)
+        gl.uniform1i(uHasTextureLoc, 1)
+      } else {
+        gl.uniform1i(uHasTextureLoc, 0)
+      }
 
       gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer)
       gl.enableVertexAttribArray(aPosLoc)
@@ -287,7 +382,12 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       gl.enableVertexAttribArray(aNormLoc)
       gl.vertexAttribPointer(aNormLoc, 3, gl.FLOAT, false, 0, 0)
 
-      const vertCount = normalizedPos.length / 3
+      if (aUvLoc !== -1) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer)
+        gl.enableVertexAttribArray(aUvLoc)
+        gl.vertexAttribPointer(aUvLoc, 2, gl.FLOAT, false, 0, 0)
+      }
+
       if (wireframe) {
         gl.drawArrays(gl.LINES, 0, vertCount)
       } else {
@@ -304,10 +404,12 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       if (gl) {
         gl.deleteBuffer(posBuffer)
         gl.deleteBuffer(normBuffer)
+        gl.deleteBuffer(uvBuffer)
+        if (glTex) gl.deleteTexture(glTex)
         gl.deleteProgram(prog)
       }
     }
-  }, [data, wireframe, autoRotate])
+  }, [data, wireframe, autoRotate, showTexture, flipV, activeTextureUrl])
 
   // Mouse interaction handlers
   const onMouseDown = (e: React.MouseEvent) => {
@@ -322,11 +424,9 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
     dragRef.current.startY = e.clientY
 
     if (dragRef.current.button === 0) {
-      // Left click: rotate
       rotRef.current.y += dx * 0.012
       rotRef.current.x = Math.max(-1.5, Math.min(1.5, rotRef.current.x + dy * 0.012))
     } else if (dragRef.current.button === 2) {
-      // Right click: pan
       panRef.current.x += dx * 0.003
       panRef.current.y -= dy * 0.003
     }
@@ -336,15 +436,38 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
     dragRef.current = null
   }
 
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    zoomRef.current = Math.max(0.6, Math.min(8.0, zoomRef.current + e.deltaY * 0.003))
-  }
+  // Non-passive wheel handler to prevent scroll without browser warning
+  useEffect(() => {
+    const box = canvasBoxRef.current
+    if (!box) return
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      zoomRef.current = Math.max(0.6, Math.min(8.0, zoomRef.current + e.deltaY * 0.003))
+    }
+    box.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      box.removeEventListener('wheel', handleWheel)
+    }
+  }, [])
 
   const resetCamera = () => {
     rotRef.current = { x: 0.35, y: 0.75 }
     zoomRef.current = 2.5
     panRef.current = { x: 0, y: 0 }
+  }
+
+  const handlePickLocalTexture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCustomTextureUrl(reader.result)
+        setCustomTextureName(file.name)
+        setShowTexture(true)
+      }
+    }
+    reader.readAsDataURL(file)
   }
 
   return (
@@ -371,6 +494,63 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         </div>
 
         <div className="mesh-preview__actions">
+          {/* Attached or custom Texture Button */}
+          {activeTextureName ? (
+            <button
+              type="button"
+              className={`btn btn--tiny ${showTexture ? 'is-active' : ''}`}
+              onClick={() => setShowTexture((v) => !v)}
+              title={showTexture ? `Текстура включена: ${activeTextureName} (клик для отключения)` : `Включить текстуру: ${activeTextureName}`}
+            >
+              <Icon name="image" size={11} />
+              <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeTextureName}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--tiny is-dim"
+              onClick={() => fileInputRef.current?.click()}
+              title="Текстура не найдена автоматически. Нажмите, чтобы выбрать текстуру вручную"
+            >
+              <Icon name="image" size={11} />
+              <span>+ Текстура</span>
+            </button>
+          )}
+
+          {/* Flip UV toggle */}
+          {activeTextureName && showTexture && (
+            <button
+              type="button"
+              className={`btn btn--tiny ${flipV ? 'is-active' : ''}`}
+              onClick={() => setFlipV((v) => !v)}
+              title="Отразить координаты текстуры по вертикали (Flip V)"
+            >
+              <Icon name="sort" size={11} />
+              <span>Flip V</span>
+            </button>
+          )}
+
+          {/* Change Texture File */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".png,.jpg,.jpeg,.webp,.tga,.dds"
+            style={{ display: 'none' }}
+            onChange={handlePickLocalTexture}
+          />
+          {activeTextureName && (
+            <button
+              type="button"
+              className="btn btn--tiny"
+              onClick={() => fileInputRef.current?.click()}
+              title="Сменить текстуру (выбрать файл с диска)"
+            >
+              <Icon name="folder-open" size={11} />
+            </button>
+          )}
+
           <button
             type="button"
             className={`btn btn--tiny ${wireframe ? 'is-active' : ''}`}
@@ -402,12 +582,12 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
 
       {/* 3D Canvas Box */}
       <div
+        ref={canvasBoxRef}
         className="mesh-preview__canvas-box"
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
-        onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
       >
         {loading && (

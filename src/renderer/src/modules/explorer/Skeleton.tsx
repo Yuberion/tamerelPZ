@@ -60,7 +60,7 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
       setVanillaOverwrites(new Set())
       return
     }
-    window.pz.stalker
+    ;(window.pz.explorer || window.pz.stalker)
       .vanillaOverwrites(mod.path)
       .then((paths) => setVanillaOverwrites(new Set(paths.map((p) => p.toLowerCase()))))
       .catch(() => setVanillaOverwrites(new Set()))

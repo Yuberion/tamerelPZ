@@ -45,7 +45,7 @@ description: Boundaries between PZ Management project and the original Project Z
 **PZ MANAGEMENT** — desktop-приложение (Electron + React 19 + TypeScript, Zero runtime dependencies) для работы с модами Project Zomboid (B41 / B42).
 
 ### Модули:
-- **Stalker**: Обозреватель и инспектор установленных модов (Steam, Workshop, локальные, серверные).
+- **Explorer**: Обозреватель и инспектор установленных модов (Steam, Workshop, локальные, серверные).
 - **Loadout**: Порядок загрузки клиента (`default.txt`) и серверов (`.ini`), сортировка зависимостей, профили.
 - **Workbench**: Создание модов (scaffold), редактирование `mod.info`, валидация (Lua, скрипты, JSON/txt переводы, теги), упаковка в Workshop.
 - **Ledger**: Парсинг краш-логов и консоли (`console.txt`), привязка ошибок к модам.

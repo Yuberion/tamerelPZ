@@ -41,7 +41,7 @@ interface ToolbarProps {
   onOpenGrep?: () => void
 }
 
-export function StalkerToolbar({
+export function ExplorerToolbar({
   onExit,
   onRescan,
   scanning,

@@ -19,12 +19,12 @@ import { useAppStore } from '@renderer/state/store'
 import { InfoPanel } from './InfoPanel'
 import { ModList } from './ModList'
 import { Skeleton } from './Skeleton'
-import { StalkerToolbar } from './StalkerToolbar'
+import { ExplorerToolbar } from './ExplorerToolbar'
 import { ModGrepModal } from './ModGrepModal'
 import { useModRows, type IssueFilter, type ModFilters } from './useModRows'
 
-const LS_LEFT = 'pz.stalker.leftWidth'
-const LS_RIGHT = 'pz.stalker.rightWidth'
+const LS_LEFT = 'pz.explorer.leftWidth'
+const LS_RIGHT = 'pz.explorer.rightWidth'
 
 const SOURCE_BUTTONS: Array<{
   kind: ModSourceKind
@@ -36,11 +36,12 @@ const SOURCE_BUTTONS: Array<{
 ]
 
 function readWidth(key: string, fallback: number): number {
-  const raw = Number(localStorage.getItem(key))
+  const legacyKey = key.replace('pz.explorer.', 'pz.stalker.')
+  const raw = Number(localStorage.getItem(key) || localStorage.getItem(legacyKey))
   return Number.isFinite(raw) && raw > 160 ? raw : fallback
 }
 
-export function Stalker({ onExit }: { onExit: () => void }) {
+export function Explorer({ onExit }: { onExit: () => void }) {
   const { scan, scanning, settings, refresh, saveSettings, byKey } = useAppStore()
   const { notify } = useToast()
   const { t, p } = useI18n()
@@ -306,8 +307,8 @@ export function Stalker({ onExit }: { onExit: () => void }) {
 
   return (
     <MenuProvider>
-      <div className="stalker">
-        <StalkerToolbar
+      <div className="explorer">
+        <ExplorerToolbar
           onExit={onExit}
           onRescan={() => void refresh(true)}
           scanning={scanning}
@@ -327,7 +328,7 @@ export function Stalker({ onExit }: { onExit: () => void }) {
           onOpenGrep={() => setIsGrepOpen(true)}
         />
 
-        <div className="stalker__body">
+        <div className="explorer__body">
           <section className="pane pane--left" style={{ width: leftW, flex: `0 0 ${leftW}px` }}>
             <div className="pane__head">
               <Icon name="list" size={13} color="var(--rust)" />

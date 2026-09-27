@@ -7,7 +7,7 @@ import { Hub } from './hub/Hub'
 import { moduleById, type ModuleId } from './hub/modules'
 import { Ledger } from './modules/ledger/Ledger'
 import { Loadout } from './modules/loadout/Loadout'
-import { Stalker } from './modules/stalker/Stalker'
+import { Explorer } from './modules/explorer/Explorer'
 import { Tools } from './modules/tools/Tools'
 import { Workbench } from './modules/workbench/Workbench'
 import { WorkshopOverview } from './modules/workshop/WorkshopOverview'
@@ -50,7 +50,7 @@ export default function App() {
             />
             <main className="shell__body">
               {view === 'hub' ? <Hub onOpen={setView} /> : null}
-              {view === 'stalker' ? <Stalker onExit={goHome} /> : null}
+              {view === 'explorer' ? <Explorer onExit={goHome} /> : null}
               {view === 'loadout' ? <Loadout onExit={goHome} /> : null}
               {view === 'workshop' ? <WorkshopOverview onExit={goHome} /> : null}
               {view === 'workbench' ? <Workbench onExit={goHome} /> : null}

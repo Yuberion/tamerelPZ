@@ -26,7 +26,7 @@
   vertical-align: middle;
 }
 
-/* The stalker tab strip is text only; these tabs carry an icon. */
+/* The explorer tab strip is text only; these tabs carry an icon. */
 .loadout .ptab {
   display: inline-flex;
   align-items: center;

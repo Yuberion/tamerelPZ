@@ -1158,6 +1158,7 @@ export interface WorkshopSearchQuery {
   tags?: string[]
   installedOnly?: boolean
   updatesOnly?: boolean
+  forceRefresh?: boolean
 }
 
 export interface WorkshopItemSummary {
@@ -1287,7 +1288,7 @@ export interface ToggleReadOnlyResult {
   error?: string
 }
 
-/* ----------------------------------------------------------- Stalker Plus -- */
+/* ----------------------------------------------------------- Explorer Plus -- */
 
 export interface MeshPreviewData {
   ok: boolean
@@ -1297,6 +1298,10 @@ export interface MeshPreviewData {
   triangleCount: number
   positions: number[]
   normals: number[]
+  uvs?: number[]
+  texturePath?: string
+  textureUrl?: string
+  textureName?: string
   error?: string
 }
 

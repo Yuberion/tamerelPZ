@@ -100,7 +100,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
   )
 
   // Query executor
-  const runQuery = async (targetPage = page): Promise<void> => {
+  const runQuery = async (targetPage = page, forceRefresh = false): Promise<void> => {
     setLoading(true)
     try {
       const q: WorkshopSearchQuery = {
@@ -109,7 +109,8 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
         page: targetPage,
         numPerPage: 32,
         tags: selectedTag ? [selectedTag] : undefined,
-        updatesOnly
+        updatesOnly,
+        forceRefresh
       }
 
       const res = await window.pz.workshop.query(q)
@@ -249,12 +250,18 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
       const res = await window.pz.workshop.unsubscribe(id)
       if (res.success) {
         notify(isRu ? 'Вы отписались от мода в Steam' : 'Unsubscribed from mod in Steam', 'ok')
-        setSelectedItem((prev) => (prev ? { ...prev, isInstalled: false, isSubscribed: false } : null))
-        setItems((prev) =>
-          prev.map((it) => (it.id === id ? { ...it, isInstalled: false, isSubscribed: false } : it))
-        )
         if (mode === 'installed') {
+          // Immediately remove the unsubscribed mod from the installed grid
+          setItems((prev) => prev.filter((it) => it.id !== id))
+          setTotalCount((c) => Math.max(0, c - 1))
           setInstalledCount((c) => Math.max(0, c - 1))
+          // Close detail modal/drawer if this was the open mod
+          setSelectedItem((prev) => (prev?.id === id ? null : prev))
+        } else {
+          setSelectedItem((prev) => (prev ? { ...prev, isInstalled: false, isSubscribed: false } : null))
+          setItems((prev) =>
+            prev.map((it) => (it.id === id ? { ...it, isInstalled: false, isSubscribed: false } : it))
+          )
         }
       } else {
         notify(
@@ -266,6 +273,29 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
       notify(isRu ? 'Ошибка при связи со Steam' : 'Steam connection error', 'warn')
     } finally {
       setSubscribing(false)
+    }
+  }
+
+  // Action: Manual Force Rescan / Refresh
+  const handleForceRescan = async (): Promise<void> => {
+    setLoading(true)
+    try {
+      const syncRes = await window.pz.workshop.syncSteam()
+      setInstalledCount(syncRes.installedCount)
+      await runQuery(1, true)
+      notify(
+        isRu
+          ? `Список обновлен (установлено модов: ${syncRes.installedCount})`
+          : `List refreshed (${syncRes.installedCount} mods installed)`,
+        'ok'
+      )
+    } catch (err) {
+      notify(
+        isRu ? `Ошибка при обновлении списка: ${String(err)}` : `Refresh failed: ${String(err)}`,
+        'warn'
+      )
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -414,10 +444,33 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
           <button
             className={`btn btn--tiny ${updatesOnly ? 'btn--active' : 'btn--subtle'}`}
             onClick={() => setUpdatesOnly(!updatesOnly)}
-            title={isRu ? 'Моды с доступными обновлениями в Steam' : 'Mods with pending updates in Steam'}
+            title={
+              isRu
+                ? 'Фильтр: показывать только моды с доступными обновлениями в Steam'
+                : 'Filter: show only mods with pending updates in Steam'
+            }
           >
-            <Icon name="rotate" size={11} color={updatesOnly ? '#f59e0b' : undefined} />
-            <span>{isRu ? 'Обновления' : 'Updates'}</span>
+            <Icon name="arrow-up" size={11} color={updatesOnly ? '#f59e0b' : undefined} />
+            <span>{isRu ? 'Есть обновления' : 'Need updates'}</span>
+          </button>
+
+          {/* Refresh / Force Rescan Button */}
+          <button
+            className="btn btn--subtle btn--tiny"
+            onClick={() => void handleForceRescan()}
+            disabled={loading}
+            title={
+              mode === 'installed'
+                ? isRu
+                  ? 'Пересканировать установленные моды на диске'
+                  : 'Rescan installed mods on disk'
+                : isRu
+                  ? 'Обновить результаты поиска'
+                  : 'Refresh search results'
+            }
+          >
+            <Icon name="refresh" size={11} className={loading ? 'spin' : ''} />
+            <span>{isRu ? 'Обновить' : 'Refresh'}</span>
           </button>
         </div>
       </header>
@@ -533,19 +586,49 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               </span>
             </div>
           ) : items.length === 0 ? (
-            <div className="pane__empty" style={{ padding: '60px 0' }}>
-              <Icon name="download" size={36} color="var(--text-muted)" />
-              <span className="label bold">{isRu ? 'Моды не найдены' : 'No mods found'}</span>
-              <span className="label wbmuted">
-                {mode === 'installed'
-                  ? isRu
-                    ? 'В вашей библиотеке не найдено модов по выбранному фильтру или категории.'
-                    : 'No installed mods found matching the selected filter or category.'
-                  : isRu
-                    ? 'Попробуйте изменить поисковый запрос или категорию.'
-                    : 'Try adjusting your search query or category.'}
-              </span>
-            </div>
+            updatesOnly ? (
+              <div className="pane__empty" style={{ padding: '60px 0' }}>
+                <Icon name="check-circle" size={36} color="#22c55e" />
+                <span className="label bold">{isRu ? 'Все моды актуальны' : 'All mods are up to date'}</span>
+                <span className="label wbmuted">
+                  {isRu
+                    ? 'В вашей библиотеке нет модов, требующих обновления в Steam.'
+                    : 'No installed mods have pending Steam updates.'}
+                </span>
+                <button
+                  className="btn btn--subtle btn--tiny"
+                  style={{ marginTop: 12 }}
+                  onClick={() => setUpdatesOnly(false)}
+                >
+                  <Icon name="grid" size={12} />
+                  <span>{isRu ? 'Показать все установленные моды' : 'Show all installed mods'}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="pane__empty" style={{ padding: '60px 0' }}>
+                <Icon name="download" size={36} color="var(--text-muted)" />
+                <span className="label bold">{isRu ? 'Моды не найдены' : 'No mods found'}</span>
+                <span className="label wbmuted">
+                  {mode === 'installed'
+                    ? isRu
+                      ? 'В вашей библиотеке не найдено модов по выбранному фильтру или категории.'
+                      : 'No installed mods found matching the selected filter or category.'
+                    : isRu
+                      ? 'Попробуйте изменить поисковый запрос или категорию.'
+                      : 'Try adjusting your search query or category.'}
+                </span>
+                {selectedTag && (
+                  <button
+                    className="btn btn--subtle btn--tiny"
+                    style={{ marginTop: 12 }}
+                    onClick={() => setSelectedTag('')}
+                  >
+                    <Icon name="rotate" size={12} />
+                    <span>{isRu ? 'Сбросить фильтр категории' : 'Reset category filter'}</span>
+                  </button>
+                )}
+              </div>
+            )
           ) : (
             <>
               {/* Active Filter Bar Info */}

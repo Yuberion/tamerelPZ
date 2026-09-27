@@ -5,7 +5,7 @@
  * `Record<TKey, string>`, so a missing or misspelled Russian key is a compile error
  * rather than a silent English fallback at runtime.
  *
- * Module codenames (Stalker, Loadout, Signal, ...) are deliberately NOT translated —
+ * Module codenames (Explorer, Loadout, Signal, ...) are deliberately NOT translated —
  * they are product identifiers, like the "PZ MANAGEMENT" wordmark. Their taglines and
  * descriptions are.
  */
@@ -45,9 +45,12 @@ export const EN = {
   'hub.noUserDir': 'user directory not found',
 
   // ---- module taglines / descriptions -------------------------------------
-  'module.stalker.tagline': 'Mod explorer',
+  'module.explorer.tagline': 'Mod explorer & inspector',
+  'module.explorer.desc':
+    'Deep inspection of installed mods: file trees, 3D meshes, mod.info metadata, dependency graphs, global text search and vanilla file collisions.',
+  'module.stalker.tagline': 'Mod explorer & inspector',
   'module.stalker.desc':
-    'Walk every mod on the drive. Structure, metadata, artwork and files — straight to Explorer.',
+    'Deep inspection of installed mods: file trees, 3D meshes, mod.info metadata, dependency graphs, global text search and vanilla file collisions.',
   'module.loadout.tagline': 'Load order & profiles',
   'module.loadout.desc':
     'Order mods, build named profiles and push them into the game config.',
@@ -277,9 +280,9 @@ export const EN = {
   'help.hub.status':
     'The result of the last drive scan: the detected game build, how many mods were found, and how many of them collide. Duplicate ids and broken requires are counted separately because they are the two faults that actually stop a mod from loading.',
   'help.hub.modules':
-    'Nine modules, two of them finished. Stalker inspects what is already installed; Workbench creates, edits, checks and packs mods of your own. The sealed tiles are placeholders and open nothing.',
+    'Nine modules, finished ones are available. Explorer inspects what is already installed; Workbench creates, edits, checks and packs mods of your own. The sealed tiles are placeholders and open nothing.',
 
-  // ---- stalker ------------------------------------------------------------
+  // ---- explorer ------------------------------------------------------------
   'help.tb.sources':
     'One button per mod container found on this machine. Pressing one narrows the list to that source, pressing it again releases it, and several can be lit at once. The small folder button opens the container itself in Explorer.',
   'help.tb.rescan':
@@ -1407,9 +1410,12 @@ export const RU: Record<TKey, string> = {
   'hub.noGameDir': 'каталог игры не найден',
   'hub.noUserDir': 'каталог пользователя не найден',
 
-  'module.stalker.tagline': 'Обозреватель модов',
+  'module.explorer.tagline': 'Обозреватель и инспектор модов',
+  'module.explorer.desc':
+    'Глубокая инспекция установленных модов: файловое дерево, 3D-модели, метаданные mod.info, граф зависимостей, глобальный поиск и проверка перезаписи файлов игры.',
+  'module.stalker.tagline': 'Обозреватель и инспектор модов',
   'module.stalker.desc':
-    'Пройти по каждому моду на диске. Структура, метаданные, обложки и файлы — сразу в Проводник.',
+    'Глубокая инспекция установленных модов: файловое дерево, 3D-модели, метаданные mod.info, граф зависимостей, глобальный поиск и проверка перезаписи файлов игры.',
   'module.loadout.tagline': 'Порядок загрузки и профили',
   'module.loadout.desc':
     'Упорядочить моды, собрать именованные профили и записать их в конфиг игры.',
@@ -1618,9 +1624,9 @@ export const RU: Record<TKey, string> = {
   'help.hub.status':
     'Итог последнего сканирования диска: определённая сборка игры, сколько модов найдено и сколько из них конфликтует. Дубли id и битые зависимости считаются отдельно: это две неисправности, из-за которых мод действительно не загрузится.',
   'help.hub.modules':
-    'Девять модулей, два из них готовы. Stalker показывает то, что уже установлено; Workbench создаёт, правит, проверяет и упаковывает ваши собственные моды. Закрытые плитки — заготовки, они ничего не открывают.',
+    'Девять модулей, готовые открыты для работы. Explorer инспектирует то, что уже установлено; Workbench создаёт, правит, проверяет и упаковывает ваши собственные моды. Закрытые плитки — заготовки, они ничего не открывают.',
 
-  // ---- stalker ------------------------------------------------------------
+  // ---- explorer ------------------------------------------------------------
   'help.tb.sources':
     'По кнопке на каждый найденный каталог с модами. Нажатие оставляет в списке только этот источник, повторное — отпускает; включить можно сразу несколько. Маленькая кнопка с папкой открывает сам каталог в Проводнике.',
   'help.tb.rescan':

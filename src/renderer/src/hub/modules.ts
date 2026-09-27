@@ -2,7 +2,7 @@ import type { IconName } from '@renderer/components/Icon'
 import type { TKey } from '@renderer/i18n'
 
 export type ModuleId =
-  | 'stalker'
+  | 'explorer'
   | 'loadout'
   | 'workshop'
   | 'workbench'
@@ -24,15 +24,15 @@ export interface ModuleDef {
   status: 'live' | 'sealed'
 }
 
-/** The nine hub tiles. STALKER, LOADOUT, WORKSHOP, WORKBENCH, TOOLS and LEDGER are wired up in this build. */
+/** The nine hub tiles. EXPLORER, LOADOUT, WORKSHOP, WORKBENCH, TOOLS and LEDGER are wired up in this build. */
 export const MODULES: ModuleDef[] = [
   {
-    id: 'stalker',
+    id: 'explorer',
     code: '01',
-    name: 'Stalker',
-    taglineKey: 'module.stalker.tagline',
-    descKey: 'module.stalker.desc',
-    icon: 'crosshair',
+    name: 'Explorer',
+    taglineKey: 'module.explorer.tagline',
+    descKey: 'module.explorer.desc',
+    icon: 'folder-open',
     status: 'live'
   },
   {

@@ -95,7 +95,11 @@ export interface PzApi {
     preview(path: string): Promise<FilePreview>
     meshPreview(path: string): Promise<MeshPreviewData>
   }
-  stalker: {
+  explorer: {
+    grep(req: ModGrepRequest): Promise<ModGrepMatch[]>
+    vanillaOverwrites(modPath: string): Promise<string[]>
+  }
+  stalker?: {
     grep(req: ModGrepRequest): Promise<ModGrepMatch[]>
     vanillaOverwrites(modPath: string): Promise<string[]>
   }

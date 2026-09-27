@@ -18,8 +18,10 @@ export const IPC = {
   fsPreview: 'fs:preview',
   fsMeshPreview: 'fs:mesh-preview',
 
-  stalkerGrep: 'stalker:grep',
-  stalkerVanillaOverwrites: 'stalker:vanilla-overwrites',
+  explorerGrep: 'explorer:grep',
+  explorerVanillaOverwrites: 'explorer:vanilla-overwrites',
+  stalkerGrep: 'explorer:grep',
+  stalkerVanillaOverwrites: 'explorer:vanilla-overwrites',
 
   shellReveal: 'shell:reveal',
   shellOpen: 'shell:open',

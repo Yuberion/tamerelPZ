@@ -36,7 +36,7 @@ export function ModGrepModal({ isOpen, onClose, onSelectMatch }: ModGrepModalPro
         extFilter === 'all'
           ? ['lua', 'txt', 'xml', 'ini', 'json']
           : [extFilter]
-      const matches = await window.pz.stalker.grep({
+      const matches = await (window.pz.explorer || window.pz.stalker).grep({
         query: q,
         caseSensitive,
         fileExtensions: exts,

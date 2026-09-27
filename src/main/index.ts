@@ -18,7 +18,7 @@ process.on('unhandledRejection', (reason) => {
 protocol.registerSchemesAsPrivileged([
   {
     scheme: PZ_FILE_SCHEME,
-    privileges: { supportFetchAPI: true, stream: true, bypassCSP: true, standard: false }
+    privileges: { supportFetchAPI: true, stream: true, bypassCSP: true, corsEnabled: true, standard: false }
   }
 ])
 
@@ -39,7 +39,14 @@ function registerFileProtocol(): void {
       return new Response('Forbidden', { status: 403 })
     }
     try {
-      return await net.fetch(pathToFileURL(target).toString())
+      const res = await net.fetch(pathToFileURL(target).toString())
+      const headers = new Headers(res.headers)
+      headers.set('Access-Control-Allow-Origin', '*')
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers
+      })
     } catch {
       return new Response('Not found', { status: 404 })
     }
