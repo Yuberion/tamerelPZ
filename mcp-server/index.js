@@ -85,6 +85,10 @@ const TOOLS = [
         targetModName: {
           type: 'string',
           description: 'Optional destination folder name under Zomboid/mods'
+        },
+        isPort: {
+          type: 'boolean',
+          description: 'Set to true if porting a B40/B41 mod (requires _Port suffix), false if syncing a newly developed mod.'
         }
       },
       required: ['sourceModPath']

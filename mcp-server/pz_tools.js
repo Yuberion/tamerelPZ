@@ -247,14 +247,15 @@ export function validateSandboxOptions({ filePath }) {
 /**
  * Tool 5: Safely Sync Port Mod to Game mods folder with BOM and Cyrillic audit
  */
-export function syncPortMod({ sourceModPath, targetModName }) {
+export function syncPortMod({ sourceModPath, targetModName, isPort = null }) {
   if (!sourceModPath || !existsSync(sourceModPath)) {
     throw new Error(`sourceModPath does not exist: ${sourceModPath}`);
   }
 
   const base = basename(resolve(sourceModPath));
-  if (!base.includes('_Port')) {
-    throw new Error(`Highest priority rule violation: source directory name "${base}" must contain "_Port"!`);
+  // If explicitly porting or not specified as a new mod, validate _Port if it's a porting workflow
+  if (isPort === true && !base.includes('_Port')) {
+    throw new Error(`Porting rule violation: ported mod source directory "${base}" must contain "_Port"!`);
   }
 
   const modName = targetModName || base;
