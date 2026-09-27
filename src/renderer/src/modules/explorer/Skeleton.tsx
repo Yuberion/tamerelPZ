@@ -210,23 +210,23 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
           onClick: () => void window.pz.shell.open(node.path)
         },
         {
-          label: 'Открыть в Notepad++ / Блокноте',
+          label: t('menu.openNpp'),
           icon: 'code',
           disabled: node.dir,
           onClick: () => {
             window.pz.npp
               .open(node.path)
               .then(() => {
-                notify('Файл открыт в редакторе', 'ok')
+                notify(t('menu.fileOpenedEditor'), 'ok')
               })
               .catch((err: unknown) => {
                 window.pz.shell
                   .open(node.path)
                   .then(() => {
-                    notify('Файл открыт', 'ok')
+                    notify(t('menu.fileOpened'), 'ok')
                   })
                   .catch(() => {
-                    notify(err instanceof Error ? err.message : 'Не удалось открыть файл', 'warn')
+                    notify(err instanceof Error ? err.message : t('menu.fileOpenError'), 'warn')
                   })
               })
           }

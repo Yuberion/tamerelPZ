@@ -128,13 +128,13 @@ export function HelpProvider({ children }: { children: ReactNode }) {
     }
     const onAway = (): void => close()
     window.addEventListener('keydown', onKey, true)
-    window.addEventListener('mousedown', onDown, true)
+    window.addEventListener('mousedown', onDown)
     window.addEventListener('wheel', onWheel, { passive: true })
     window.addEventListener('resize', onAway)
     window.addEventListener('blur', onAway)
     return () => {
       window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('mousedown', onDown, true)
+      window.removeEventListener('mousedown', onDown)
       window.removeEventListener('wheel', onWheel)
       window.removeEventListener('resize', onAway)
       window.removeEventListener('blur', onAway)

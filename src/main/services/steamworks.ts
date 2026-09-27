@@ -49,8 +49,13 @@ export async function subscribeToWorkshopItem(
     return { success: false, error: 'Steam is not running' }
   }
 
+  const cleanId = String(publishedFileId).trim().match(/\d+/)?.[0]
+  if (!cleanId) {
+    return { success: false, error: `Invalid Workshop ID: "${publishedFileId}"` }
+  }
+
   try {
-    const idBig = BigInt(publishedFileId)
+    const idBig = BigInt(cleanId)
     await client.workshop.subscribe(idBig)
     try {
       client.workshop.download(idBig, true)
@@ -72,8 +77,13 @@ export async function unsubscribeFromWorkshopItem(
     return { success: false, error: 'Steam is not running' }
   }
 
+  const cleanId = String(publishedFileId).trim().match(/\d+/)?.[0]
+  if (!cleanId) {
+    return { success: false, error: `Invalid Workshop ID: "${publishedFileId}"` }
+  }
+
   try {
-    const idBig = BigInt(publishedFileId)
+    const idBig = BigInt(cleanId)
     await client.workshop.unsubscribe(idBig)
     return { success: true }
   } catch (err: any) {

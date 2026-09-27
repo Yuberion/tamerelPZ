@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { pzFileUrl } from '@shared/ipc'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n } from '@renderer/i18n'
@@ -20,9 +21,11 @@ export function SourceCodeSnippet({ path, line, onOpenNpp }: SourceCodeSnippetPr
   const [loading, setLoading] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
 
+  const isImage = /\.(png|jpe?g|webp|gif|bmp|tga|dds|ico)$/i.test(path)
   const targetLine = line && line > 0 ? line : 1
 
   useEffect(() => {
+    if (isImage) return
     let cancelled = false
     setLoading(true)
     window.pz.logs
@@ -43,11 +46,50 @@ export function SourceCodeSnippet({ path, line, onOpenNpp }: SourceCodeSnippetPr
     return () => {
       cancelled = true
     }
-  }, [path, targetLine, radius])
-
-  if (!snippet && !loading) return null
+  }, [path, targetLine, radius, isImage])
 
   const fileName = path.split(/[\\/]/).pop() ?? path
+
+  if (isImage) {
+    return (
+      <div className="ledsnippet">
+        <div className="ledsnippet__header">
+          <button
+            className="btn btn--tiny btn--subtle"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? t('led.expandSnippet') : t('led.collapseSnippet')}
+          >
+            <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={11} />
+            <Icon name="image" size={11} />
+            <span className="mono bold">{fileName}</span>
+            <span className="wbmuted mono">({t('ip.typeFile')})</span>
+          </button>
+
+          <div className="toolbar__spacer" />
+
+          {onOpenNpp && (
+            <button className="btn btn--tiny" onClick={onOpenNpp} title={t('led.openInNppTitle')}>
+              <Icon name="external" size={10} />
+              {t('led.openInNpp')}
+            </button>
+          )}
+        </div>
+
+        {!collapsed && (
+          <div className="imgpreview brackets" style={{ margin: 0, border: 'none', maxHeight: '280px' }}>
+            <img
+              src={pzFileUrl(path)}
+              alt={fileName}
+              draggable={false}
+              style={{ maxWidth: '100%', maxHeight: '260px', objectFit: 'contain', display: 'block' }}
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (!snippet && !loading) return null
 
   const handleCopyCode = async () => {
     if (!snippet) return

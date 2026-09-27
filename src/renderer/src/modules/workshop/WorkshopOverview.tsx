@@ -305,6 +305,16 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     notify(isRu ? 'Страница мода открыта в Steam' : 'Opened mod in Steam', 'ok')
   }
 
+  // Action: Open in Browser
+  const handleOpenBrowser = async (id: string): Promise<void> => {
+    try {
+      await window.pz.shell.external(`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`)
+      notify(isRu ? 'Страница открыта в браузере' : 'Opened page in browser', 'ok')
+    } catch {
+      notify(isRu ? 'Ошибка при открытии ссылки' : 'Failed to open URL', 'warn')
+    }
+  }
+
   // Action: Open local folder
   const handleOpenFolder = async (id: string): Promise<void> => {
     const ok = await window.pz.workshop.openFolder(id)
@@ -936,11 +946,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
 
                   <button
                     className="btn btn--subtle btn--tiny"
-                    onClick={() =>
-                      window.pz.shell.external(
-                        `https://steamcommunity.com/sharedfiles/filedetails/?id=${selectedItem.id}`
-                      )
-                    }
+                    onClick={() => void handleOpenBrowser(selectedItem.id)}
                     title={isRu ? 'Открыть в веб-браузере' : 'Open in browser'}
                   >
                     <Icon name="globe" size={12} />

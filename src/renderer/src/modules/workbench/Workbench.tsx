@@ -253,6 +253,7 @@ function ModList({
   }
 
   const rowMenu = (e: React.MouseEvent, mod: ModEntry): void => {
+    onSelect(mod)
     openMenu(e, [
       {
         label: t('wb.revealMod'),

@@ -201,6 +201,7 @@ export function OrderList({
   }
 
   const rowMenu = (e: React.MouseEvent, entry: OrderEntry): void => {
+    onSelect(entry.index)
     const items: Parameters<typeof openMenu>[1] = []
 
     if (!isSeparator(entry.value)) {

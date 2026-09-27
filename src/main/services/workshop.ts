@@ -856,12 +856,13 @@ export async function getWorkshopItemDetails(
   publishedFileId: string,
   forceTranslate = false
 ): Promise<WorkshopItemDetails> {
+  const cleanId = String(publishedFileId).trim().match(/\d+/)?.[0] ?? publishedFileId.trim()
   await loadMetadataCache()
-  let raw = steamMetadataCache.get(publishedFileId)
+  let raw = steamMetadataCache.get(cleanId)
 
   if (!raw) {
-    await fetchBatchSteamDetails([publishedFileId])
-    raw = steamMetadataCache.get(publishedFileId)
+    await fetchBatchSteamDetails([cleanId])
+    raw = steamMetadataCache.get(cleanId)
   }
 
   const screenshots: string[] = []
@@ -871,7 +872,7 @@ export async function getWorkshopItemDetails(
 
   // Scrape gallery screenshots from Steam community page
   try {
-    const pageRes = await fetch(`https://steamcommunity.com/sharedfiles/filedetails/?id=${publishedFileId}`, {
+    const pageRes = await fetch(`https://steamcommunity.com/sharedfiles/filedetails/?id=${cleanId}`, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -894,9 +895,9 @@ export async function getWorkshopItemDetails(
 
   // Check local installation & Steam subscription status
   const installedList = await scanAllInstalledWorkshopItems(settings)
-  const local = installedList.find((it) => it.id === publishedFileId)
+  const local = installedList.find((it) => it.id === cleanId)
   const steamSubs = getSteamSubscribedIds()
-  const isSubscribed = steamSubs.has(publishedFileId)
+  const isSubscribed = steamSubs.has(cleanId)
   const isInstalled = Boolean(local) || isSubscribed
 
   const originalDesc = raw?.description || ''
@@ -906,18 +907,18 @@ export async function getWorkshopItemDetails(
   let descRuHtml: string | undefined
   if (originalDesc) {
     try {
-      const translatedText = await translateModDescription(publishedFileId, originalDesc, 'ru', forceTranslate)
+      const translatedText = await translateModDescription(cleanId, originalDesc, 'ru', forceTranslate)
       if (translatedText) {
         descRuHtml = bbcodeToHtml(translatedText)
       }
     } catch (err) {
-      console.warn('[workshop] Translation failed for item', publishedFileId, err)
+      console.warn('[workshop] Translation failed for item', cleanId, err)
     }
   }
 
   return {
-    id: publishedFileId,
-    title: raw?.title || local?.title || `Workshop item #${publishedFileId}`,
+    id: cleanId,
+    title: raw?.title || local?.title || `Workshop item #${cleanId}`,
     previewUrl: raw?.preview_url || local?.previewUrl || '',
     author: local?.author || raw?.creator || '',
     authorId: raw?.creator,

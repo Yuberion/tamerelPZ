@@ -131,6 +131,10 @@ export const EN = {
   'menu.copyWorkshopUrl': 'Copy Workshop link',
   'menu.searchWorkshop': 'Search in Steam Workshop',
   'menu.openLink': 'Open link',
+  'menu.openNpp': 'Open in Notepad++ / Text Editor',
+  'menu.fileOpenedEditor': 'File opened in editor',
+  'menu.fileOpened': 'File opened',
+  'menu.fileOpenError': 'Failed to open file',
   'menu.hintDblClick': 'dbl-click',
 
   // ---- row glyph tooltips -------------------------------------------------
@@ -1501,6 +1505,10 @@ export const RU: Record<TKey, string> = {
   'menu.copyWorkshopUrl': 'Скопировать ссылку Workshop',
   'menu.searchWorkshop': 'Найти в Steam Workshop',
   'menu.openLink': 'Открыть ссылку',
+  'menu.openNpp': 'Открыть в Notepad++ / Блокноте',
+  'menu.fileOpenedEditor': 'Файл открыт в редакторе',
+  'menu.fileOpened': 'Файл открыт',
+  'menu.fileOpenError': 'Не удалось открыть файл',
   'menu.hintDblClick': '2 клика',
 
   'glyph.warnings': 'Есть предупреждения',
