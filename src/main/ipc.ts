@@ -103,7 +103,7 @@ import {
 import { applyGameMemory, getMemoryReport, setEnvJavaOptions, toggleGameFilesReadOnly } from './services/memory'
 import { packMod } from './services/pack'
 import { createMergePatch } from './services/patcher'
-import { detectPaths } from './services/paths'
+import { detectGameDir, detectPaths } from './services/paths'
 import { scanMods, type ScanOptions } from './services/scanner'
 import { getSettings, setSettings } from './services/settings'
 import { shovelMods } from './services/shovel'
@@ -415,9 +415,11 @@ export function registerIpc(): void {
     cleanArchivedLogs(await getSettings(), keepCount)
   )
 
-  ipcMain.handle(IPC.logResolveSource, async (_e, file: string, modPath?: string, gameDir?: string, line?: number) =>
-    resolveLogSourceFile(file, modPath, gameDir, line)
-  )
+  ipcMain.handle(IPC.logResolveSource, async (_e, file: string, modPath?: string, gameDir?: string, line?: number) => {
+    const settings = await getSettings()
+    const effectiveGameDir = gameDir || settings.gameDirOverride || (await detectGameDir(settings))
+    return resolveLogSourceFile(file, modPath, effectiveGameDir, line)
+  })
 
   ipcMain.handle(IPC.logSnippet, async (_e, path: string, targetLine: number, radius?: number) =>
     readSourceSnippet(path, targetLine, radius)

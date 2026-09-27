@@ -8,6 +8,7 @@ import { LEVEL_ICON, LEVEL_KEY } from './LogList'
 import { resolveSourcePath, type LogIncident } from './parseLog'
 import { SourceCodeSnippet } from './SourceCodeSnippet'
 import { JavaDecompileModal } from './JavaDecompileModal'
+import type { SourceResolution } from '@shared/types'
 
 export interface LogDetailProps {
   incident: LogIncident | undefined
@@ -46,10 +47,14 @@ export function LogDetail({ incident, gameDir, onFilterMod }: LogDetailProps) {
     return resolveSourcePath(callSite.file, modPath, gameDir)
   })
   const [resolvedLine, setResolvedLine] = useState<number | undefined>(callSite?.line)
+  const [scriptResolution, setScriptResolution] = useState<SourceResolution | undefined>(undefined)
+
+  const isImage = Boolean(resolvedPath && /\.(png|jpe?g|webp|gif|bmp|tga|dds|ico)$/i.test(resolvedPath))
 
   useEffect(() => {
     let cancelled = false
     setResolvedLine(callSite?.line)
+    setScriptResolution(undefined)
 
     const candidate =
       callSite?.file ||
@@ -119,19 +124,22 @@ export function LogDetail({ incident, gameDir, onFilterMod }: LogDetailProps) {
   }
 
   const openInNpp = async () => {
-    if (!resolvedPath) {
+    const targetPath = isImage && scriptResolution?.path ? scriptResolution.path : resolvedPath
+    const targetLine = isImage && scriptResolution?.line ? scriptResolution.line : (resolvedLine ?? callSite?.line)
+
+    if (!targetPath) {
       notify(t('led.fileNotFound'), 'warn')
       return
     }
     try {
-      await window.pz.npp.open(resolvedPath, resolvedLine ?? callSite?.line)
+      await window.pz.npp.open(targetPath, targetLine)
       notify(t('led.openedInNpp'), 'ok')
       return
     } catch {
       // Fallback to default shell open
     }
     try {
-      await window.pz.shell.open(resolvedPath)
+      await window.pz.shell.open(targetPath)
       notify(t('led.openedInEditor'), 'ok')
     } catch {
       notify(t('led.fileNotFound'), 'warn')
@@ -261,13 +269,19 @@ export function LogDetail({ incident, gameDir, onFilterMod }: LogDetailProps) {
             {(callSite || resolvedPath) && (
               <div className="ledsource__file">
                 <Icon
-                  name={callSite?.isLua || resolvedPath?.toLowerCase().endsWith('.lua') ? 'code' : 'cube'}
+                  name={callSite?.isLua || resolvedPath?.toLowerCase().endsWith('.lua') ? 'code' : isImage ? 'image' : 'cube'}
                   size={12}
                   className="ledcallsite__icon"
                 />
                 <span className="ledsource__filename mono truncate" title={resolvedPath ?? callSite?.file}>
                   {callSite?.file ?? (resolvedPath ? resolvedPath.split(/[\\/]/).pop() : '')}
-                  {resolvedLine ? ` : line ${resolvedLine}` : callSite?.line ? ` : line ${callSite.line}` : ''}
+                  {resolvedLine
+                    ? ` : line ${resolvedLine}`
+                    : scriptResolution?.line
+                      ? ` : line ${scriptResolution.line}`
+                      : callSite?.line
+                        ? ` : line ${callSite.line}`
+                        : ''}
                 </span>
               </div>
             )}
@@ -287,6 +301,23 @@ export function LogDetail({ incident, gameDir, onFilterMod }: LogDetailProps) {
               </div>
             )}
 
+            {isImage && scriptResolution && (
+              <div className="ledsource__pathrow" style={{ marginTop: '2px', opacity: 0.9 }}>
+                <Icon name="code" size={11} color="var(--amber)" />
+                <span className="ledsource__path mono truncate" title={scriptResolution.path}>
+                  {shortenPath(scriptResolution.path, 4)}
+                  {scriptResolution.line ? ` : line ${scriptResolution.line}` : ''}
+                </span>
+                <button
+                  className="btn btn-icon btn--tiny"
+                  onClick={() => void copy(scriptResolution.path, t('led.pathCopied'))}
+                  title={t('led.copyPath')}
+                >
+                  <Icon name="copy" size={10} />
+                </button>
+              </div>
+            )}
+
             <div className="ledsource__actions">
               {resolvedPath && (
                 <>
@@ -297,7 +328,13 @@ export function LogDetail({ incident, gameDir, onFilterMod }: LogDetailProps) {
                   >
                     <Icon name="code" size={11} />
                     {t('led.openInNpp')}
-                    {resolvedLine ? ` (${resolvedLine})` : callSite?.line ? ` (${callSite.line})` : ''}
+                    {isImage && scriptResolution?.line
+                      ? ` (${scriptResolution.line})`
+                      : resolvedLine
+                        ? ` (${resolvedLine})`
+                        : callSite?.line
+                          ? ` (${callSite.line})`
+                          : ''}
                   </button>
                   <button
                     className="btn btn--tiny"
@@ -359,7 +396,10 @@ export function LogDetail({ incident, gameDir, onFilterMod }: LogDetailProps) {
           <SourceCodeSnippet
             path={resolvedPath}
             line={resolvedLine ?? callSite?.line}
+            modPath={modPath}
+            gameDir={gameDir}
             onOpenNpp={() => void openInNpp()}
+            onScriptResolved={(res) => setScriptResolution(res)}
           />
         )}
 

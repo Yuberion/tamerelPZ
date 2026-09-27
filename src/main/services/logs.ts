@@ -274,26 +274,31 @@ async function findSymbolInRoot(
       return bHit - aHit
     })
 
-    const exactEntityRe = new RegExp(`^\\s*entity\\s+(${escShort}|${escFull})\\b`, 'i')
-    const itemOrOtherRe = new RegExp(`^\\s*(?:item|vehicle|recipe|template)\\s+(${escShort}|${escFull})\\b`, 'i')
+    const exactEntityRe = new RegExp(
+      `^\\s*(?:entity|model|item|vehicle|recipe|template)\\s+(${escShort}|${escFull})\\b`,
+      'i'
+    )
     const generalRe = new RegExp(`\\b(${escShort}|${escFull})\\b`, 'i')
 
+    let generalMatch: SourceResolution | undefined = undefined
+
     for (const file of txtFiles) {
-      const content = await readTextSafe(file, 512 * 1024)
+      const content = await readTextSafe(file, 2 * 1024 * 1024)
       if (!content || !content.toLowerCase().includes(needle)) continue
       const lines = content.split(/\r?\n/)
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]!
-        if (exactEntityRe.test(line) || itemOrOtherRe.test(line)) {
+        if (exactEntityRe.test(line)) {
           return { path: normalize(file), line: i + 1 }
         }
-      }
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]!
-        if (generalRe.test(line)) {
-          return { path: normalize(file), line: i + 1 }
+        if (!generalMatch && generalRe.test(line)) {
+          generalMatch = { path: normalize(file), line: i + 1 }
         }
       }
+    }
+
+    if (generalMatch) {
+      return generalMatch
     }
   }
 
@@ -314,8 +319,10 @@ async function findSymbolInRoot(
     const fieldRe = new RegExp(`\\b(${escShort}|${escFull})\\s*=`, 'i')
     const strRe = new RegExp(`["'](${escShort}|${escFull})["']`, 'i')
 
+    let secondaryMatch: SourceResolution | undefined = undefined
+
     for (const file of luaFiles) {
-      const content = await readTextSafe(file, 512 * 1024)
+      const content = await readTextSafe(file, 2 * 1024 * 1024)
       if (!content || !content.toLowerCase().includes(needle)) continue
       const lines = content.split(/\r?\n/)
       for (let i = 0; i < lines.length; i++) {
@@ -323,13 +330,14 @@ async function findSymbolInRoot(
         if (assignRe.test(line) || fieldRe.test(line)) {
           return { path: normalize(file), line: i + 1 }
         }
-      }
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]!
-        if (strRe.test(line)) {
-          return { path: normalize(file), line: i + 1 }
+        if (!secondaryMatch && strRe.test(line)) {
+          secondaryMatch = { path: normalize(file), line: i + 1 }
         }
       }
+    }
+
+    if (secondaryMatch) {
+      return secondaryMatch
     }
   }
 
@@ -508,6 +516,10 @@ export async function readSourceSnippet(
   radius = 12
 ): Promise<SourceSnippetResult | undefined> {
   if (!filePath || !(await exists(filePath)) || (await isDir(filePath))) {
+    return undefined
+  }
+  // Never read binary image, audio or compiled assets as text code snippets
+  if (/\.(png|jpe?g|webp|gif|bmp|tga|dds|ico|ogg|wav|mp3|bank)$/i.test(filePath)) {
     return undefined
   }
   const text = await readTextSafe(filePath, 2 * 1024 * 1024)
