@@ -16,7 +16,7 @@ import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n, type TKey } from '@renderer/i18n'
 import { categoryMeta, fileColor, fileIcon, sourceLabel, SOURCE_META } from '@renderer/lib/catmeta'
-import { copyText, formatBytes, formatCount, formatDate } from '@renderer/lib/format'
+import { copyText, extractWorkshopId, formatBytes, formatCount, formatDate } from '@renderer/lib/format'
 import { highlight } from '@renderer/lib/highlight'
 import { bbcodeToHtml } from '@renderer/lib/bbcode'
 import { useAppStore } from '@renderer/state/store'
@@ -441,21 +441,35 @@ function ModInfo({
             source ? ` · ${sourceLabel(source, t)}` : ''
           }`}
         />
-        {mod.workshopId && (
-          <Field
-            label={t('ip.workshop')}
-            value={mod.workshopId}
-            mono
-            action={{
-              icon: 'link',
-              title: t('ip.openWorkshopPage'),
-              onClick: () =>
-                void window.pz.shell.external(
-                  `https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.workshopId}`
-                )
-            }}
-          />
-        )}
+        {(() => {
+          const cleanWsId = extractWorkshopId(mod)
+          if (!cleanWsId) return null
+          return (
+            <Field
+              label={t('ip.workshop')}
+              value={cleanWsId}
+              mono
+              action={{
+                icon: 'link',
+                title: t('ip.openWorkshopPage'),
+                onClick: async () => {
+                  try {
+                    const ok = await window.pz.workshop.openSteam(cleanWsId)
+                    if (!ok) {
+                      await window.pz.shell.external(
+                        `https://steamcommunity.com/sharedfiles/filedetails/?id=${cleanWsId}`
+                      )
+                    }
+                  } catch {
+                    await window.pz.shell.external(
+                      `https://steamcommunity.com/sharedfiles/filedetails/?id=${cleanWsId}`
+                    )
+                  }
+                }
+              }}
+            />
+          )
+        })()}
         {mod.url && (
           <Field
             label={t('ip.url')}

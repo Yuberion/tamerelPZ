@@ -119,3 +119,26 @@ export async function copyText(value: string): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Safely extracts a clean numeric Steam Workshop item ID (excluding the game AppID 108600).
+ * Handles URLs, combined IDs like `<workshopId>/<modId>`, or path tokens.
+ */
+export function extractWorkshopId(mod?: {
+  workshopId?: string
+  rawModId?: string
+  url?: string
+  path?: string
+}): string | undefined {
+  if (!mod) return undefined
+  const candidates = [mod.workshopId, mod.rawModId, mod.url, mod.path]
+  for (const c of candidates) {
+    if (!c) continue
+    const matches = String(c).match(/\b\d{7,12}\b/g)
+    if (matches) {
+      const valid = matches.find((id) => id !== '108600')
+      if (valid) return valid
+    }
+  }
+  return undefined
+}

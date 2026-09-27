@@ -50,16 +50,20 @@ export function MenuProvider({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') close()
     }
-    const onDown = (): void => close()
+    const onDismiss = (e: Event): void => {
+      const target = e.target as HTMLElement | null
+      if (target?.closest?.('.ctxmenu')) return
+      close()
+    }
     window.addEventListener('keydown', onKey)
-    window.addEventListener('mousedown', onDown, true)
-    window.addEventListener('wheel', onDown, { passive: true })
-    window.addEventListener('blur', onDown)
+    window.addEventListener('mousedown', onDismiss)
+    window.addEventListener('wheel', onDismiss, { passive: true })
+    window.addEventListener('blur', close)
     return () => {
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('mousedown', onDown, true)
-      window.removeEventListener('wheel', onDown)
-      window.removeEventListener('blur', onDown)
+      window.removeEventListener('mousedown', onDismiss)
+      window.removeEventListener('wheel', onDismiss)
+      window.removeEventListener('blur', close)
     }
   }, [state, close])
 
@@ -84,8 +88,8 @@ export function MenuProvider({ children }: { children: ReactNode }) {
                 key={i}
                 className="ctxmenu__item"
                 disabled={item.disabled}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation()
                   close()
                   item.onClick?.()
                 }}

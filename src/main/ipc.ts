@@ -43,6 +43,7 @@ import {
 } from './services/steamworks'
 import { listAuthoringTargets, readModInfoDraft, scaffoldMod, writeModInfo } from './services/authoring'
 import { assimpStatus, cancelAssimp, looksLikeAssimp, prepareAssimp } from './services/assimp'
+import { openExternal } from './services/opener'
 import {
   assertForgePath,
   collectConvertible,
@@ -251,8 +252,7 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.shellExternal, async (_e, url: string) => {
-    if (!/^https?:\/\//i.test(url)) throw new Error('Only http(s) urls can be opened')
-    await shell.openExternal(url)
+    return openExternal(url)
   })
 
   ipcMain.handle(IPC.shellTerminal, async (_e, path: string) => {

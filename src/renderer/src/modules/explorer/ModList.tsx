@@ -1,11 +1,11 @@
 import { useCallback, useEffect } from 'react'
 import type { ModEntry, UserModAnnotation } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
-import { useMenu } from '@renderer/components/Menu'
+import { useMenu, type MenuItem } from '@renderer/components/Menu'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n } from '@renderer/i18n'
 import { categoryMeta, primaryCategory, SOURCE_META } from '@renderer/lib/catmeta'
-import { copyText, formatCount, segmentByIndices } from '@renderer/lib/format'
+import { copyText, extractWorkshopId, formatCount, segmentByIndices } from '@renderer/lib/format'
 import { useVirtual } from '@renderer/lib/useVirtual'
 import type { ModRow } from './useModRows'
 
@@ -115,7 +115,9 @@ export function ModList({
                 onDoubleClick={() => void window.pz.shell.open(mod.path)}
                 onContextMenu={(e) => {
                   onSelect(mod)
-                  openMenu(e, [
+                  const wsId = extractWorkshopId(mod)
+
+                  const items: MenuItem[] = [
                     {
                       label: isFav ? 'Убрать из избранного' : 'Добавить в избранное',
                       icon: 'star',
@@ -159,35 +161,95 @@ export function ModList({
                         void copyText(mod.path)
                         notify(t('toast.pathCopied'), 'ok')
                       }
-                    },
-                    { separator: true },
-                    {
-                      label: t('menu.openWorkshop'),
-                      icon: 'link',
-                      onClick: () => {
-                        const wsId =
-                          mod.workshopId ||
-                          mod.rawModId?.match(/^(\d+)\//)?.[1] ||
-                          mod.url?.match(/[?&]id=(\d+)/)?.[1] ||
-                          mod.path.match(/[\\/]108600[\\/](\d+)[\\/]/)?.[1]
+                    }
+                  ]
 
-                        if (wsId) {
-                          void window.pz.shell.external(
+                  if (wsId) {
+                    items.push(
+                      { separator: true },
+                      {
+                        label: t('menu.openWorkshopSteam'),
+                        icon: 'download',
+                        onClick: async () => {
+                          try {
+                            const ok = await window.pz.workshop.openSteam(wsId)
+                            if (ok) {
+                              notify(t('toast.openedInSteam'), 'ok')
+                            } else {
+                              await window.pz.shell.external(
+                                `https://steamcommunity.com/sharedfiles/filedetails/?id=${wsId}`
+                              )
+                              notify(t('toast.openedInBrowser'), 'ok')
+                            }
+                          } catch (err) {
+                            notify(`Ошибка: ${String(err)}`, 'warn')
+                          }
+                        }
+                      },
+                      {
+                        label: t('menu.openWorkshopBrowser'),
+                        icon: 'globe',
+                        onClick: async () => {
+                          try {
+                            await window.pz.shell.external(
+                              `https://steamcommunity.com/sharedfiles/filedetails/?id=${wsId}`
+                            )
+                            notify(t('toast.openedInBrowser'), 'ok')
+                          } catch (err) {
+                            notify(`Ошибка открытия браузера: ${String(err)}`, 'warn')
+                          }
+                        }
+                      },
+                      {
+                        label: t('menu.copyWorkshopUrl'),
+                        icon: 'link',
+                        onClick: () => {
+                          void copyText(
                             `https://steamcommunity.com/sharedfiles/filedetails/?id=${wsId}`
                           )
-                          notify('Открытие страницы в Steam Workshop...', 'ok')
-                        } else if (mod.url && /^https?:\/\//i.test(mod.url)) {
-                          void window.pz.shell.external(mod.url)
-                          notify('Открытие ссылки мода...', 'ok')
-                        } else {
-                          void window.pz.shell.external(
-                            `https://steamcommunity.com/workshop/browse/?appid=108600&searchtext=${encodeURIComponent(mod.name)}`
-                          )
-                          notify('Поиск мода в Steam Workshop...', 'ok')
+                          notify(t('toast.workshopUrlCopied'), 'ok')
                         }
                       }
+                    )
+                  } else {
+                    items.push(
+                      { separator: true },
+                      {
+                        label: t('menu.searchWorkshop'),
+                        icon: 'search',
+                        onClick: async () => {
+                          try {
+                            const searchUrl = `https://steamcommunity.com/workshop/browse/?appid=108600&searchtext=${encodeURIComponent(mod.name)}`
+                            try {
+                              await window.pz.shell.external(`steam://openurl/${searchUrl}`)
+                              notify(t('toast.openedInSteam'), 'ok')
+                            } catch {
+                              await window.pz.shell.external(searchUrl)
+                              notify(t('toast.openedInBrowser'), 'ok')
+                            }
+                          } catch (err) {
+                            notify(`Ошибка поиска: ${String(err)}`, 'warn')
+                          }
+                        }
+                      }
+                    )
+                    if (mod.url && /^https?:\/\//i.test(mod.url)) {
+                      items.push({
+                        label: t('menu.openLink'),
+                        icon: 'external',
+                        onClick: async () => {
+                          try {
+                            await window.pz.shell.external(mod.url!)
+                            notify(t('toast.openedInBrowser'), 'ok')
+                          } catch (err) {
+                            notify(`Ошибка открытия ссылки: ${String(err)}`, 'warn')
+                          }
+                        }
+                      })
                     }
-                  ])
+                  }
+
+                  openMenu(e, items)
                 }}
                 title={mod.path}
               >

@@ -13,6 +13,7 @@ import type {
 import { pzFileUrl } from '../../shared/ipc'
 import { PZ_APP_ID, detectPaths } from './paths'
 import { getSteamSubscribedIds } from './steamworks'
+import { openWorkshopInSteam } from './opener'
 
 /** Simple BBCode to HTML converter for Steam workshop descriptions */
 export function bbcodeToHtml(bb: string): string {
@@ -943,14 +944,7 @@ export async function getWorkshopItemDetails(
    ========================================================================= */
 
 export async function openInSteamClient(publishedFileId: string): Promise<boolean> {
-  const url = `https://steamcommunity.com/sharedfiles/filedetails/?id=${publishedFileId}`
-  try {
-    await shell.openExternal(url)
-    return true
-  } catch (err) {
-    console.error('[workshop] Failed to open external URL:', err)
-    return false
-  }
+  return openWorkshopInSteam(publishedFileId)
 }
 
 export async function openWorkshopFolder(settings: AppSettings, publishedFileId: string): Promise<boolean> {

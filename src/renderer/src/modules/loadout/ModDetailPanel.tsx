@@ -182,8 +182,15 @@ export function ModDetailPanel({
     notify(isRu ? `${label} скопирован` : `${label} copied`, 'ok')
   }
 
-  const openWorkshop = (id: string): void => {
-    void window.pz.shell.external(`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`)
+  const openWorkshop = async (id: string): Promise<void> => {
+    try {
+      const ok = await window.pz.workshop.openSteam(id)
+      if (!ok) {
+        await window.pz.shell.external(`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`)
+      }
+    } catch {
+      await window.pz.shell.external(`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`)
+    }
   }
 
   const openFolder = (path: string): void => {
