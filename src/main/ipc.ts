@@ -17,9 +17,12 @@ import type {
   ValidateOptions,
   WorkbenchProgress,
   WorkshopSearchQuery,
-  WriteModInfoRequest
+  WriteModInfoRequest,
+  ApplyMemoryRequest,
+  ToggleReadOnlyRequest
 } from '../shared/types'
 import {
+  bbcodeToHtml,
   downloadWorkshopItem,
   getInstalledWorkshopCount,
   getWorkshopItemDetails,
@@ -27,7 +30,8 @@ import {
   openInSteamClient,
   openWorkshopFolder,
   queryWorkshop,
-  syncSteamWorkshop
+  syncSteamWorkshop,
+  translateModDescription
 } from './services/workshop'
 import {
   isSteamClientActive,
@@ -69,13 +73,25 @@ import {
   resolveLogSourceFile
 } from './services/logs'
 import {
+  autoDetectNpp,
   installNppPack,
+  launchNpp,
   looksLikeNpp,
   nppPathFor,
   nppStatus,
   openInNpp,
   previewNppPack
 } from './services/npp'
+import {
+  applyToGame,
+  checkPzoptUpdate,
+  downloadToProgram,
+  getPzoptStatus,
+  readPzoptConfig,
+  removeFromGame,
+  writePzoptConfig
+} from './services/pzopt'
+import { applyGameMemory, getMemoryReport, setEnvJavaOptions, toggleGameFilesReadOnly } from './services/memory'
 import { packMod } from './services/pack'
 import { createMergePatch } from './services/patcher'
 import { detectPaths } from './services/paths'
@@ -526,8 +542,12 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.nppLocate, async (e) => {
     const win = senderWindow(e)
     const options: Electron.OpenDialogOptions = {
-      title: 'Pick the Notepad++ install folder',
-      properties: ['openDirectory']
+      title: 'Pick Notepad++ executable (notepad++.exe) or install folder',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Notepad++ Executable', extensions: ['exe'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
     }
     const result = win
       ? await dialog.showOpenDialog(win, options)
@@ -537,6 +557,14 @@ export function registerIpc(): void {
       await setSettings({ nppPathOverride: picked })
     }
     return nppStatus(await getSettings())
+  })
+
+  ipcMain.handle(IPC.nppAutoDetect, async () => {
+    return autoDetectNpp(await getSettings(), setSettings)
+  })
+
+  ipcMain.handle(IPC.nppLaunch, async () => {
+    await launchNpp(await getSettings())
   })
 
   ipcMain.handle(IPC.nppInstall, async () => installNppPack(await getSettings()))
@@ -553,6 +581,52 @@ export function registerIpc(): void {
     const path = await nppPathFor(await getSettings(), target)
     if (target === 'udl') await shell.openPath(path)
     else shell.showItemInFolder(path)
+  })
+
+  // --- Tools (module 07): PZ Optimization ------------------------------------
+  ipcMain.handle(IPC.pzoptStatus, async () => {
+    return getPzoptStatus(await getSettings())
+  })
+
+  ipcMain.handle(IPC.pzoptCheckUpdate, async () => {
+    return checkPzoptUpdate(await getSettings())
+  })
+
+  ipcMain.handle(IPC.pzoptDownloadToProgram, async () => {
+    return downloadToProgram(await getSettings())
+  })
+
+  ipcMain.handle(IPC.pzoptApplyToGame, async () => {
+    return applyToGame(await getSettings())
+  })
+
+  ipcMain.handle(IPC.pzoptRemoveFromGame, async () => {
+    return removeFromGame(await getSettings())
+  })
+
+  ipcMain.handle(IPC.pzoptReadConfig, async () => {
+    return readPzoptConfig(await getSettings())
+  })
+
+  ipcMain.handle(IPC.pzoptWriteConfig, async (_e, content: string) => {
+    return writePzoptConfig(await getSettings(), content)
+  })
+
+  // --- Tools (module 07): Memory (RAM) Manager --------------------------------
+  ipcMain.handle(IPC.memReport, async () => {
+    return getMemoryReport(await getSettings())
+  })
+
+  ipcMain.handle(IPC.memApply, async (_e, req: ApplyMemoryRequest) => {
+    return applyGameMemory(await getSettings(), req)
+  })
+
+  ipcMain.handle(IPC.memSetEnv, async (_e, val: string | null) => {
+    return setEnvJavaOptions(val)
+  })
+
+  ipcMain.handle(IPC.memSetReadOnly, async (_e, req: ToggleReadOnlyRequest) => {
+    return toggleGameFilesReadOnly(await getSettings(), req)
   })
 
   // --- Workshop Overview (module 03) -----------------------------------------
@@ -595,6 +669,17 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.wsInstalledCount, async () => {
     return getInstalledWorkshopCount(await getSettings())
   })
+
+  ipcMain.handle(
+    IPC.wsTranslate,
+    async (_e, id: string, text: string, targetLang?: string, force?: boolean) => {
+      const translated = await translateModDescription(id, text, targetLang || 'ru', force)
+      return {
+        text: translated,
+        html: bbcodeToHtml(translated)
+      }
+    }
+  )
 
   // Start background live watcher for appworkshop_108600.acf
   void getSettings().then((settings) => {

@@ -109,6 +109,8 @@ const api: PzApi = {
   npp: {
     status: () => ipcRenderer.invoke(IPC.nppStatus),
     locate: () => ipcRenderer.invoke(IPC.nppLocate),
+    autoDetect: () => ipcRenderer.invoke(IPC.nppAutoDetect),
+    launch: () => ipcRenderer.invoke(IPC.nppLaunch),
     install: () => ipcRenderer.invoke(IPC.nppInstall),
     preview: () => ipcRenderer.invoke(IPC.nppPreview),
     open: (path: string, line?: number) => ipcRenderer.invoke(IPC.nppOpen, path, line),
@@ -125,7 +127,24 @@ const api: PzApi = {
     download: (publishedFileId) => ipcRenderer.invoke(IPC.wsDownload, publishedFileId),
     syncSteam: () => ipcRenderer.invoke(IPC.wsSync),
     getInstalledCount: () => ipcRenderer.invoke(IPC.wsInstalledCount),
+    translate: (id, text, targetLang, force) =>
+      ipcRenderer.invoke(IPC.wsTranslate, id, text, targetLang, force),
     onSyncChanged: (cb) => subscribe(IPC.wsSyncChanged, cb)
+  },
+  pzopt: {
+    status: () => ipcRenderer.invoke(IPC.pzoptStatus),
+    checkUpdate: () => ipcRenderer.invoke(IPC.pzoptCheckUpdate),
+    downloadToProgram: () => ipcRenderer.invoke(IPC.pzoptDownloadToProgram),
+    applyToGame: () => ipcRenderer.invoke(IPC.pzoptApplyToGame),
+    removeFromGame: () => ipcRenderer.invoke(IPC.pzoptRemoveFromGame),
+    readConfig: () => ipcRenderer.invoke(IPC.pzoptReadConfig),
+    writeConfig: (content: string) => ipcRenderer.invoke(IPC.pzoptWriteConfig, content)
+  },
+  memory: {
+    report: () => ipcRenderer.invoke(IPC.memReport),
+    apply: (req) => ipcRenderer.invoke(IPC.memApply, req),
+    setEnv: (val) => ipcRenderer.invoke(IPC.memSetEnv, val),
+    setReadOnly: (req) => ipcRenderer.invoke(IPC.memSetReadOnly, req)
   }
 }
 

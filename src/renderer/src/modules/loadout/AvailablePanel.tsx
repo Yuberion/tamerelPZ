@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MLOSCategory, ModEntry } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useI18n } from '@renderer/i18n'
@@ -6,6 +6,8 @@ import { SOURCE_META } from '@renderer/lib/catmeta'
 import { fuzzyMatch, segmentByIndices } from '@renderer/lib/format'
 import { useVirtual } from '@renderer/lib/useVirtual'
 import { CATEGORY_META, detectMlosCategory, RAW_CATEGORY_ORDER } from './mlos'
+import type { ModConflictTarget, ModMissingDepTarget } from './conflicts'
+import { ModStatusTooltip, type ModTooltipData } from './ModStatusTooltip'
 
 const ROW_H = 30
 
@@ -16,6 +18,8 @@ export interface Candidate {
   /** Human label; falls back to the token when nothing resolves it. */
   label: string
   mod?: ModEntry
+  incompatibleWith?: ModConflictTarget[]
+  missingDeps?: ModMissingDepTarget[]
 }
 
 interface AvailablePanelProps {
@@ -61,6 +65,38 @@ export function AvailablePanel({
   const { t, lang } = useI18n()
   const isRu = lang === 'ru'
   const [selectedCat, setSelectedCat] = useState<MLOSCategory | 'all'>('all')
+  const [hoveredCandidate, setHoveredCandidate] = useState<ModTooltipData | null>(null)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    }
+  }, [])
+
+  const handleMouseEnter = (candidate: Candidate, el: HTMLElement) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    const hasConflict = (candidate.incompatibleWith?.length ?? 0) > 0
+    const hasMissing = (candidate.missingDeps?.length ?? 0) > 0
+    if (!hasConflict && !hasMissing) {
+      setHoveredCandidate(null)
+      return
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredCandidate({
+        name: candidate.label,
+        id: candidate.value,
+        incompatibleWith: candidate.incompatibleWith,
+        missingDeps: candidate.missingDeps,
+        rect: el.getBoundingClientRect()
+      })
+    }, 120)
+  }
+
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    setHoveredCandidate(null)
+  }
 
   const candidatesWithCat = useMemo(() => {
     return candidates.map((c) => ({
@@ -166,7 +202,7 @@ export function AvailablePanel({
           </div>
         </div>
       ) : (
-        <div className="pane__scroll" ref={v.ref}>
+        <div className="pane__scroll" ref={v.ref} onScroll={handleMouseLeave}>
           <div style={{ height: v.totalHeight, position: 'relative' }}>
             <div style={{ transform: `translateY(${v.offset}px)` }}>
               {rows.slice(v.start, v.end).map(({ candidate, category, indices }) => {
@@ -176,10 +212,25 @@ export function AvailablePanel({
                 const segments = indices.length
                   ? segmentByIndices(candidate.label, indices)
                   : null
+
+                const hasConflict = (candidate.incompatibleWith?.length ?? 0) > 0
+                const hasMissing = (candidate.missingDeps?.length ?? 0) > 0
+                const conflictList = candidate.incompatibleWith?.map((c) => c.name).join(', ')
+                const missingList = candidate.missingDeps?.map((d) => d.name).join(', ')
+
+                let rowTitle = candidate.mod?.path ?? candidate.value
+                if (hasConflict && hasMissing) {
+                  rowTitle = `⛔ ${isRu ? 'Несовместим с' : 'Conflicts with'}: ${conflictList}\n⚠ ${isRu ? 'Требует' : 'Requires'}: ${missingList}`
+                } else if (hasConflict) {
+                  rowTitle = `⛔ ${isRu ? 'Несовместим с' : 'Conflicts with'}: ${conflictList}`
+                } else if (hasMissing) {
+                  rowTitle = `⚠ ${isRu ? 'Требует' : 'Requires'}: ${missingList}`
+                }
+
                 return (
                   <div
                     key={`${candidate.value}:${candidate.mod?.key ?? ''}`}
-                    className={`locand ${isUsed ? 'is-used' : ''} ${inspectedValue === candidate.value ? 'is-active' : ''}`}
+                    className={`locand ${isUsed ? 'is-used' : ''} ${inspectedValue === candidate.value ? 'is-active' : ''} ${hasConflict ? 'is-incompatible' : ''} ${hasMissing ? 'is-missing-dep' : ''}`}
                     style={{ height: ROW_H }}
                     onClick={() => onInspect?.(candidate.value)}
                     onDoubleClick={() => {
@@ -187,8 +238,12 @@ export function AvailablePanel({
                       if (isUsed) onRemove?.(candidate.value)
                       else onAdd(candidate.value)
                     }}
-                    onMouseEnter={() => onInspect?.(candidate.value)}
-                    title={candidate.mod?.path ?? candidate.value}
+                    onMouseEnter={(e) => {
+                      onInspect?.(candidate.value)
+                      handleMouseEnter(candidate, e.currentTarget)
+                    }}
+                    onMouseLeave={handleMouseLeave}
+                    title={rowTitle}
                   >
                     <button
                       type="button"
@@ -233,6 +288,35 @@ export function AvailablePanel({
                         <span className="locand__id mono truncate">{candidate.value}</span>
                       )}
                     </span>
+
+                    {hasConflict && (
+                      <span
+                        className="locand-badge locand-badge--conflict"
+                        title={
+                          isRu
+                            ? `Несовместим с: ${conflictList}`
+                            : `Conflicts with: ${conflictList}`
+                        }
+                      >
+                        <Icon name="alert" size={9} />
+                        {t('lo.badgeConflict')}
+                      </span>
+                    )}
+
+                    {hasMissing && (
+                      <span
+                        className="locand-badge locand-badge--dep"
+                        title={
+                          isRu
+                            ? `Требует: ${missingList}`
+                            : `Requires: ${missingList}`
+                        }
+                      >
+                        <Icon name="link" size={9} />
+                        {t('lo.badgeDep')}
+                      </span>
+                    )}
+
                     {catMeta && (
                       <span
                         className="lomlos-badge"
@@ -265,6 +349,7 @@ export function AvailablePanel({
           </div>
         </div>
       )}
+      <ModStatusTooltip data={hoveredCandidate} />
     </>
   )
 }

@@ -73,10 +73,27 @@ export const IPC = {
   /* Tools — the Notepad++ bridge. No channel here accepts an exe path. */
   nppStatus: 'npp:status',
   nppLocate: 'npp:locate',
+  nppAutoDetect: 'npp:autodetect',
+  nppLaunch: 'npp:launch',
   nppInstall: 'npp:install',
   nppPreview: 'npp:preview',
   nppOpen: 'npp:open',
   nppReveal: 'npp:reveal',
+
+  /* Tools — PZ Optimization */
+  pzoptStatus: 'pzopt:status',
+  pzoptCheckUpdate: 'pzopt:check-update',
+  pzoptDownloadToProgram: 'pzopt:download-to-program',
+  pzoptApplyToGame: 'pzopt:apply-to-game',
+  pzoptRemoveFromGame: 'pzopt:remove-from-game',
+  pzoptReadConfig: 'pzopt:read-config',
+  pzoptWriteConfig: 'pzopt:write-config',
+
+  /* Tools — Memory (RAM) Manager */
+  memReport: 'mem:report',
+  memApply: 'mem:apply',
+  memSetEnv: 'mem:set-env',
+  memSetReadOnly: 'mem:set-readonly',
 
   /* Workshop Overview (Module 03) */
   wsQuery: 'ws:query',
@@ -89,7 +106,8 @@ export const IPC = {
   wsDownload: 'ws:download',
   wsSync: 'ws:sync',
   wsSyncChanged: 'ws:sync-changed',
-  wsInstalledCount: 'ws:installed-count'
+  wsInstalledCount: 'ws:installed-count',
+  wsTranslate: 'ws:translate'
 } as const
 
 /** Custom protocol used to render local images inside the renderer. */

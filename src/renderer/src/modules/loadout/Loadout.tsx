@@ -21,6 +21,7 @@ import { ServerSyncModal } from './ServerSyncModal'
 import { BuildReportModal } from './BuildReportModal'
 import { copyOrderText, detectMlosCategory, sortModsMLOS, validateOrder } from './mlos'
 import { ModDetailPanel } from './ModDetailPanel'
+import { computeModsStatus, getModStatusForToken } from './conflicts'
 import {
   bareId,
   indexByModId,
@@ -269,6 +270,13 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
     return validateOrder(values, byModId, store.rules)
   }, [active, values, byModId, store.rules])
 
+  const modsStatus = useMemo(() => {
+    if (active !== 'mods') {
+      return { statusMap: new Map(), activeBareIds: new Set<string>() }
+    }
+    return computeModsStatus(values, mods, byModId, store.rules)
+  }, [active, values, mods, byModId, store.rules])
+
   const entries = useMemo<OrderEntry[]>(() => {
     const seen = new Set<string>()
     return values.map((value, index) => {
@@ -283,9 +291,22 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
         active === 'mods' && mod ? detectMlosCategory(mod, store.rules[key]?.category) : undefined
       const issues = active === 'mods' ? validationResult.issuesByMod?.get(key) : undefined
       const hasRule = active === 'mods' && Boolean(store.rules[key])
-      return { value, index, mod, missing: !mod, duplicate, category, issues, hasRule }
+      const status =
+        active === 'mods' ? getModStatusForToken(value, mod, modsStatus.statusMap) : undefined
+      return {
+        value,
+        index,
+        mod,
+        missing: !mod,
+        duplicate,
+        category,
+        issues,
+        hasRule,
+        incompatibleWith: status?.incompatibleWith,
+        missingDeps: status?.missingDeps
+      }
     })
-  }, [values, keyOf, lookup, active, store.rules, validationResult])
+  }, [values, keyOf, lookup, active, store.rules, validationResult, modsStatus])
 
   const used = useMemo(() => new Set(values.filter((v) => !isSeparator(v)).map(keyOf)), [values, keyOf])
   const missingCount = resolve ? entries.filter((e) => !isSeparator(e.value) && e.missing).length : 0
@@ -312,10 +333,18 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
       const key = keyOf(value)
       if (seen.has(key)) continue
       seen.add(key)
-      out.push({ value, label: mod.name, mod })
+      const status =
+        active === 'mods' ? getModStatusForToken(value, mod, modsStatus.statusMap) : undefined
+      out.push({
+        value,
+        label: mod.name,
+        mod,
+        incompatibleWith: status?.incompatibleWith,
+        missingDeps: status?.missingDeps
+      })
     }
     return out
-  }, [active, mods, mapFolders, keyOf])
+  }, [active, mods, mapFolders, keyOf, modsStatus])
 
   /* ---------------------------------------------------------------- editing -- */
 
@@ -911,12 +940,12 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
                   disabled={busy || values.length < 2}
                   title={
                     isRu
-                      ? 'Умная топологическая сортировка MLOS (категории, require, loadAfter, Lua soft-deps)'
-                      : 'Smart MLOS topological sort (categories, require, loadAfter, Lua soft-deps)'
+                      ? 'Сортировка BAS (Better Auto Sorting): категории, require, loadAfter, Lua soft-deps'
+                      : 'BAS Sort (Better Auto Sorting): categories, require, loadAfter, Lua soft-deps'
                   }
                 >
                   <Icon name="sort" size={11} />
-                  {isRu ? 'Сортировка MLOS' : 'MLOS Sort'}
+                  {isRu ? 'Сортировка BAS' : 'BAS Sort'}
                 </button>
                 <button
                   className="btn btn--tiny"

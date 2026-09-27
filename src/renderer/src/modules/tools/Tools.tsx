@@ -4,21 +4,28 @@ import { Icon, type IconName } from '@renderer/components/Icon'
 import { useI18n, type TKey } from '@renderer/i18n'
 import { formatBytes, formatCount, shortenPath } from '@renderer/lib/format'
 import { ForgeTool } from './ForgeTool'
+import { MemoryTool } from './MemoryTool'
 import { NppTool } from './NppTool'
+import { PzoptTool } from './PzoptTool'
 import { useForge } from './useForge'
+import { useMemory } from './useMemory'
 import { useNpp } from './useNpp'
+import { usePzopt } from './usePzopt'
 
-type Tab = 'forge' | 'npp'
+type Tab = 'forge' | 'npp' | 'pzopt' | 'memory'
 
 const TABS: Array<{ id: Tab; labelKey: TKey; icon: IconName }> = [
   { id: 'forge', labelKey: 'tl.tabForge', icon: 'cube' },
-  { id: 'npp', labelKey: 'tl.tabNpp', icon: 'edit' }
+  { id: 'npp', labelKey: 'tl.tabNpp', icon: 'edit' },
+  { id: 'pzopt', labelKey: 'tl.tabPzopt', icon: 'pulse' },
+  { id: 'memory', labelKey: 'tl.tabMemory', icon: 'hard-drive' }
 ]
 
 const LS_TAB = 'pz.tools.tab'
 
 function readTab(): Tab {
-  return localStorage.getItem(LS_TAB) === 'npp' ? 'npp' : 'forge'
+  const v = localStorage.getItem(LS_TAB)
+  return v === 'npp' ? 'npp' : v === 'pzopt' ? 'pzopt' : v === 'memory' ? 'memory' : 'forge'
 }
 
 /**
@@ -35,12 +42,15 @@ export function Tools({ onExit }: { onExit: () => void }) {
   const [tab, setTab] = useState<Tab>(readTab)
   const forge = useForge()
   const npp = useNpp()
+  const pzopt = usePzopt()
+  const memory = useMemory()
 
   useEffect(() => {
     localStorage.setItem(LS_TAB, tab)
   }, [tab])
 
   const packState = npp.missing ? 'missing' : npp.stale ? 'stale' : 'ok'
+  const pzoptState = pzopt.status?.state ?? 'not_installed'
 
   return (
     <div className="tools">
@@ -77,12 +87,46 @@ export function Tools({ onExit }: { onExit: () => void }) {
               {packState === 'ok' ? t('tl.packCurrent') : packState === 'stale' ? t('tl.packStale') : t('tl.packAbsent')}
             </span>
           )}
+          {tab === 'pzopt' && (
+            <span
+              className={`tlpill ${
+                pzoptState === 'ok'
+                  ? 'tlpill--ok'
+                  : pzoptState === 'mismatch'
+                    ? 'tlpill--warn'
+                    : pzoptState === 'corrupt'
+                      ? 'tlpill--bad'
+                      : 'tlpill--idle'
+              }`}
+            >
+              {pzoptState === 'ok'
+                ? t('tl.pzoptStateOk')
+                : pzoptState === 'mismatch'
+                  ? t('tl.pzoptStateMismatch')
+                  : pzoptState === 'corrupt'
+                    ? t('tl.pzoptStateCorrupt')
+                    : t('tl.pzoptStateNotInstalled')}
+            </span>
+          )}
+          {tab === 'memory' && (
+            <span className="tlpill tlpill--ok">
+              {`${(memory.selectedXmxMb / 1024).toFixed(1)} GB RAM`}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="tools__body">
         <section className="pane pane--center tools__main">
-          {tab === 'forge' ? <ForgeTool store={forge} /> : <NppTool store={npp} />}
+          {tab === 'forge' ? (
+            <ForgeTool store={forge} />
+          ) : tab === 'npp' ? (
+            <NppTool store={npp} />
+          ) : tab === 'pzopt' ? (
+            <PzoptTool store={pzopt} />
+          ) : (
+            <MemoryTool store={memory} />
+          )}
         </section>
       </div>
 
@@ -113,7 +157,7 @@ export function Tools({ onExit }: { onExit: () => void }) {
                   : t('tl.noFolder')}
             </span>
           </>
-        ) : (
+        ) : tab === 'npp' ? (
           <>
             <span>{npp.status?.installed ? t('tl.nppFound') : t('tl.nppMissing')}</span>
             {npp.status?.version && (
@@ -132,6 +176,38 @@ export function Tools({ onExit }: { onExit: () => void }) {
             <span className="statusbar__spacer" />
             <span className="statusbar__path" title={npp.status?.udlDir}>
               {npp.status?.udlDir ? shortenPath(npp.status.udlDir, 3) : '—'}
+            </span>
+          </>
+        ) : tab === 'memory' ? (
+          <>
+            <span>{t('tl.memSbConfigured', { xmx: `${memory.selectedXmxMb} MB` })}</span>
+            <span className="statusbar__sep">·</span>
+            <span className="is-dim">
+              {t('tl.memSbSystem', { total: `${memory.report?.system.totalMb ?? '—'} MB` })}
+            </span>
+            {memory.report?.envJavaOptions.isOverriding && (
+              <>
+                <span className="statusbar__sep">·</span>
+                <span className="is-warn">
+                  {t('tl.memSbEnvOverride', { val: memory.report.envJavaOptions.user ?? memory.report.envJavaOptions.machine ?? '' })}
+                </span>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <span>
+              {pzopt.status?.installed
+                ? t('tl.pzoptSbInstalled', { rev: pzopt.status.installedRevision ?? '—' })
+                : t('tl.pzoptSbNotInstalled')}
+            </span>
+            <span className="statusbar__sep">·</span>
+            <span className="is-dim">
+              {t('tl.pzoptSbGameRev', { rev: pzopt.status?.gameRevision ?? '—' })}
+            </span>
+            <span className="statusbar__spacer" />
+            <span className="statusbar__path" title={pzopt.status?.gameDir}>
+              {pzopt.status?.gameDir ? shortenPath(pzopt.status.gameDir, 4) : '—'}
             </span>
           </>
         )}

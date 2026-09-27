@@ -1043,6 +1043,105 @@ export interface NppPackPreview {
 }
 
 /* =========================================================================
+   PZ Optimization types (Tools module 07)
+   ========================================================================= */
+
+export type PzoptState = 'ok' | 'mismatch' | 'corrupt' | 'not_installed'
+
+export interface PzoptStagedPackage {
+  available: boolean
+  path: string
+  revision?: string
+  commit?: string
+  tag?: string
+  builtDate?: string
+  downloadedAt?: string
+  filesCount: number
+  source: 'workshop' | 'github'
+}
+
+export interface PzoptStatus {
+  gameDir?: string
+  gameJarExists: boolean
+  gameRevision?: string
+  // Game installation state
+  installed: boolean
+  installedRevision?: string
+  installedTag?: string
+  installedCommit?: string
+  installedFilesCount: number
+  manifestPath?: string
+  state: PzoptState
+  missingCount: number
+  modifiedCount: number
+  installedDate?: string
+  // Game running state
+  gameRunning: boolean
+  // Staged package stored in PZ Management
+  staged: PzoptStagedPackage
+  // Up-to-date check with staged vs game
+  isGameUpToDateWithStaged: boolean
+  // GitHub release check
+  remoteCheck?: {
+    checked: boolean
+    hasNewerVersion: boolean
+    latestRelease?: {
+      tag: string
+      revision: string
+      commit: string
+      downloadUrl: string
+      publishedAt: string
+      assetName: string
+      size: number
+    }
+    error?: string
+  }
+  // Configuration
+  propertiesPath?: string
+  propertiesExist: boolean
+  propertiesContent?: string
+}
+
+export interface PzoptDownloadResult {
+  ok: boolean
+  tag: string
+  revision: string
+  filesCount: number
+  error?: string
+}
+
+export interface PzoptApplyResult {
+  ok: boolean
+  writtenCount: number
+  revision: string
+  error?: string
+}
+
+export interface PzoptUninstallResult {
+  ok: boolean
+  removedCount: number
+  error?: string
+}
+
+export interface PzoptCheckUpdateResult {
+  hasNewerVersion: boolean
+  latestRelease?: {
+    tag: string
+    revision: string
+    commit: string
+    downloadUrl: string
+    publishedAt: string
+    assetName: string
+    size: number
+  }
+  gameRevision?: string
+  stagedRevision?: string
+  stagedTag?: string
+  installedRevision?: string
+  error?: string
+}
+
+/* =========================================================================
    Workshop Overview types (Module 03)
    ========================================================================= */
 
@@ -1106,4 +1205,84 @@ export interface WorkshopSyncResult {
   installedCount: number
   updatedCount: number
   totalBytes: number
+}
+
+/* ----------------------------------------------------------- Memory (RAM) -- */
+
+export interface SystemMemoryInfo {
+  totalBytes: number
+  freeBytes: number
+  totalMb: number
+  freeMb: number
+  recommendedMinMb: number
+  recommendedMaxMb: number
+}
+
+export interface SessionMemoryTelemetry {
+  jvmMaxMb: number
+  jvmTotalMb: number
+  jvmFreeMb: number
+  systemRamMb: number
+  vramMb?: number
+  timestamp?: string
+}
+
+export interface GameConfigFileInfo {
+  path: string
+  exists: boolean
+  xmxMb: number
+  xmsMb?: number
+  rawXmx: string
+  rawXms?: string
+  isReadOnly?: boolean
+}
+
+export interface WindowsEnvOptions {
+  user?: string
+  machine?: string
+  isOverriding: boolean
+}
+
+export interface MemoryReport {
+  system: SystemMemoryInfo
+  lastSession?: SessionMemoryTelemetry
+  clientJson?: GameConfigFileInfo
+  clientBat?: GameConfigFileInfo
+  serverBat?: GameConfigFileInfo
+  envJavaOptions: WindowsEnvOptions
+  gameDir?: string
+}
+
+export interface ApplyMemoryRequest {
+  targetJson: boolean
+  targetBat: boolean
+  targetServerBat: boolean
+  xmxMb: number
+  xmsMb?: number
+  protectReadOnly?: boolean
+}
+
+export interface ApplyMemoryResult {
+  ok: boolean
+  updatedFiles: string[]
+  error?: string
+}
+
+export interface SetEnvOptionsResult {
+  ok: boolean
+  currentValue?: string
+  error?: string
+}
+
+export interface ToggleReadOnlyRequest {
+  targetJson?: boolean
+  targetBat?: boolean
+  targetServerBat?: boolean
+  readOnly: boolean
+}
+
+export interface ToggleReadOnlyResult {
+  ok: boolean
+  updatedFiles: string[]
+  error?: string
 }

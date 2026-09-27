@@ -37,50 +37,91 @@ export function NppTool({ store }: { store: NppStore }) {
     }
   }
 
+  const handleLaunch = async () => {
+    try {
+      await store.launch()
+      notify(t('tl.nppLaunchedToast'), 'ok')
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), 'warn')
+    }
+  }
+
+  const handleAutoDetect = async () => {
+    const res = await store.autoDetect()
+    if (res.found && res.exePath) {
+      notify(t('tl.nppBoundToast', { path: res.exePath }), 'ok')
+    } else {
+      notify(t('tl.nppNotFoundToast'), 'warn')
+    }
+  }
+
+  const renderInstallButton = () => (
+    <button
+      className={`btn btn--tiny ${store.missing || store.stale ? 'is-active' : ''}`}
+      onClick={() => {
+        void store.install().then((done) => {
+          if (!done) return
+          notify(t('tl.installedToast', { n: done.written, bytes: formatBytes(done.bytes) }), 'ok')
+        })
+      }}
+      disabled={store.busy}
+      title={t('tl.installTitle')}
+    >
+      <Icon name="download" size={11} />
+      {installLabel}
+    </button>
+  )
+
+  const renderRefreshButton = () => (
+    <button
+      className="btn btn--tiny"
+      onClick={() => void store.refresh()}
+      disabled={store.loading}
+      title={t('tl.nppRefresh')}
+    >
+      <Icon name="refresh" size={11} className={store.loading ? 'spin' : undefined} />
+      {t('tl.nppRefresh')}
+    </button>
+  )
+
   return (
     <Panel
       title={t('tl.nppTitle')}
       lede={t('tl.nppLede')}
       icon="edit"
       help={t('help.tl.npp')}
-      actions={
-        <>
-          <button className="btn" onClick={() => void store.locate()} disabled={store.busy} title={t('tl.locateTitle')}>
-            <Icon name="search" size={13} />
-            {t('tl.locate')}
-          </button>
-          <button
-            className={`btn ${store.missing || store.stale ? 'is-primary' : ''}`}
-            onClick={() => {
-              void store.install().then((done) => {
-                if (!done) return
-                notify(t('tl.installedToast', { n: done.written, bytes: formatBytes(done.bytes) }), 'ok')
-              })
-            }}
-            disabled={store.busy}
-            title={t('tl.installTitle')}
-          >
-            <Icon name="download" size={13} />
-            {installLabel}
-          </button>
-          <button
-            className="btn btn-icon"
-            onClick={() => void store.refresh()}
-            disabled={store.loading}
-            title={t('tl.nppRefresh')}
-          >
-            <Icon name="refresh" size={13} className={store.loading ? 'spin' : undefined} />
-          </button>
-        </>
-      }
     >
       {store.error && <Alert kind="bad">{store.error}</Alert>}
 
       <Group title={t('tl.nppEditor')} help={t('help.tl.nppEditor')}>
         {status && !status.installed && (
-          <Alert kind="warn" title={t('tl.nppMissing')}>
-            {t('tl.nppMissingBody')}
-          </Alert>
+          <>
+            <Alert kind="warn" title={t('tl.nppMissing')}>
+              {t('tl.nppMissingBody')}
+            </Alert>
+            <div className="btnrow" style={{ marginTop: '8px' }}>
+              <button
+                className="btn btn--tiny is-primary"
+                onClick={() => void handleAutoDetect()}
+                disabled={store.busy}
+                title={t('tl.nppAutoDetectTitle')}
+              >
+                <Icon name="search" size={11} />
+                {t('tl.nppAutoDetect')}
+              </button>
+              <button
+                className="btn btn--tiny"
+                onClick={() => void store.locate()}
+                disabled={store.busy}
+                title={t('tl.nppBrowseTitle')}
+              >
+                <Icon name="folder-open" size={11} />
+                {t('tl.nppBrowse')}
+              </button>
+              {renderInstallButton()}
+              {renderRefreshButton()}
+            </div>
+          </>
         )}
         {status?.installed && (
           <div className="tlok">
@@ -102,6 +143,35 @@ export function NppTool({ store }: { store: NppStore }) {
         />
         {status?.exePath && (
           <div className="btnrow">
+            <button
+              className="btn btn--tiny is-primary"
+              onClick={() => void handleLaunch()}
+              disabled={store.busy}
+              title={t('tl.nppLaunchTitle')}
+            >
+              <Icon name="play" size={11} />
+              {t('tl.nppLaunch')}
+            </button>
+            <button
+              className="btn btn--tiny"
+              onClick={() => void handleAutoDetect()}
+              disabled={store.busy}
+              title={t('tl.nppAutoDetectTitle')}
+            >
+              <Icon name="search" size={11} />
+              {t('tl.nppAutoDetect')}
+            </button>
+            <button
+              className="btn btn--tiny"
+              onClick={() => void store.locate()}
+              disabled={store.busy}
+              title={t('tl.nppBrowseTitle')}
+            >
+              <Icon name="folder-open" size={11} />
+              {t('tl.nppBrowse')}
+            </button>
+            {renderInstallButton()}
+            {renderRefreshButton()}
             <button className="btn btn--tiny" onClick={() => void reveal('exe')}>
               <Icon name="external" size={11} />
               {t('tl.nppReveal')}
@@ -136,6 +206,7 @@ export function NppTool({ store }: { store: NppStore }) {
         <Readout label={t('tl.packInstalledVersion')} value={status?.installedVersion ?? '—'} />
         <Readout label={t('tl.nppUdl')} value={status?.udlDir ?? '—'} />
         <div className="btnrow">
+          {renderInstallButton()}
           <button
             className="btn btn--tiny"
             onClick={() => void reveal('udl')}

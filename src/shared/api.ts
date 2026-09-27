@@ -47,7 +47,18 @@ import type {
   WorkshopSearchResult,
   WorkshopSyncResult,
   WriteModInfoRequest,
-  WriteModInfoResult
+  WriteModInfoResult,
+  PzoptApplyResult,
+  PzoptCheckUpdateResult,
+  PzoptDownloadResult,
+  PzoptStatus,
+  PzoptUninstallResult,
+  ApplyMemoryRequest,
+  ApplyMemoryResult,
+  MemoryReport,
+  SetEnvOptionsResult,
+  ToggleReadOnlyRequest,
+  ToggleReadOnlyResult
 } from './types'
 
 export interface ScanRequest {
@@ -198,6 +209,10 @@ export interface PzApi {
     status(): Promise<NppStatus>
     /** Ask the user where Notepad++ lives, then re-probe. */
     locate(): Promise<NppStatus>
+    /** Auto-detect Notepad++ from registry, known dirs, or PATH and persist to settings. */
+    autoDetect(): Promise<{ found: boolean; exePath?: string; source?: string; status: NppStatus }>
+    /** Launch the Notepad++ application. */
+    launch(): Promise<void>
     install(): Promise<NppInstallResult>
     /** The pack's XML as it would be written, for inspection before installing. */
     preview(): Promise<NppPackPreview[]>
@@ -222,6 +237,33 @@ export interface PzApi {
     download(publishedFileId: string): Promise<WorkshopDownloadResult>
     syncSteam(): Promise<WorkshopSyncResult>
     getInstalledCount(): Promise<number>
+    translate(
+      id: string,
+      text: string,
+      targetLang?: string,
+      force?: boolean
+    ): Promise<{ text: string; html: string }>
     onSyncChanged(cb: (res: WorkshopSyncResult) => void): () => void
+  }
+  /**
+   * PZ Optimization engine overrides manager.
+   */
+  pzopt: {
+    status(): Promise<PzoptStatus>
+    checkUpdate(): Promise<PzoptCheckUpdateResult>
+    downloadToProgram(): Promise<PzoptDownloadResult>
+    applyToGame(): Promise<PzoptApplyResult>
+    removeFromGame(): Promise<PzoptUninstallResult>
+    readConfig(): Promise<string>
+    writeConfig(content: string): Promise<boolean>
+  }
+  /**
+   * Memory (RAM) manager for client, scripts, server, and system environment.
+   */
+  memory: {
+    report(): Promise<MemoryReport>
+    apply(req: ApplyMemoryRequest): Promise<ApplyMemoryResult>
+    setEnv(val: string | null): Promise<SetEnvOptionsResult>
+    setReadOnly(req: ToggleReadOnlyRequest): Promise<ToggleReadOnlyResult>
   }
 }

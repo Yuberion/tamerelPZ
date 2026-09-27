@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
-import type { ModEntry, ModOverwritesSummary, SortingRule } from '@shared/types'
+import { useState, useMemo, useEffect } from 'react'
+import type { ModEntry, ModOverwritesSummary, SortingRule, WorkshopItemDetails } from '@shared/types'
 import { pzFileUrl } from '@shared/ipc'
 import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { useI18n } from '@renderer/i18n'
 import { SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText } from '@renderer/lib/format'
+import { bbcodeToHtml } from '@renderer/lib/bbcode'
 import { CATEGORY_META, detectMlosCategory } from './mlos'
 import { bareId } from './useLoadout'
 
@@ -33,6 +34,137 @@ export function ModDetailPanel({
   const isRu = lang === 'ru'
   const [posterFailed, setPosterFailed] = useState(false)
 
+  // Description & Translation state
+  const [wsDetails, setWsDetails] = useState<WorkshopItemDetails | null>(null)
+  const [loadingDesc, setLoadingDesc] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  const [showOriginalDesc, setShowOriginalDesc] = useState(false)
+  const [localRuHtml, setLocalRuHtml] = useState<string | null>(null)
+
+  useEffect(() => {
+    setWsDetails(null)
+    setLocalRuHtml(null)
+    setShowOriginalDesc(false)
+    setPosterFailed(false)
+
+    if (!mod) return
+
+    let cancelled = false
+
+    if (mod.workshopId) {
+      setLoadingDesc(true)
+      window.pz.workshop
+        .details(mod.workshopId)
+        .then((details) => {
+          if (!cancelled && details) {
+            setWsDetails(details)
+          }
+        })
+        .catch((err) => {
+          console.warn('[ModDetailPanel] Failed to fetch workshop details:', err)
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoadingDesc(false)
+          }
+        })
+    } else if (isRu && mod.description) {
+      const text = mod.description.trim()
+      const cyrillicCount = (text.match(/[\u0400-\u04FF]/g) || []).length
+      if (cyrillicCount <= text.length * 0.25) {
+        setLoadingDesc(true)
+        window.pz.workshop
+          .translate(mod.modId || mod.key, text, 'ru', false)
+          .then((res) => {
+            if (!cancelled && res?.html) {
+              setLocalRuHtml(res.html)
+            }
+          })
+          .catch((err) => {
+            console.warn('[ModDetailPanel] Local translation failed:', err)
+          })
+          .finally(() => {
+            if (!cancelled) {
+              setLoadingDesc(false)
+            }
+          })
+      }
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [mod?.key, mod?.workshopId, mod?.description, isRu])
+
+  const handleForceTranslate = async (): Promise<void> => {
+    if (!mod) return
+    setTranslating(true)
+    try {
+      if (mod.workshopId) {
+        const details = await window.pz.workshop.details(mod.workshopId, true)
+        setWsDetails(details)
+        setShowOriginalDesc(false)
+        if (details.descriptionRu && details.descriptionRu !== details.description) {
+          notify(
+            isRu ? 'Описание успешно переведено на русский' : 'Description translated to Russian',
+            'ok'
+          )
+        } else {
+          notify(
+            isRu
+              ? 'Перевод недоступен или текст уже на русском'
+              : 'Translation unavailable or already in Russian',
+            'warn'
+          )
+        }
+      } else if (mod.description) {
+        const res = await window.pz.workshop.translate(mod.modId || mod.key, mod.description, 'ru', true)
+        if (res?.html && res.text !== mod.description) {
+          setLocalRuHtml(res.html)
+          setShowOriginalDesc(false)
+          notify(
+            isRu ? 'Описание успешно переведено на русский' : 'Description translated to Russian',
+            'ok'
+          )
+        } else {
+          notify(
+            isRu
+              ? 'Перевод недоступен или текст уже на русском'
+              : 'Translation unavailable or already in Russian',
+            'warn'
+          )
+        }
+      }
+    } catch {
+      notify(isRu ? 'Ошибка при переводе описания' : 'Failed to translate description', 'warn')
+    } finally {
+      setTranslating(false)
+    }
+  }
+
+  const origHtml = useMemo(() => {
+    if (wsDetails?.description) return wsDetails.description
+    if (mod?.description) return bbcodeToHtml(mod.description)
+    return ''
+  }, [wsDetails?.description, mod?.description])
+
+  const ruHtml = useMemo(() => {
+    if (wsDetails?.descriptionRu) return wsDetails.descriptionRu
+    if (localRuHtml) return localRuHtml
+    return ''
+  }, [wsDetails?.descriptionRu, localRuHtml])
+
+  const hasRuTranslation = useMemo(() => {
+    return Boolean(ruHtml && ruHtml.trim() && ruHtml !== origHtml)
+  }, [ruHtml, origHtml])
+
+  const displayHtml = useMemo(() => {
+    if (isRu && hasRuTranslation && !showOriginalDesc) {
+      return ruHtml
+    }
+    return origHtml
+  }, [isRu, hasRuTranslation, showOriginalDesc, ruHtml, origHtml])
+
   const activeSet = useMemo(() => {
     return new Set(activeMods.map((m) => m.trim().toLowerCase()))
   }, [activeMods])
@@ -40,8 +172,10 @@ export function ModDetailPanel({
   const artwork = useMemo(() => {
     if (!mod) return undefined
     if (!posterFailed && mod.posterPath) return mod.posterPath
-    return mod.iconPath ?? mod.posterPath
-  }, [mod, posterFailed])
+    if (mod.iconPath) return mod.iconPath
+    if (wsDetails?.previewUrl) return wsDetails.previewUrl
+    return mod.posterPath
+  }, [mod, posterFailed, wsDetails?.previewUrl])
 
   const copyVal = async (text: string, label: string): Promise<void> => {
     await copyText(text)
@@ -137,7 +271,7 @@ export function ModDetailPanel({
             <div className="lodetail-poster brackets">
               {artwork ? (
                 <img
-                  src={pzFileUrl(artwork)}
+                  src={artwork.startsWith('http') ? artwork : pzFileUrl(artwork)}
                   alt={mod.name}
                   onError={() => setPosterFailed(true)}
                   draggable={false}
@@ -432,11 +566,83 @@ export function ModDetailPanel({
               </div>
             )}
 
-            {/* Description */}
-            {mod.description && (
+            {/* Description Section with Workshop Translation */}
+            {Boolean(displayHtml || mod.description) && (
               <div className="lodetail-section">
-                <span className="label stencil">{isRu ? 'Описание:' : 'Description:'}</span>
-                <div className="lodetail-desc mono">{mod.description}</div>
+                <div
+                  className="lodetail-sec-head"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 6
+                  }}
+                >
+                  <span className="label stencil">{isRu ? 'Описание мода:' : 'Mod Description:'}</span>
+
+                  {/* Segmented language switcher when translation is available */}
+                  {isRu && hasRuTranslation ? (
+                    <div className="ws-desc-lang-switch">
+                      <button
+                        type="button"
+                        className={`ws-desc-lang-btn ${!showOriginalDesc ? 'is-active' : ''}`}
+                        onClick={() => setShowOriginalDesc(false)}
+                        title={isRu ? 'Показать описание на русском языке' : 'Show Russian translation'}
+                      >
+                        <Icon name="globe" size={11} />
+                        <span>Русский</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`ws-desc-lang-btn ${showOriginalDesc ? 'is-active' : ''}`}
+                        onClick={() => setShowOriginalDesc(true)}
+                        title={isRu ? 'Показать оригинальное описание' : 'Show English original'}
+                      >
+                        <span>Оригинал (EN)</span>
+                      </button>
+                    </div>
+                  ) : isRu && !loadingDesc && Boolean(mod.description || wsDetails?.description) ? (
+                    <button
+                      type="button"
+                      className="ws-btn-trans-retry"
+                      onClick={() => void handleForceTranslate()}
+                      disabled={translating}
+                      title={isRu ? 'Перевести описание на русский язык' : 'Translate description to Russian'}
+                    >
+                      <Icon name="rotate" size={11} className={translating ? 'spin' : ''} />
+                      <span>
+                        {translating
+                          ? isRu
+                            ? 'Переводим…'
+                            : 'Translating…'
+                          : isRu
+                            ? 'Перевести (RU)'
+                            : 'Translate (RU)'}
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
+
+                {loadingDesc ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      color: 'var(--ash-faint)',
+                      padding: '8px 0',
+                      fontSize: '0.78rem'
+                    }}
+                  >
+                    <Icon name="refresh" size={12} className="spin" />
+                    <span>{isRu ? 'Загрузка и перевод описания…' : 'Loading description…'}</span>
+                  </div>
+                ) : (
+                  <div
+                    className="ws-desc-container lodetail-desc"
+                    dangerouslySetInnerHTML={{ __html: displayHtml }}
+                  />
+                )}
               </div>
             )}
           </div>

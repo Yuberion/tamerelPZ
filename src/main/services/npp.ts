@@ -104,6 +104,28 @@ async function locateExe(settings: AppSettings): Promise<Found | undefined> {
     const exe = join(dir, EXE)
     if (await exists(exe)) return { exePath: normalize(exe), dir: normalize(dir), source: 'known' }
   }
+
+  const inPath = await searchInPath()
+  if (inPath) {
+    return { exePath: inPath, dir: dirname(inPath), source: 'known' }
+  }
+
+  return undefined
+}
+
+async function searchInPath(): Promise<string | undefined> {
+  if (process.platform !== 'win32') return undefined
+  try {
+    const { stdout } = await run('where', ['notepad++'], { windowsHide: true })
+    const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    for (const line of lines) {
+      if (line.toLowerCase().endsWith('.exe') && (await exists(line))) {
+        return normalize(line)
+      }
+    }
+  } catch {
+    // Ignore error
+  }
   return undefined
 }
 
@@ -496,10 +518,54 @@ export async function openInNpp(settings: AppSettings, path: string, line?: numb
   child.unref()
 }
 
-/** True when `dir` looks like a Notepad++ install; used to validate a pick. */
-export async function looksLikeNpp(dir: string): Promise<boolean> {
-  if (!(await isDir(dir))) return false
-  return exists(join(dir, EXE))
+/**
+ * Launch Notepad++ without any specific file argument.
+ */
+export async function launchNpp(settings: AppSettings): Promise<void> {
+  if (process.platform !== 'win32') throw new Error('Notepad++ is Windows only')
+  const found = await locateExe(settings)
+  if (!found) {
+    throw new Error('Notepad++ was not found on this machine')
+  }
+
+  const child = spawn(found.exePath, [], {
+    cwd: found.dir,
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: false
+  })
+  child.unref()
+}
+
+/**
+ * Auto-detect installed Notepad++ from registry, known dirs, or PATH and persist into settings.
+ */
+export async function autoDetectNpp(
+  settings: AppSettings,
+  saveSettings: (patch: Partial<AppSettings>) => Promise<unknown>
+): Promise<{ found: boolean; exePath?: string; source?: string; status: NppStatus }> {
+  // Re-detect without existing override to find fresh system install
+  const settingsWithoutOverride = { ...settings, nppPathOverride: undefined }
+  const found = await locateExe(settingsWithoutOverride)
+
+  if (found) {
+    await saveSettings({ nppPathOverride: found.exePath })
+    const updatedStatus = await nppStatus({ ...settings, nppPathOverride: found.exePath })
+    return { found: true, exePath: found.exePath, source: found.source, status: updatedStatus }
+  }
+
+  const currentStatus = await nppStatus(settings)
+  return { found: false, status: currentStatus }
+}
+
+/** True when `target` looks like a Notepad++ install or executable; used to validate a pick. */
+export async function looksLikeNpp(target: string): Promise<boolean> {
+  const norm = normalize(target)
+  if (norm.toLowerCase().endsWith('.exe')) {
+    return exists(norm)
+  }
+  if (!(await isDir(norm))) return false
+  return exists(join(norm, EXE))
 }
 
 /**

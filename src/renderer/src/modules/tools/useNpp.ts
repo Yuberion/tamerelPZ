@@ -16,6 +16,8 @@ export interface NppStore {
   error: string | undefined
   refresh(): Promise<void>
   locate(): Promise<void>
+  autoDetect(): Promise<{ found: boolean; exePath?: string }>
+  launch(): Promise<void>
   install(): Promise<{ written: number; bytes: number } | undefined>
   preview: NppPackPreview[]
   loadPreview(): Promise<void>
@@ -55,6 +57,34 @@ export function useNpp(): NppStore {
       setError(undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const autoDetect = useCallback(async () => {
+    setBusy(true)
+    try {
+      const res = await window.pz.npp.autoDetect()
+      setStatus(res.status)
+      setError(undefined)
+      return { found: res.found, exePath: res.exePath }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      return { found: false }
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const launch = useCallback(async () => {
+    setBusy(true)
+    try {
+      await window.pz.npp.launch()
+      setError(undefined)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      throw e
     } finally {
       setBusy(false)
     }
@@ -101,12 +131,14 @@ export function useNpp(): NppStore {
       error,
       refresh,
       locate,
+      autoDetect,
+      launch,
       install,
       preview,
       loadPreview,
       missing,
       stale
     }),
-    [status, loading, busy, error, refresh, locate, install, preview, loadPreview, missing, stale]
+    [status, loading, busy, error, refresh, locate, autoDetect, launch, install, preview, loadPreview, missing, stale]
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MLOSCategory, ModEntry, ModOverwritesSummary, OrderIssue } from '@shared/types'
 import { Icon } from '@renderer/components/Icon'
 import { useMenu } from '@renderer/components/Menu'
@@ -8,6 +8,8 @@ import { SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText } from '@renderer/lib/format'
 import { CATEGORY_META } from './mlos'
 import { bareId } from './useLoadout'
+import type { ModConflictTarget, ModMissingDepTarget } from './conflicts'
+import { ModStatusTooltip, type ModTooltipData } from './ModStatusTooltip'
 
 export interface OrderEntry {
   value: string
@@ -18,6 +20,8 @@ export interface OrderEntry {
   category?: MLOSCategory
   issues?: OrderIssue[]
   hasRule?: boolean
+  incompatibleWith?: ModConflictTarget[]
+  missingDeps?: ModMissingDepTarget[]
 }
 
 export function isSeparator(value: string): boolean {
@@ -71,6 +75,38 @@ export function OrderList({
   const [dragIndex, setDragIndex] = useState<number>()
   const [overIndex, setOverIndex] = useState<number>()
   const [collapsedSeps, setCollapsedSeps] = useState<Set<number>>(() => new Set())
+  const [hoveredEntry, setHoveredEntry] = useState<ModTooltipData | null>(null)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    }
+  }, [])
+
+  const handleMouseEnter = (entry: OrderEntry, el: HTMLElement) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    const hasConflict = (entry.incompatibleWith?.length ?? 0) > 0
+    const hasMissing = (entry.missingDeps?.length ?? 0) > 0
+    if (!hasConflict && !hasMissing) {
+      setHoveredEntry(null)
+      return
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredEntry({
+        name: entry.mod?.name ?? entry.value,
+        id: entry.value,
+        incompatibleWith: entry.incompatibleWith,
+        missingDeps: entry.missingDeps,
+        rect: el.getBoundingClientRect()
+      })
+    }, 120)
+  }
+
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    setHoveredEntry(null)
+  }
 
   // Calculate group ranges and membership for separators
   const { sepCounts, itemToSep } = useMemo(() => {
@@ -231,7 +267,7 @@ export function OrderList({
   }
 
   return (
-    <div className="pane__scroll" onDragEnd={endDrag}>
+    <div className="pane__scroll" onDragEnd={endDrag} onScroll={handleMouseLeave}>
       <div className="loorder">
         {entries.map((entry) => {
           const isSep = isSeparator(entry.value)
@@ -379,6 +415,22 @@ export function OrderList({
           const catMeta = entry.category ? CATEGORY_META[entry.category] : undefined
           const issueCount = entry.issues?.length ?? 0
 
+          const hasConflict = (entry.incompatibleWith?.length ?? 0) > 0
+          const hasMissing = (entry.missingDeps?.length ?? 0) > 0
+          const conflictList = entry.incompatibleWith?.map((c) => c.name).join(', ')
+          const missingList = entry.missingDeps?.map((d) => d.name).join(', ')
+
+          let rowTitle = entry.mod?.path ?? entry.value
+          if (hasConflict && hasMissing) {
+            rowTitle = `⛔ ${isRu ? 'Несовместим с' : 'Conflicts with'}: ${conflictList}\n⚠ ${isRu ? 'Требует' : 'Requires'}: ${missingList}`
+          } else if (hasConflict) {
+            rowTitle = `⛔ ${isRu ? 'Несовместим с' : 'Conflicts with'}: ${conflictList}`
+          } else if (hasMissing) {
+            rowTitle = `⚠ ${isRu ? 'Требует' : 'Requires'}: ${missingList}`
+          } else if (entry.issues?.length) {
+            rowTitle = entry.issues.map((i) => `⚠ ${i.message}`).join('\n')
+          }
+
           // Overwrite stats (Point 7)
           const overwrites = overwritesSummary?.overwritesOthers[entry.value] ?? 0
           const overwritten = overwritesSummary?.overwrittenByOthers[entry.value] ?? 0
@@ -392,6 +444,8 @@ export function OrderList({
                 selected === entry.index ? 'is-selected' : '',
                 bad ? 'is-missing' : '',
                 entry.duplicate ? 'is-duplicate' : '',
+                hasConflict ? 'is-incompatible' : '',
+                hasMissing ? 'is-missing-dep' : '',
                 issueCount > 0 ? 'is-warn-issue' : '',
                 isPinned ? 'is-pinned' : '',
                 dragIndex === entry.index ? 'is-dragging' : '',
@@ -404,6 +458,8 @@ export function OrderList({
               draggable={!disabled}
               onClick={() => onSelect(entry.index)}
               onContextMenu={(e) => rowMenu(e, entry)}
+              onMouseEnter={(e) => handleMouseEnter(entry, e.currentTarget)}
+              onMouseLeave={handleMouseLeave}
               onDragStart={(e) => {
                 setDragIndex(entry.index)
                 e.dataTransfer.effectAllowed = 'move'
@@ -422,11 +478,7 @@ export function OrderList({
                 }
                 endDrag()
               }}
-              title={
-                entry.issues?.length
-                  ? entry.issues.map((i) => `⚠ ${i.message}`).join('\n')
-                  : entry.mod?.path ?? entry.value
-              }
+              title={rowTitle}
             >
               <span className="lorow__grip">
                 <Icon name="dots" size={12} />
@@ -442,7 +494,7 @@ export function OrderList({
                 title={
                   isPinned
                     ? (isRu ? 'Позиция зафиксирована (кликните, чтобы снять замок)' : 'Position locked (click to unlock)')
-                    : (isRu ? 'Зафиксировать позицию мода при сортировке MLOS' : 'Lock position during MLOS sort')
+                    : (isRu ? 'Зафиксировать позицию мода при сортировке BAS' : 'Lock position during BAS sort')
                 }
               >
                 <Icon name="lock" size={10} color={isPinned ? '#f59e0b' : undefined} />
@@ -506,6 +558,34 @@ export function OrderList({
                 <span className={`lorow__drop-badge ${dropStatus === 'safe' ? 'is-safe' : 'is-unsafe'}`}>
                   <Icon name={dropStatus === 'safe' ? 'check' : 'alert'} size={10} />
                   {dropReason}
+                </span>
+              )}
+
+              {hasConflict && (
+                <span
+                  className="lopill lopill--conflict"
+                  title={
+                    isRu
+                      ? `Несовместим с: ${conflictList}`
+                      : `Conflicts with: ${conflictList}`
+                  }
+                >
+                  <Icon name="alert" size={9} />
+                  {t('lo.badgeConflict')}
+                </span>
+              )}
+
+              {hasMissing && (
+                <span
+                  className="lopill lopill--dep-warn"
+                  title={
+                    isRu
+                      ? `Требует: ${missingList}`
+                      : `Requires: ${missingList}`
+                  }
+                >
+                  <Icon name="link" size={9} />
+                  {t('lo.badgeDep')}
                 </span>
               )}
 
@@ -581,6 +661,7 @@ export function OrderList({
           )
         })}
       </div>
+      <ModStatusTooltip data={hoveredEntry} />
     </div>
   )
 }

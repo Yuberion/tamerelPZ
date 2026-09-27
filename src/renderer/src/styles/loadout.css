@@ -1141,17 +1141,21 @@
 }
 
 .lodetail-desc {
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: #11151a;
-  border-left: 2px solid var(--rust-dim);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  font-size: 11px;
-  line-height: 1.5;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 2px solid var(--rust-hot, #e06c3a);
+  border-radius: var(--radius);
+  font-size: 11.5px;
+  line-height: 1.55;
   color: var(--ash);
-  max-height: 220px;
+  max-height: 280px;
   overflow-y: auto;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.lodetail-desc.ws-desc-container {
+  white-space: normal;
 }
 
 /* ---------------- Pin / Lock Position ---------------- */
@@ -1403,5 +1407,217 @@
 .fcol-provider__badge.badge-winner {
   background: var(--amber, #f59e0b);
   color: #111;
+}
+
+/* ---------------- Loadout Conflicts & Missing Dependencies ---------------- */
+
+/* Incompatible / Conflict styling (Red) */
+.lorow.is-incompatible {
+  box-shadow: inset 3px 0 0 0 #ef4444 !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+.lorow.is-incompatible:hover {
+  background: rgba(239, 68, 68, 0.16) !important;
+}
+
+.locand.is-incompatible {
+  box-shadow: inset 3px 0 0 0 #ef4444 !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+.locand.is-incompatible:hover {
+  background: rgba(239, 68, 68, 0.16) !important;
+}
+
+/* Missing Dependency styling (Orange) */
+.lorow.is-missing-dep:not(.is-incompatible) {
+  box-shadow: inset 3px 0 0 0 #f59e0b;
+  background: rgba(245, 158, 11, 0.06);
+}
+.lorow.is-missing-dep:not(.is-incompatible):hover {
+  background: rgba(245, 158, 11, 0.13);
+}
+
+.locand.is-missing-dep:not(.is-incompatible) {
+  box-shadow: inset 3px 0 0 0 #f59e0b;
+  background: rgba(245, 158, 11, 0.06);
+}
+.locand.is-missing-dep:not(.is-incompatible):hover {
+  background: rgba(245, 158, 11, 0.13);
+}
+
+/* Badges for OrderList */
+.lopill--conflict {
+  color: #fca5a5;
+  border-color: #991b1b;
+  background: #450a0a;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+}
+
+.lopill--dep-warn {
+  color: #fde68a;
+  border-color: #92400e;
+  background: #451a03;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+}
+
+/* Badges for AvailablePanel */
+.locand-badge {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.locand-badge--conflict {
+  color: #fca5a5;
+  border: 1px solid #991b1b;
+  background: #450a0a;
+}
+.locand-badge--dep {
+  color: #fde68a;
+  border: 1px solid #92400e;
+  background: #451a03;
+}
+
+/* Floating Hover Tooltip */
+.mod-status-tooltip {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  background: #13171d;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--bone);
+  animation: mod-status-tooltip-in 0.12s ease-out;
+}
+
+@keyframes mod-status-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mod-status-tooltip__header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #232a34;
+}
+
+.mod-status-tooltip__mod-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: #f3f4f6;
+}
+
+.mod-status-tooltip__mod-id {
+  font-size: 9.5px;
+  color: #9ca3af;
+}
+
+.mod-status-tooltip__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mod-status-tooltip__section + .mod-status-tooltip__section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #232a34;
+}
+
+.mod-status-tooltip__sec-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.mod-status-tooltip__title--conflict {
+  color: #ef4444;
+}
+
+.mod-status-tooltip__title--dep {
+  color: #f59e0b;
+}
+
+.mod-status-tooltip__desc {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.mod-status-tooltip__list {
+  list-style: none;
+  margin: 2px 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mod-status-tooltip__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.mod-status-tooltip__item-name {
+  color: #e5e7eb;
+  font-weight: 500;
+}
+
+.mod-status-tooltip__item-id {
+  font-size: 9px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.mod-status-tooltip__badge {
+  margin-left: auto;
+  font-size: 8.5px;
+  padding: 0 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.mod-status-tooltip__badge.is-inactive {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.mod-status-tooltip__badge.is-uninstalled {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
