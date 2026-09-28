@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PZ 3D: Технический план и архитектурная дорожная карта</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border-color: #30363d;
+      --text-main: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-glow: rgba(88, 166, 255, 0.15);
+      --accent-orange: #f0883e;
+      --accent-green: #3fb950;
+      --accent-purple: #bc8cff;
+      --accent-red: #ff7b72;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.65;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* Hero Banner */
+    .hero {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 40px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .hero-img {
+      width: 100%;
+      height: 480px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .hero-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(180deg, rgba(13, 17, 23, 0) 0%, rgba(13, 17, 23, 0.85) 60%, rgba(13, 17, 23, 0.98) 100%);
+      padding: 40px 32px 28px;
+    }
+
+    .badge-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .badge-blue { background: rgba(88, 166, 255, 0.2); color: #79c0ff; border: 1px solid rgba(88, 166, 255, 0.3); }
+    .badge-orange { background: rgba(240, 136, 62, 0.2); color: #ffa657; border: 1px solid rgba(240, 136, 62, 0.3); }
+    .badge-green { background: rgba(63, 185, 80, 0.2); color: #7ee787; border: 1px solid rgba(63, 185, 80, 0.3); }
+    .badge-purple { background: rgba(188, 140, 255, 0.2); color: #d2a8ff; border: 1px solid rgba(188, 140, 255, 0.3); }
+
+    h1 {
+      font-size: 2.6rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      line-height: 1.2;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 800px;
+    }
+
+    /* Headings */
+    h2 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin: 48px 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin: 24px 0 12px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: var(--text-main);
+    }
+
+    /* Cards & Grid */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      margin: 20px 0;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Code & Pre */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #ff7b72;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+    }
+
+    pre {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      border: none;
+      color: var(--text-main);
+      font-size: 0.9rem;
+    }
+
+    /* Diagrams */
+    .diagram-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    .diagram-caption {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    th, td {
+      padding: 14px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background: var(--bg-tertiary);
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Lists */
+    ul, ol {
+      margin: 12px 0 20px 24px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Callouts */
+    .callout {
+      background: rgba(88, 166, 255, 0.08);
+      border-left: 4px solid var(--accent);
+      padding: 16px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 20px 0;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Print styling */
+    @media print {
+      body { background: #fff; color: #111; }
+      .hero { box-shadow: none; border: 1px solid #ccc; }
+      .card, table, .diagram-box { background: #fff; border: 1px solid #ddd; }
+      th { background: #f0f0f0; color: #000; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Hero Card with Concept Art -->
+    <div class="hero">
+      <img src="concept_art.jpg" alt="PZ 3D Valheim Style Concept Art" class="hero-img">
+      <div class="hero-overlay">
+        <div class="badge-group">
+          <span class="badge badge-blue">Unity 6 LTS</span>
+          <span class="badge badge-orange">DOTS / Entities 1.x</span>
+          <span class="badge badge-green">Valheim-Style Visuals</span>
+          <span class="badge badge-purple">Burst & Multi-Threading</span>
+        </div>
+        <h1>PZ 3D: Технический план и архитектура</h1>
+        <p class="subtitle">Полный перенос глубоких симуляционных механик Project Zomboid в полноценное 3D с видом от 3-го/1-го лица, процедурным аудио и оптимизацией под 5 000+ зомби.</p>
+      </div>
+    </div>
+
+    <!-- Section 1 -->
+    <h2>1. Стек технологий и инструментарий</h2>
+    
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🎮 Движок Unity 6 & Пакеты DOTS</div>
+        <ul>
+          <li><code>com.unity.entities</code> — ядро Data-Oriented Design (ECS).</li>
+          <li><code>com.unity.entities.graphics</code> — отрисовка тысяч зомби через GPU Indirect Draw.</li>
+          <li><code>com.unity.physics</code> — быстрая детерминированная многопоточная физика без GC.</li>
+          <li><code>com.unity.burst</code> — прямая компиляция C# в SIMD машинный код.</li>
+          <li><code>com.unity.mathematics</code> — сверхбыстрые векторные операции (SIMD float3/quaternion).</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🎨 Арт-пайплайн (Valheim Style)</div>
+        <ul>
+          <li><strong>Blender 5.2 LTS:</strong> модульные дома (стены, полы, окна), лоу-поли зомби и пропсы.</li>
+          <li><strong>Blockbench / Aseprite:</strong> пиксельные текстуры 64×64 – 256×256 с фильтрацией <code>Point (no filter)</code>.</li>
+          <li><strong>URP (Universal Render Pipeline):</strong> Forward+ свет, объемный туман, солнечные лучи, SSAO.</li>
+          <li><strong>FMOD / Jobified Audio:</strong> пространственный 3D-звук с акустической окклюзией сквозь стены.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-title">🤖 Интеграция с встроенной AI-экосистемой (MCP)</div>
+      <p>Проект использует подключенные MCP-серверы рабочей среды:</p>
+      <ul style="margin-bottom: 0;">
+        <li><code>blender</code> MCP — автономная генерация 3D-модулей домов, мебели и риггинга низкополигональных зомби.</li>
+        <li><code>openviking</code> MCP — каноническая долговременная память архитектурных решений, структур данных и тестов.</li>
+        <li><code>pz-modding</code> MCP — декомпиляция Java-движка PZ (<code>pz_decompile_class</code>) для точного переноса 1:1 формул медицины, усталости, баллистики и слышимости.</li>
+      </ul>
+    </div>
+
+    <!-- Section 2 -->
+    <h2>2. Архитектура движка (Data-Oriented Design)</h2>
+    <p>В отличие от классического объектно-ориентированного подхода Unity (где один Zombie — это тяжелый <code>GameObject</code> с 10 скриптами), в архитектуре DOTS данные отделены от кода и хранятся в последовательных блоках памяти:</p>
+
+    <div class="diagram-box">
+      <pre class="mermaid">
+graph TD
+    subgraph Data [Entities & Components - Данные в памяти]
+        E1["Entity: Zombie #1402"] --> C1["ZombieTag"]
+        E1 --> C2["LocalTransform"]
+        E1 --> C3["HordeMember: TargetPosition"]
+        E1 --> C4["PerceptionState: Hearing/Sight"]
+    end
+
+    subgraph Systems [Job Systems - Многопоточная логика на всех ядрах CPU]
+        S1["FlowFieldPathfindingSystem"]
+        S2["ZombiePerceptionSystem"]
+        S3["DamageAndBleedingSystem"]
+        S4["SoundPropagationSystem"]
+    end
+
+    Systems -->|Параллельный проход через Burst| Data
+      </pre>
+      <div class="diagram-caption">Рис. 1 — Многопоточная обработка компонентов через Burst Compiler</div>
+    </div>
+
+    <!-- Section 3 -->
+    <h2>3. Преодоление 3 главных вызовов</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Вызов</th>
+          <th>Почему это ломает обычные движки</th>
+          <th>Архитектурное решение в PZ 3D</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Орда зомби<br>(2 000 – 5 000 тел)</strong></td>
+          <td>Классический NavMesh забивает CPU расчетами 5 000 путей, а кости скелетов съедают кадры на рендеринге.</td>
+          <td>
+            1. <strong>Flowfield Pathfinding:</strong> 1 общий расчет градиента направления для всего сектора карты.<br>
+            2. <strong>GPU Vertex Animation Textures (VAT):</strong> анимация запекается в текстуру и считается на GPU без нагрузок на CPU.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Слепые зоны и слух в 3D</strong></td>
+          <td>В изометрии экран плоский. В 3D за спиной ничего не видно, но зомби должны красться реалистично.</td>
+          <td>
+            1. <strong>3D Cone-of-Sight Culling:</strong> шейдер скрывает или силуэтирует зомби вне поля зрения.<br>
+            2. <strong>Акустические лучи:</strong> если зомби крадется сзади, игрок ориентируется на 3D-звук шагов и хруст веток.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Гигантский мир и лут</strong></td>
+          <td>Сотни зданий и десятки тысяч шкафов, коробок, ящиков переполняют память.</td>
+          <td>
+            1. <strong>Chunk Streaming:</strong> мир подгружается сеткой 32×32м.<br>
+            2. <strong>Ленивый спавн лута:</strong> содержимое шкафа генерируется сидом только при первом открытии игроком.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 4 -->
+    <h2>4. Дорожная карта реализации проекта</h2>
+    
+    <div class="diagram-box">
+      <pre class="mermaid">
+gantt
+    title Дорожная карта разработки PZ 3D
+    dateFormat  YYYY-MM-DD
+    section Фаза 0: Среда и шейдеры
+    Настройка Unity 6 + DOTS + Blender MCP       :active, p0_1, 2026-10-01, 7d
+    Базовый шейдер Valheim-style в URP           :p0_2, after p0_1, 5d
+    section Фаза 1: Орда (Tech Spike #1)
+    Спавн 5 000 тел через Entities.Graphics      :p1_1, after p0_2, 7d
+    Многопоточный Flowfield Pathfinding          :p1_2, after p1_1, 10d
+    section Фаза 2: Модульный мир
+    Сетка строительства и модульные дома         :p2_1, after p1_2, 10d
+    Физика дверей, окон, баррикад                :p2_2, after p2_1, 7d
+    section Фаза 3: Симуляция выживания
+    Система медицины и 17 зон тела               :p3_1, after p2_2, 8d
+    Инвентарь, вес, контейнеры                   :p3_2, after p3_1, 7d
+    section Фаза 4: Звук и Атмосфера
+    Акустические лучи звука сквозь стены         :p4_1, after p3_2, 7d
+    Слепые зоны и Cone-of-Sight в 3D             :p4_2, after p4_1, 6d
+      </pre>
+      <div class="diagram-caption">Рис. 2 — Поэтапный план реализации функционала (Gantt)</div>
+    </div>
+
+    <!-- Section 5 -->
+    <h2>5. Детализация фаз разработки</h2>
+    
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top:0; color: #79c0ff;">Фаза 0: Подготовка инфраструктуры и пайплайна ассетов</h3>
+      <p>Развертывание пустого проекта в Unity 6 LTS. Настройка пакетов <code>Entities</code>, <code>Burst</code>, <code>Entities Graphics</code>, <code>Physics</code>. Создание мастер-шейдера в Shader Graph с поддержкой низкополигональных мешей, пиксельных текстур (Point filter), объемного освещения и виньетки.</p>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top:0; color: #ffa657;">Фаза 1: Стресс-тест орды (The Horde Engine)</h3>
+      <p>Создание стресс-сцены: спавн 5 000 лоу-поли зомби на плоскости. Написание системы векторных полей (Flowfield). При возникновении громкого звука в точке X векторное поле пересчитывается в Job System, и вся масса зомби одновременно устремляется к цели при стабильных 60+ FPS.</p>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top:0; color: #7ee787;">Фаза 2: Модульный 3D-мир (Дома, двери, окна)</h3>
+      <p>Создание модульного кита: стены 2x3 метра, дверные проемы, оконные рамы, полы, крыши. Интерактивные сущности: возможность закрыть дверь на замок, выбить плечом, разбить стекло (опасность порезаться), заколотить досками и занавесить простыней.</p>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top:0; color: #d2a8ff;">Фаза 3: Симуляция тела и выживания (PZ Core)</h3>
+      <p>Перенос точных формул Project Zomboid: 17 частей тела, кровотечение, обработка ран алкоголем, наложение повязок, усталость от бега, паника (сужает поле зрения камеры и вызывает тремор рук при прицеливании).</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0; color: #ff7b72;">Фаза 4: Акустика и слепые зоны (Cone of Sight)</h3>
+      <p>Настройка системы пространственного 3D-аудио: шаги игрока привлекают зомби в радиусе 15м, выстрел из дробовика — в радиусе 200м. Окклюзия звука за закрытыми дверями. Шейдер скрытия зомби вне конуса обзора персонажа.</p>
+    </div>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#161b22',
+        primaryColor: '#21262d',
+        primaryTextColor: '#c9d1d9',
+        primaryBorderColor: '#30363d',
+        lineColor: '#58a6ff',
+        secondaryColor: '#161b22',
+        tertiaryColor: '#0d1117'
+      }
+    });
+  </script>
+</body>
+</html>
