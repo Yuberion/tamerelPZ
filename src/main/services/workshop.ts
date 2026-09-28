@@ -297,12 +297,19 @@ interface LocalModMeta {
   id: string
   author: string
   tags: string[]
+  description?: string
   posterRel?: string
   posterAbs?: string
+  workshopId?: string
+  pzversion?: string
+  versionMin?: string
+  versionMax?: string
 }
 
 function parseModInfoQuick(content: string, modFolder: string): LocalModMeta {
   const res: LocalModMeta = { name: '', id: '', author: '', tags: [] }
+  const descLines: string[] = []
+
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
@@ -313,20 +320,80 @@ function parseModInfoQuick(content: string, modFolder: string): LocalModMeta {
     if (key === 'name' && !res.name) res.name = val
     else if (key === 'id' && !res.id) res.id = val
     else if ((key === 'author' || key === 'authors') && !res.author) res.author = val
-    else if (key === 'tags') {
-      res.tags = val.split(';').map((t) => t.trim()).filter(Boolean)
+    else if (key === 'description') {
+      if (val) descLines.push(val)
+    } else if (key === 'tags') {
+      res.tags = val.split(/[;,]/).map((t) => t.trim()).filter(Boolean)
     } else if (key === 'poster' && !res.posterRel) {
       res.posterRel = val
       const abs = join(modFolder, val)
       if (existsSync(abs)) res.posterAbs = abs
+    } else if (key === 'icon' && !res.posterRel) {
+      const abs = join(modFolder, val)
+      if (existsSync(abs)) res.posterAbs = abs
+    } else if (key === 'workshopid' || key === 'workshop_id' || key === 'workshop') {
+      const numMatch = val.match(/\d{5,12}/)
+      if (numMatch) res.workshopId = numMatch[0]
+    } else if (key === 'url') {
+      const urlMatch = val.match(/id=(\d{5,12})/)
+      if (urlMatch) res.workshopId = urlMatch[1]
+    } else if (key === 'pzversion') {
+      res.pzversion = val
+    } else if (key === 'versionmin') {
+      res.versionMin = val
+    } else if (key === 'versionmax') {
+      res.versionMax = val
     }
   }
+
+  if (descLines.length > 0) {
+    res.description = descLines.join('\n')
+  }
+
   return res
 }
 
-// In-memory cache for installed items
+function detectModBuilds(
+  subDirs: string[],
+  pzversion?: string,
+  steamTags?: string[]
+): { hasB41: boolean; hasB42: boolean; builds: string[] } {
+  let hasB42 = false
+  let hasB41 = false
+
+  for (const s of subDirs) {
+    const lower = s.toLowerCase()
+    if (lower === 'common' || lower.startsWith('42') || lower === 'b42') {
+      hasB42 = true
+    } else if (lower.startsWith('41') || lower === 'b41') {
+      hasB41 = true
+    }
+  }
+
+  if (pzversion?.startsWith('42')) hasB42 = true
+  if (pzversion?.startsWith('41')) hasB41 = true
+
+  if (steamTags) {
+    if (steamTags.some((t) => t.toLowerCase().includes('42'))) hasB42 = true
+    if (steamTags.some((t) => t.toLowerCase().includes('41'))) hasB41 = true
+  }
+
+  // If no B42 indicators found, default to B41 (legacy PZ format)
+  if (!hasB42) {
+    hasB41 = true
+  }
+
+  const builds: string[] = []
+  if (hasB41) builds.push('B41')
+  if (hasB42) builds.push('B42')
+
+  return { hasB41, hasB42, builds }
+}
+
+// In-memory cache for installed items and descriptions
 let cachedInstalledList: WorkshopItemSummary[] | null = null
 let cachedInstalledMap = new Map<string, WorkshopItemSummary>()
+const localDescriptionsMap = new Map<string, string>()
 let lastInstalledScanTime = 0
 
 // Set of item IDs that were unsubscribed in this session (so they don't reappear before Steam purges files)
@@ -363,6 +430,9 @@ export async function scanAllInstalledWorkshopItems(
   const itemMap = new Map<string, WorkshopItemSummary>()
   const missingDetailIds: string[] = []
 
+  // -------------------------------------------------------------------------
+  // 1. Scan Steam Workshop directories
+  // -------------------------------------------------------------------------
   for (const wsDir of workshopDirs) {
     // wsDir is ".../steamapps/workshop/content/108600"
     // The sibling ACF file is at ".../steamapps/workshop/appworkshop_108600.acf"
@@ -411,6 +481,9 @@ export async function scanAllInstalledWorkshopItems(
       let localAuthor = ''
       let localTags: string[] = []
       let posterPath: string | undefined
+      let localDesc = ''
+      let localPzVersion: string | undefined
+      const detectedVersionDirs: string[] = []
 
       const modsDir = join(itemFolder, 'mods')
       if (existsSync(modsDir)) {
@@ -418,12 +491,22 @@ export async function scanAllInstalledWorkshopItems(
           const submods = await fs.readdir(modsDir)
           for (const sub of submods) {
             const subDir = join(modsDir, sub)
+            try {
+              const subEntries = await fs.readdir(subDir, { withFileTypes: true })
+              for (const e of subEntries) {
+                if (e.isDirectory()) detectedVersionDirs.push(e.name)
+              }
+            } catch {
+              // ignore
+            }
+
             // Candidate paths for mod.info in standard and B42 versions
             const infoCandidates = [
               join(subDir, 'mod.info'),
               join(subDir, 'common', 'mod.info'),
               join(subDir, '42', 'mod.info'),
-              join(subDir, '42.20', 'mod.info')
+              join(subDir, '42.20', 'mod.info'),
+              join(subDir, '41', 'mod.info')
             ]
             for (const candidate of infoCandidates) {
               if (existsSync(candidate)) {
@@ -434,6 +517,8 @@ export async function scanAllInstalledWorkshopItems(
                   if (parsed.author && !localAuthor) localAuthor = parsed.author
                   if (parsed.tags.length) localTags = parsed.tags
                   if (parsed.posterAbs && !posterPath) posterPath = parsed.posterAbs
+                  if (parsed.description && !localDesc) localDesc = parsed.description
+                  if (parsed.pzversion && !localPzVersion) localPzVersion = parsed.pzversion
                 } catch {
                   // ignore
                 }
@@ -446,9 +531,18 @@ export async function scanAllInstalledWorkshopItems(
         }
       }
 
-      // Combine tags: Steam official tags take priority, fallback to local mod.info tags
+      // Combine tags: Steam official tags + local tags + detected builds
       const steamTags = cachedSteam?.tags?.map((t) => t.tag) || []
-      const combinedTags = Array.from(new Set([...steamTags, ...localTags]))
+      const buildInfo = detectModBuilds(detectedVersionDirs, localPzVersion, steamTags)
+
+      const combinedTags = Array.from(
+        new Set([
+          ...steamTags,
+          ...localTags,
+          ...(buildInfo.hasB41 ? ['Build 41'] : []),
+          ...(buildInfo.hasB42 ? ['Build 42'] : [])
+        ])
+      )
 
       const updatedSec = cachedSteam?.time_updated || acf?.timeUpdated || Math.floor(mtimeMs / 1000)
       const acfUpdatedSec = acf?.timeUpdated || Math.floor(mtimeMs / 1000)
@@ -486,8 +580,154 @@ export async function scanAllInstalledWorkshopItems(
         fileSize: Number(cachedSteam?.file_size) || acf?.size || 0,
         tags: combinedTags,
         isInstalled: true,
+        isLocal: false,
         localPath: itemFolder,
-        needsUpdate
+        needsUpdate,
+        builds: buildInfo.builds
+      }
+
+      if (localDesc) {
+        localDescriptionsMap.set(id, localDesc)
+      }
+
+      itemMap.set(id, summary)
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 2. Scan Local Mods (Zomboid/mods, game/mods, etc.)
+  // -------------------------------------------------------------------------
+  const localRoots: string[] = []
+  if (pathsReport.zomboidDir) {
+    localRoots.push(join(pathsReport.zomboidDir, 'mods'))
+  }
+  if (pathsReport.gameDir) {
+    localRoots.push(join(pathsReport.gameDir, 'mods'))
+    localRoots.push(join(pathsReport.gameDir, 'media', 'mods'))
+  }
+
+  for (const localDir of localRoots) {
+    if (!existsSync(localDir)) continue
+    let modFolders: string[] = []
+    try {
+      modFolders = await fs.readdir(localDir)
+    } catch {
+      continue
+    }
+
+    for (const folderName of modFolders) {
+      const modRoot = join(localDir, folderName)
+      let mtimeMs = 0
+      let birthtimeMs = 0
+      try {
+        const stat = await fs.stat(modRoot)
+        if (!stat.isDirectory()) continue
+        mtimeMs = stat.mtimeMs
+        birthtimeMs = stat.birthtimeMs || stat.ctimeMs || mtimeMs
+      } catch {
+        continue
+      }
+
+      // Check subdirectories for version folders
+      let versionDirs: string[] = []
+      try {
+        versionDirs = (await fs.readdir(modRoot, { withFileTypes: true }))
+          .filter((e) => e.isDirectory())
+          .map((e) => e.name)
+      } catch {
+        // ignore
+      }
+
+      const infoCandidates = [
+        join(modRoot, 'mod.info'),
+        join(modRoot, 'common', 'mod.info'),
+        join(modRoot, '42', 'mod.info'),
+        join(modRoot, '42.20', 'mod.info'),
+        join(modRoot, '41', 'mod.info')
+      ]
+
+      let parsed: LocalModMeta | undefined
+      for (const candidate of infoCandidates) {
+        if (existsSync(candidate)) {
+          try {
+            const raw = await fs.readFile(candidate, 'utf8')
+            parsed = parseModInfoQuick(raw, dirname(candidate))
+            break
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      // Also search for poster if not explicitly set in mod.info
+      let posterPath = parsed?.posterAbs
+      if (!posterPath) {
+        for (const imgName of ['poster.png', 'poster.jpg', 'preview.png', 'icon.png']) {
+          const cand = join(modRoot, imgName)
+          if (existsSync(cand)) {
+            posterPath = cand
+            break
+          }
+        }
+      }
+
+      const title = parsed?.name || folderName
+      const author = parsed?.author || 'Local Mod'
+      const workshopId = parsed?.workshopId
+      const buildInfo = detectModBuilds(versionDirs, parsed?.pzversion)
+
+      const localTags = Array.from(
+        new Set([
+          ...(parsed?.tags || []),
+          'Local',
+          ...(buildInfo.hasB41 ? ['Build 41'] : []),
+          ...(buildInfo.hasB42 ? ['Build 42'] : [])
+        ])
+      )
+
+      // If mod already present via Workshop subscription, mark it with local presence
+      if (workshopId && itemMap.has(workshopId)) {
+        const existing = itemMap.get(workshopId)!
+        existing.isLocal = true
+        if (!existing.localPath) existing.localPath = modRoot
+        if (parsed?.description) localDescriptionsMap.set(workshopId, parsed.description)
+        continue
+      }
+
+      // Assign an ID: use numeric workshopId if available, otherwise 'local_<folderName>'
+      const id = workshopId && /^\d{5,12}$/.test(workshopId) ? workshopId : `local_${folderName}`
+      const isLinkedWorkshop = Boolean(workshopId && /^\d{5,12}$/.test(workshopId))
+
+      if (isLinkedWorkshop && !steamMetadataCache.has(id)) {
+        missingDetailIds.push(id)
+      }
+
+      const cachedSteam = isLinkedWorkshop ? steamMetadataCache.get(id) : undefined
+      const previewUrl = cachedSteam?.preview_url || (posterPath ? pzFileUrl(posterPath) : '')
+
+      const summary: WorkshopItemSummary = {
+        id,
+        title: cachedSteam?.title || title,
+        previewUrl,
+        posterPath,
+        author: cachedSteam?.creator || author,
+        authorId: cachedSteam?.creator,
+        subscriptions: Number(cachedSteam?.subscriptions) || 0,
+        favorited: Number(cachedSteam?.favorited) || 0,
+        views: Number(cachedSteam?.views) || 0,
+        timeCreated: cachedSteam?.time_created || Math.floor(birthtimeMs / 1000),
+        timeUpdated: cachedSteam?.time_updated || Math.floor(mtimeMs / 1000),
+        fileSize: Number(cachedSteam?.file_size) || 0,
+        tags: Array.from(new Set([...(cachedSteam?.tags?.map((t) => t.tag) || []), ...localTags])),
+        isInstalled: true,
+        isLocal: true,
+        localPath: modRoot,
+        needsUpdate: false,
+        builds: buildInfo.builds
+      }
+
+      if (parsed?.description) {
+        localDescriptionsMap.set(id, parsed.description)
       }
 
       itemMap.set(id, summary)
@@ -856,13 +1096,19 @@ export async function getWorkshopItemDetails(
   publishedFileId: string,
   forceTranslate = false
 ): Promise<WorkshopItemDetails> {
-  const cleanId = String(publishedFileId).trim().match(/\d+/)?.[0] ?? publishedFileId.trim()
-  await loadMetadataCache()
-  let raw = steamMetadataCache.get(cleanId)
+  const isLocalId = publishedFileId.startsWith('local_')
+  const cleanId = !isLocalId && /^\d+$/.test(publishedFileId.trim())
+    ? publishedFileId.trim()
+    : publishedFileId.trim()
 
-  if (!raw) {
-    await fetchBatchSteamDetails([cleanId])
+  await loadMetadataCache()
+  let raw: RawSteamItemDetail | undefined
+  if (!isLocalId && /^\d+$/.test(cleanId)) {
     raw = steamMetadataCache.get(cleanId)
+    if (!raw) {
+      await fetchBatchSteamDetails([cleanId])
+      raw = steamMetadataCache.get(cleanId)
+    }
   }
 
   const screenshots: string[] = []
@@ -870,38 +1116,77 @@ export async function getWorkshopItemDetails(
     screenshots.push(raw.preview_url)
   }
 
-  // Scrape gallery screenshots from Steam community page
-  try {
-    const pageRes = await fetch(`https://steamcommunity.com/sharedfiles/filedetails/?id=${cleanId}`, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      }
-    })
-    if (pageRes.ok) {
-      const pageHtml = await pageRes.text()
-      const scrRegex = /highlight_strip_item[\s\S]*?src="([^"]+)"/g
-      let sm: RegExpExecArray | null
-      while ((sm = scrRegex.exec(pageHtml)) !== null) {
-        const u = sm[1].replace(/\?.*/, '')
-        if (!screenshots.includes(u)) {
-          screenshots.push(u)
+  // Scrape gallery screenshots from Steam community page if it's a numeric Steam ID
+  if (!isLocalId && /^\d+$/.test(cleanId)) {
+    try {
+      const pageRes = await fetch(`https://steamcommunity.com/sharedfiles/filedetails/?id=${cleanId}`, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      })
+      if (pageRes.ok) {
+        const pageHtml = await pageRes.text()
+        const scrRegex = /highlight_strip_item[\s\S]*?src="([^"]+)"/g
+        let sm: RegExpExecArray | null
+        while ((sm = scrRegex.exec(pageHtml)) !== null) {
+          const u = sm[1].replace(/\?.*/, '')
+          if (!screenshots.includes(u)) {
+            screenshots.push(u)
+          }
         }
       }
+    } catch {
+      // Non-critical, fallback to preview_url
     }
-  } catch {
-    // Non-critical, fallback to preview_url
   }
 
   // Check local installation & Steam subscription status
   const installedList = await scanAllInstalledWorkshopItems(settings)
-  const local = installedList.find((it) => it.id === cleanId)
+  const local = installedList.find((it) => it.id === cleanId || it.id === publishedFileId)
   const steamSubs = getSteamSubscribedIds()
-  const isSubscribed = steamSubs.has(cleanId)
+  const isSubscribed = !isLocalId && steamSubs.has(cleanId)
   const isInstalled = Boolean(local) || isSubscribed
 
-  const originalDesc = raw?.description || ''
-  const descHtml = bbcodeToHtml(originalDesc)
+  // If local mod or missing screenshots, look for local screenshot files in localPath
+  if (screenshots.length <= 1 && local?.localPath && existsSync(local.localPath)) {
+    try {
+      const dirEntries = await fs.readdir(local.localPath)
+      for (const f of dirEntries) {
+        if (/^(poster|preview|icon|screenshot).*\.(png|jpg|jpeg|webp)$/i.test(f)) {
+          const u = pzFileUrl(join(local.localPath, f))
+          if (!screenshots.includes(u)) {
+            screenshots.push(u)
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Description resolution: Steam original -> local mod.info description -> fallback
+  let originalDesc = raw?.description || localDescriptionsMap.get(cleanId) || localDescriptionsMap.get(publishedFileId) || ''
+  if (!originalDesc && local?.localPath && existsSync(local.localPath)) {
+    // Attempt reading description from mod.info directly
+    for (const rel of ['mod.info', join('common', 'mod.info'), join('42', 'mod.info'), join('41', 'mod.info')]) {
+      const p = join(local.localPath, rel)
+      if (existsSync(p)) {
+        try {
+          const text = await fs.readFile(p, 'utf8')
+          const meta = parseModInfoQuick(text, dirname(p))
+          if (meta.description) {
+            originalDesc = meta.description
+            break
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  const descHtml = originalDesc ? bbcodeToHtml(originalDesc) : ''
 
   // Auto-translate description to Russian
   let descRuHtml: string | undefined
@@ -918,9 +1203,9 @@ export async function getWorkshopItemDetails(
 
   return {
     id: cleanId,
-    title: raw?.title || local?.title || `Workshop item #${cleanId}`,
-    previewUrl: raw?.preview_url || local?.previewUrl || '',
-    author: local?.author || raw?.creator || '',
+    title: raw?.title || local?.title || (isLocalId ? publishedFileId.replace(/^local_/, '') : `Workshop item #${cleanId}`),
+    previewUrl: raw?.preview_url || local?.previewUrl || (screenshots[0] ?? ''),
+    author: local?.author || raw?.creator || (isLocalId ? 'Local Mod' : ''),
     authorId: raw?.creator,
     subscriptions: Number(raw?.subscriptions) || local?.subscriptions || 0,
     favorited: Number(raw?.favorited) || local?.favorited || 0,
@@ -928,9 +1213,11 @@ export async function getWorkshopItemDetails(
     timeCreated: raw?.time_created || local?.timeCreated || 0,
     timeUpdated: raw?.time_updated || local?.timeUpdated || 0,
     fileSize: Number(raw?.file_size) || local?.fileSize || 0,
-    tags: raw?.tags?.map((t) => t.tag) || local?.tags || [],
+    tags: Array.from(new Set([...(raw?.tags?.map((t) => t.tag) || []), ...(local?.tags || [])])),
     isInstalled,
     isSubscribed,
+    isLocal: Boolean(local?.isLocal || isLocalId),
+    builds: local?.builds,
     localPath: local?.localPath,
     needsUpdate: Boolean(local?.needsUpdate),
     description: descHtml,
@@ -949,7 +1236,25 @@ export async function openInSteamClient(publishedFileId: string): Promise<boolea
 }
 
 export async function openWorkshopFolder(settings: AppSettings, publishedFileId: string): Promise<boolean> {
+  // 1. Check in cachedInstalledMap
+  const cached = cachedInstalledMap.get(publishedFileId)
+  if (cached?.localPath && existsSync(cached.localPath)) {
+    await shell.openPath(cached.localPath)
+    return true
+  }
+
+  // 2. Check local mods folder
   const pathsReport = await detectPaths(settings)
+  if (pathsReport.zomboidDir) {
+    const cleanFolder = publishedFileId.replace(/^local_/, '')
+    const localTarget = join(pathsReport.zomboidDir, 'mods', cleanFolder)
+    if (existsSync(localTarget)) {
+      await shell.openPath(localTarget)
+      return true
+    }
+  }
+
+  // 3. Check workshop dirs
   for (const wsDir of pathsReport.workshopDirs ?? []) {
     const target = join(wsDir, publishedFileId)
     try {

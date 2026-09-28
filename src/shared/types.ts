@@ -1179,6 +1179,8 @@ export interface WorkshopItemSummary {
   isSubscribed?: boolean
   localPath?: string
   needsUpdate?: boolean
+  isLocal?: boolean
+  builds?: string[]
 }
 
 export interface WorkshopItemDetails extends WorkshopItemSummary {

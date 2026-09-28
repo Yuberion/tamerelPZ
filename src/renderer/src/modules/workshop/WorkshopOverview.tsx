@@ -27,6 +27,7 @@ const WORKSHOP_CATEGORIES: CategoryDef[] = [
   { tag: 'Build 42', ru: 'Build 42', en: 'Build 42', icon: 'clock', isBuild: true },
   { tag: 'Build 41', ru: 'Build 41', en: 'Build 41', icon: 'clock', isBuild: true },
   { tag: 'Build 40', ru: 'Build 40', en: 'Build 40', icon: 'clock', isBuild: true },
+  { tag: 'Local', ru: 'Локальные моды', en: 'Local Mods', icon: 'folder' },
   // Gameplay Content
   { tag: 'Weapons', ru: 'Оружие', en: 'Weapons', icon: 'gun' },
   { tag: 'Vehicles', ru: 'Транспорт', en: 'Vehicles', icon: 'car' },
@@ -660,7 +661,13 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               <div className="ws-grid">
                 {items.map((item) => {
                   const isSelected = selectedItem?.id === item.id
-                  const isB42 = item.tags.some((t) => t.toLowerCase().includes('42'))
+                  const isB42 = item.tags.some((t) => t.toLowerCase().includes('42') || t.toLowerCase() === 'build 42')
+                  const isB41 =
+                    item.tags.some((t) => t.toLowerCase().includes('41') || t.toLowerCase() === 'build 41') ||
+                    (!isB42 && !item.tags.some((t) => t.toLowerCase().includes('40')))
+                  const isLocal = Boolean(
+                    item.isLocal || item.id.startsWith('local_') || item.tags.some((t) => t.toLowerCase() === 'local')
+                  )
 
                   return (
                     <article
@@ -682,6 +689,11 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                             <Icon name="rotate" size={10} />
                             <span>{isRu ? 'Апдейт' : 'Update'}</span>
                           </div>
+                        ) : isLocal ? (
+                          <div className="ws-card__badge ws-card__badge--local">
+                            <Icon name="folder" size={10} />
+                            <span>{isRu ? 'Локальный' : 'Local'}</span>
+                          </div>
                         ) : item.isInstalled ? (
                           <div className="ws-card__badge ws-card__badge--installed">
                             <Icon name="check" size={10} />
@@ -699,8 +711,18 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                         {/* Tags */}
                         <div className="ws-card__tags">
                           {isB42 && <span className="ws-card__tag ws-card__tag--b42">Build 42</span>}
+                          {isB41 && <span className="ws-card__tag ws-card__tag--b41">Build 41</span>}
+                          {isLocal && (
+                            <span className="ws-card__tag ws-card__tag--local">
+                              {isRu ? 'Локальный' : 'Local'}
+                            </span>
+                          )}
                           {item.tags
-                            .filter((t) => !t.toLowerCase().includes('build'))
+                            .filter(
+                              (t) =>
+                                !t.toLowerCase().includes('build') &&
+                                t.toLowerCase() !== 'local'
+                            )
                             .slice(0, 3)
                             .map((t) => (
                               <span key={t} className="ws-card__tag">
@@ -787,192 +809,261 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
         </main>
 
         {/* Side-Drawer: Detailed Mod View */}
-        {selectedItem && (
-          <aside className="ws-drawer">
-            <header className="ws-drawer__header">
-              <div className="ws-drawer__title-block">
-                <div className="ws-drawer__title">{selectedItem.title}</div>
-                <div className="ws-drawer__author">
-                  {isRu ? 'Автор: ' : 'Author: '}
-                  <span className="bold" style={{ color: 'var(--amber)' }}>
-                    {selectedItem.author || 'Steam User'}
-                  </span>
-                </div>
-              </div>
-              <button
-                className="btn btn--subtle btn--tiny"
-                onClick={() => setSelectedItem(null)}
-                title={isRu ? 'Закрыть' : 'Close'}
-              >
-                <Icon name="close" size={13} />
-              </button>
-            </header>
+        {selectedItem && (() => {
+          const isDrawerB42 = selectedItem.tags.some(
+            (t) => t.toLowerCase().includes('42') || t.toLowerCase() === 'build 42'
+          )
+          const isDrawerB41 =
+            selectedItem.tags.some(
+              (t) => t.toLowerCase().includes('41') || t.toLowerCase() === 'build 41'
+            ) ||
+            (!isDrawerB42 && !selectedItem.tags.some((t) => t.toLowerCase().includes('40')))
+          const isDrawerLocal = Boolean(
+            selectedItem.isLocal ||
+              selectedItem.id.startsWith('local_') ||
+              selectedItem.tags.some((t) => t.toLowerCase() === 'local')
+          )
+          const isNumericSteam = /^\d+$/.test(selectedItem.id)
 
-            <div className="ws-drawer__body">
-              {/* Media Gallery / Screenshots */}
-              <div className="ws-gallery">
-                <div className="ws-gallery__hero">
-                  {activeHeroImg ? (
-                    <img src={activeHeroImg} alt="Screenshot" />
-                  ) : (
-                    <Icon name="image" size={48} color="var(--text-muted)" />
+          return (
+            <aside className="ws-drawer">
+              <header className="ws-drawer__header">
+                <div className="ws-drawer__title-block">
+                  <div className="ws-drawer__title">{selectedItem.title}</div>
+                  <div className="ws-drawer__author">
+                    {isRu ? 'Автор: ' : 'Author: '}
+                    <span className="bold" style={{ color: 'var(--amber)' }}>
+                      {selectedItem.author || (isDrawerLocal ? 'Local Mod' : 'Steam User')}
+                    </span>
+                  </div>
+
+                  {/* Build badges & tags */}
+                  <div className="ws-drawer__tags-row">
+                    {isDrawerB42 && <span className="ws-card__tag ws-card__tag--b42">Build 42</span>}
+                    {isDrawerB41 && <span className="ws-card__tag ws-card__tag--b41">Build 41</span>}
+                    {isDrawerLocal && (
+                      <span className="ws-card__tag ws-card__tag--local">
+                        <Icon name="folder" size={10} />
+                        {isRu ? 'Локальный мод' : 'Local Mod'}
+                      </span>
+                    )}
+                    {selectedItem.tags
+                      .filter((t) => !t.toLowerCase().includes('build') && t.toLowerCase() !== 'local')
+                      .slice(0, 4)
+                      .map((t) => (
+                        <span key={t} className="ws-card__tag">
+                          {t}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+                <button
+                  className="btn btn--subtle btn--tiny"
+                  onClick={() => setSelectedItem(null)}
+                  title={isRu ? 'Закрыть' : 'Close'}
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </header>
+
+              <div className="ws-drawer__body">
+                {/* Media Gallery / Screenshots */}
+                <div className="ws-gallery">
+                  <div className="ws-gallery__hero">
+                    {activeHeroImg ? (
+                      <img src={activeHeroImg} alt="Screenshot" />
+                    ) : (
+                      <Icon name="image" size={48} color="var(--text-muted)" />
+                    )}
+                  </div>
+
+                  {selectedItem.screenshots.length > 1 && (
+                    <div className="ws-gallery__thumbs">
+                      {selectedItem.screenshots.map((s, idx) => (
+                        <div
+                          key={idx}
+                          className={`ws-gallery__thumb ${activeHeroImg === s ? 'is-active' : ''}`}
+                          onClick={() => setActiveHeroImg(s)}
+                        >
+                          <img src={s} alt={`thumb ${idx}`} loading="lazy" />
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                {selectedItem.screenshots.length > 1 && (
-                  <div className="ws-gallery__thumbs">
-                    {selectedItem.screenshots.map((s, idx) => (
-                      <div
-                        key={idx}
-                        className={`ws-gallery__thumb ${activeHeroImg === s ? 'is-active' : ''}`}
-                        onClick={() => setActiveHeroImg(s)}
-                      >
-                        <img src={s} alt={`thumb ${idx}`} loading="lazy" />
+                {/* Quick Actions Bar */}
+                <div className="ws-drawer__actions">
+                  {isDrawerLocal ? (
+                    <div className="ws-drawer__installed-status">
+                      <div className="ws-badge-installed-pill ws-badge-installed-pill--local">
+                        <Icon name="folder" size={13} color="#10b981" />
+                        <span>{isRu ? 'Установлен локально (диск)' : 'Installed locally (disk)'}</span>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Actions Bar */}
-              <div className="ws-drawer__actions">
-                {selectedItem.isInstalled || selectedItem.isSubscribed ? (
-                  <div className="ws-drawer__installed-status">
-                    <div className="ws-badge-installed-pill">
-                      <Icon name="check-circle" size={13} color="#22c55e" />
-                      <span>
-                        {selectedItem.isSubscribed
-                          ? isRu
-                            ? 'Подписан в Steam'
-                            : 'Subscribed in Steam'
-                          : isRu
-                            ? 'Установлен на диске'
-                            : 'Installed locally'}
-                      </span>
-                      {selectedItem.needsUpdate && (
-                        <span className="ws-badge-update-alert">
-                          {isRu ? 'Доступно обновление' : 'Update available'}
-                        </span>
-                      )}
                     </div>
+                  ) : selectedItem.isInstalled || selectedItem.isSubscribed ? (
+                    <div className="ws-drawer__installed-status">
+                      <div className="ws-badge-installed-pill">
+                        <Icon name="check-circle" size={13} color="#22c55e" />
+                        <span>
+                          {selectedItem.isSubscribed
+                            ? isRu
+                              ? 'Подписан в Steam'
+                              : 'Subscribed in Steam'
+                            : isRu
+                              ? 'Установлен на диске'
+                              : 'Installed locally'}
+                        </span>
+                        {selectedItem.needsUpdate && (
+                          <span className="ws-badge-update-alert">
+                            {isRu ? 'Доступно обновление' : 'Update available'}
+                          </span>
+                        )}
+                      </div>
 
+                      <button
+                        className="ws-btn-unsubscribe"
+                        onClick={() => void handleUnsubscribe(selectedItem.id)}
+                        disabled={subscribing}
+                        title={
+                          isRu
+                            ? 'Отписаться от мода в Steam в 1 клик'
+                            : 'Unsubscribe from mod in Steam in 1 click'
+                        }
+                      >
+                        <Icon
+                          name={subscribing ? 'refresh' : 'close'}
+                          size={12}
+                          className={subscribing ? 'spin' : ''}
+                          color="#f87171"
+                        />
+                        <span>
+                          {subscribing
+                            ? isRu
+                              ? 'Отписка…'
+                              : 'Unsubscribing…'
+                            : isRu
+                              ? 'Отписаться в Steam'
+                              : 'Unsubscribe in Steam'}
+                        </span>
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      className="ws-btn-unsubscribe"
-                      onClick={() => void handleUnsubscribe(selectedItem.id)}
+                      className="ws-btn-steam"
+                      onClick={() => void handleSubscribe(selectedItem.id)}
                       disabled={subscribing}
                       title={
                         isRu
-                          ? 'Отписаться от мода в Steam в 1 клик'
-                          : 'Unsubscribe from mod in Steam in 1 click'
+                          ? 'Подписаться и загрузить мод через Steam в фоне без переключения'
+                          : 'Subscribe and download mod via Steam in background'
                       }
                     >
                       <Icon
-                        name={subscribing ? 'refresh' : 'close'}
-                        size={12}
+                        name={subscribing ? 'refresh' : 'download'}
+                        size={14}
                         className={subscribing ? 'spin' : ''}
-                        color="#f87171"
+                        color="#66c0f4"
                       />
                       <span>
                         {subscribing
                           ? isRu
-                            ? 'Отписка…'
-                            : 'Unsubscribing…'
+                            ? 'Оформление подписки…'
+                            : 'Subscribing in Steam…'
                           : isRu
-                            ? 'Отписаться в Steam'
-                            : 'Unsubscribe in Steam'}
+                            ? 'Подписаться / Скачать в Steam'
+                            : 'Subscribe / Download in Steam'}
                       </span>
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="ws-btn-steam"
-                    onClick={() => void handleSubscribe(selectedItem.id)}
-                    disabled={subscribing}
-                    title={
-                      isRu
-                        ? 'Подписаться и загрузить мод через Steam в фоне без переключения'
-                        : 'Subscribe and download mod via Steam in background'
-                    }
-                  >
-                    <Icon
-                      name={subscribing ? 'refresh' : 'download'}
-                      size={14}
-                      className={subscribing ? 'spin' : ''}
-                      color="#66c0f4"
-                    />
-                    <span>
-                      {subscribing
-                        ? isRu
-                          ? 'Оформление подписки…'
-                          : 'Subscribing in Steam…'
-                        : isRu
-                          ? 'Подписаться / Скачать в Steam'
-                          : 'Subscribe / Download in Steam'}
-                    </span>
-                  </button>
-                )}
-
-                <div className="ws-drawer__actions-row">
-                  {selectedItem.isInstalled && (
-                    <button
-                      className="btn btn--subtle btn--tiny"
-                      style={{ flex: 1 }}
-                      onClick={() => void handleOpenFolder(selectedItem.id)}
-                      title={isRu ? 'Открыть папку мода на диске' : 'Open mod folder on disk'}
-                    >
-                      <Icon name="folder-open" size={12} color="var(--pine)" />
-                      <span>{isRu ? 'Папка' : 'Folder'}</span>
                     </button>
                   )}
 
-                  <button
-                    className="btn btn--subtle btn--tiny"
-                    style={{ flex: 1 }}
-                    onClick={() => handleCopyId(selectedItem.id)}
-                    title={isRu ? 'Скопировать Workshop ID' : 'Copy Workshop ID'}
-                  >
-                    <Icon name="copy" size={12} />
-                    <span>ID: {selectedItem.id}</span>
-                  </button>
+                  <div className="ws-drawer__actions-row">
+                    {selectedItem.isInstalled && (
+                      <button
+                        className="btn btn--subtle btn--tiny"
+                        style={{ flex: 1 }}
+                        onClick={() => void handleOpenFolder(selectedItem.id)}
+                        title={isRu ? 'Открыть папку мода на диске' : 'Open mod folder on disk'}
+                      >
+                        <Icon name="folder-open" size={12} color="var(--pine)" />
+                        <span>{isRu ? 'Папка' : 'Folder'}</span>
+                      </button>
+                    )}
 
-                  <button
-                    className="btn btn--subtle btn--tiny"
-                    onClick={() => void handleOpenSteam(selectedItem.id)}
-                    title={isRu ? 'Открыть страницу в клиенте Steam' : 'Open page in Steam client'}
-                  >
-                    <Icon name="download" size={12} color="#66c0f4" />
-                    <span>Steam</span>
-                  </button>
+                    <button
+                      className="btn btn--subtle btn--tiny"
+                      style={{ flex: 1 }}
+                      onClick={() => handleCopyId(selectedItem.id)}
+                      title={isRu ? 'Скопировать ID' : 'Copy ID'}
+                    >
+                      <Icon name="copy" size={12} />
+                      <span>ID: {selectedItem.id}</span>
+                    </button>
 
-                  <button
-                    className="btn btn--subtle btn--tiny"
-                    onClick={() => void handleOpenBrowser(selectedItem.id)}
-                    title={isRu ? 'Открыть в веб-браузере' : 'Open in browser'}
-                  >
-                    <Icon name="globe" size={12} />
-                  </button>
-                </div>
-              </div>
+                    {isNumericSteam && (
+                      <>
+                        <button
+                          className="btn btn--subtle btn--tiny"
+                          onClick={() => void handleOpenSteam(selectedItem.id)}
+                          title={isRu ? 'Открыть страницу в клиенте Steam' : 'Open page in Steam client'}
+                        >
+                          <Icon name="download" size={12} color="#66c0f4" />
+                          <span>Steam</span>
+                        </button>
 
-              {/* Technical Specifications */}
-              <div className="ws-meta-grid">
-                <div className="ws-meta-item">
-                  <span className="ws-meta-item__label">{isRu ? 'Размер мода' : 'File Size'}</span>
-                  <span className="ws-meta-item__value mono">{formatBytes(selectedItem.fileSize)}</span>
+                        <button
+                          className="btn btn--subtle btn--tiny"
+                          onClick={() => void handleOpenBrowser(selectedItem.id)}
+                          title={isRu ? 'Открыть в веб-браузере' : 'Open in browser'}
+                        >
+                          <Icon name="globe" size={12} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="ws-meta-item">
-                  <span className="ws-meta-item__label">{isRu ? 'Подписчиков' : 'Subscribers'}</span>
-                  <span className="ws-meta-item__value mono">{selectedItem.subscriptions.toLocaleString()}</span>
+
+                {/* Technical Specifications */}
+                <div className="ws-meta-grid">
+                  <div className="ws-meta-item">
+                    <span className="ws-meta-item__label">{isRu ? 'Совместимость' : 'Target Build'}</span>
+                    <span className="ws-meta-item__value">
+                      {isDrawerB42 && isDrawerB41
+                        ? 'B41 + B42'
+                        : isDrawerB42
+                          ? 'Build 42'
+                          : 'Build 41'}
+                    </span>
+                  </div>
+                  <div className="ws-meta-item">
+                    <span className="ws-meta-item__label">{isRu ? 'Размер мода' : 'File Size'}</span>
+                    <span className="ws-meta-item__value mono">{formatBytes(selectedItem.fileSize)}</span>
+                  </div>
+                  <div className="ws-meta-item">
+                    <span className="ws-meta-item__label">{isRu ? 'Подписчиков' : 'Subscribers'}</span>
+                    <span className="ws-meta-item__value mono">
+                      {selectedItem.subscriptions > 0
+                        ? selectedItem.subscriptions.toLocaleString()
+                        : isDrawerLocal
+                          ? isRu ? 'Локальный' : 'Local'
+                          : '—'}
+                    </span>
+                  </div>
+                  <div className="ws-meta-item">
+                    <span className="ws-meta-item__label">{isRu ? 'Источник' : 'Source'}</span>
+                    <span className="ws-meta-item__value">
+                      {isDrawerLocal ? (isRu ? 'Локальный (диск)' : 'Local (disk)') : 'Steam Workshop'}
+                    </span>
+                  </div>
+                  <div className="ws-meta-item">
+                    <span className="ws-meta-item__label">{isRu ? 'Создан' : 'Created'}</span>
+                    <span className="ws-meta-item__value">{formatDate(selectedItem.timeCreated)}</span>
+                  </div>
+                  <div className="ws-meta-item">
+                    <span className="ws-meta-item__label">{isRu ? 'Обновлен' : 'Updated'}</span>
+                    <span className="ws-meta-item__value">{formatDate(selectedItem.timeUpdated)}</span>
+                  </div>
                 </div>
-                <div className="ws-meta-item">
-                  <span className="ws-meta-item__label">{isRu ? 'Создан' : 'Created'}</span>
-                  <span className="ws-meta-item__value">{formatDate(selectedItem.timeCreated)}</span>
-                </div>
-                <div className="ws-meta-item">
-                  <span className="ws-meta-item__label">{isRu ? 'Обновлен' : 'Updated'}</span>
-                  <span className="ws-meta-item__value">{formatDate(selectedItem.timeUpdated)}</span>
-                </div>
-              </div>
 
               {/* Localized / Translated Description Section */}
               <div className="ws-drawer__desc">
@@ -1035,7 +1126,8 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               </div>
             </div>
           </aside>
-        )}
+          )
+        })()}
       </div>
     </div>
   )
