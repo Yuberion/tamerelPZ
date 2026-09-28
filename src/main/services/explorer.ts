@@ -516,8 +516,38 @@ function isNonDiffuseMap(filename: string): boolean {
   return /(?:_normal|_norm|_n|_mask|_roughness|_metallic|_metal|_spec|_bump|_height|_ao|_disp)\.[a-z0-9]+$/i.test(filename)
 }
 
-/** Find all candidate media root directories for a model file (supports B41, B42 42/media, common/media) */
-async function findCandidateMediaRoots(modelPath: string): Promise<string[]> {
+/** Recursively find files satisfying a predicate */
+async function findFilesRecursive(
+  dir: string,
+  predicate: (name: string, isDir: boolean) => boolean,
+  maxDepth = 6,
+  currentDepth = 0
+): Promise<string[]> {
+  if (currentDepth > maxDepth || !(await exists(dir))) return []
+  const results: string[] = []
+  try {
+    const entries = await readdirSafe(dir)
+    for (const ent of entries) {
+      const full = join(dir, ent.name)
+      if (ent.isDirectory()) {
+        if (predicate(ent.name, true)) {
+          const sub = await findFilesRecursive(full, predicate, maxDepth, currentDepth + 1)
+          results.push(...sub)
+        }
+      } else {
+        if (predicate(ent.name, false)) {
+          results.push(full)
+        }
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+  return results
+}
+
+/** Find all candidate media root directories for a model file (supports B41, B42 42/media, common/media, legacy) */
+async function findCandidateMediaRoots(modelPath: string, gameDir?: string): Promise<string[]> {
   const norm = modelPath.replace(/\\/g, '/')
   const roots: string[] = []
 
@@ -526,197 +556,374 @@ async function findCandidateMediaRoots(modelPath: string): Promise<string[]> {
     roots.push(modelPath.slice(0, mediaIdx + 6))
   }
 
-  // Walk up to find mod root (directory containing mod.info)
   let curr = dirname(modelPath)
-  let modRoot: string | null = null
-  for (let i = 0; i < 7; i++) {
-    if (await exists(join(curr, 'mod.info'))) {
-      modRoot = curr
-      break
-    }
+  const candidateModDirs = new Set<string>()
+
+  for (let i = 0; i < 8; i++) {
     const parent = dirname(curr)
+    if (await exists(join(curr, 'mod.info'))) {
+      candidateModDirs.add(curr)
+      const currBase = basename(curr).toLowerCase()
+      if (/^(?:4[12](?:\.\d+)*|common|legacy)$/i.test(currBase)) {
+        if (await exists(join(parent, 'mod.info'))) {
+          candidateModDirs.add(parent)
+        }
+      }
+    }
     if (parent === curr) break
     curr = parent
   }
 
-  if (modRoot) {
-    const subMedia = [
-      join(modRoot, '42', 'media'),
-      join(modRoot, 'common', 'media'),
-      join(modRoot, 'media'),
-      join(modRoot, '41', 'media')
+  for (const modDir of candidateModDirs) {
+    const knownSubs = [
+      'media',
+      join('42', 'media'),
+      join('common', 'media'),
+      join('41', 'media')
     ]
-    for (const sm of subMedia) {
-      if (!roots.includes(sm) && (await exists(sm))) {
-        roots.push(sm)
+    for (const sub of knownSubs) {
+      const p = join(modDir, sub)
+      if (!roots.includes(p) && (await exists(p))) {
+        roots.push(p)
       }
+    }
+
+    try {
+      const subEntries = await readdirSafe(modDir)
+      for (const ent of subEntries) {
+        if (!ent.isDirectory()) continue
+        const candidateP = join(modDir, ent.name, 'media')
+        if (!roots.includes(candidateP) && (await exists(candidateP))) {
+          roots.push(candidateP)
+        }
+        if (ent.name.toLowerCase() === 'legacy') {
+          const legEntries = await readdirSafe(join(modDir, ent.name))
+          for (const lent of legEntries) {
+            if (!lent.isDirectory()) continue
+            const legP = join(modDir, ent.name, lent.name, 'media')
+            if (!roots.includes(legP) && (await exists(legP))) {
+              roots.push(legP)
+            }
+          }
+        }
+      }
+    } catch {
+      // Safe skip
+    }
+  }
+
+  if (gameDir) {
+    const vanillaMedia = join(gameDir, 'media')
+    if (!roots.includes(vanillaMedia) && (await exists(vanillaMedia))) {
+      roots.push(vanillaMedia)
     }
   }
 
   return roots
 }
 
-/** Autonomous cascading search for model texture file with diffuse prioritization */
+interface IndexedTexture {
+  fullPath: string
+  relPathNorm: string
+  fileNameLower: string
+  baseNameLower: string
+  ext: string
+  isAuxiliary: boolean
+  isVanilla: boolean
+  inModelDir: boolean
+}
+
+async function indexTextures(
+  roots: string[],
+  modelDir: string,
+  candidateExtensions: string[]
+): Promise<IndexedTexture[]> {
+  const textures: IndexedTexture[] = []
+  const seenPaths = new Set<string>()
+
+  async function scanFolder(dir: string, isVanilla = false): Promise<void> {
+    const files = await findFilesRecursive(
+      dir,
+      (name, isDir) => {
+        if (isDir) return !name.startsWith('.') && name !== 'node_modules'
+        const ext = extname(name).toLowerCase()
+        return candidateExtensions.includes(ext)
+      },
+      6
+    )
+
+    for (const f of files) {
+      const lower = f.toLowerCase()
+      if (seenPaths.has(lower)) continue
+      seenPaths.add(lower)
+
+      const ext = extname(f).toLowerCase()
+      const baseName = basename(f, ext)
+      const normF = f.replace(/\\/g, '/')
+      let relPathNorm = ''
+      const texIdx = normF.toLowerCase().lastIndexOf('/textures/')
+      if (texIdx !== -1) {
+        relPathNorm = normF.slice(texIdx + 10).replace(/\.[^/.]+$/, '').toLowerCase()
+      } else {
+        relPathNorm = baseName.toLowerCase()
+      }
+
+      textures.push({
+        fullPath: f,
+        relPathNorm,
+        fileNameLower: basename(f).toLowerCase(),
+        baseNameLower: baseName.toLowerCase(),
+        ext,
+        isAuxiliary: isNonDiffuseMap(f),
+        isVanilla,
+        inModelDir: dirname(f).toLowerCase() === modelDir.toLowerCase()
+      })
+    }
+  }
+
+  await scanFolder(modelDir, false)
+
+  for (const root of roots) {
+    const texDir = join(root, 'textures')
+    if (await exists(texDir)) {
+      const isVanilla = root.includes('common\\ProjectZomboid') || root.includes('common/ProjectZomboid')
+      await scanFolder(texDir, isVanilla)
+    }
+  }
+
+  return textures
+}
+
+function tokenize(str: string): string[] {
+  return str
+    .replace(/([0-9]+)/g, '_$1_')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(
+      (w) =>
+        w.length > 1 &&
+        !['model', 'mesh', 'item', 'vehicles', 'vehicle', 'skinned', 'clothes', 'worlditems', 'ammo'].includes(w)
+    )
+}
+
+function tokenMatch(t1: string, t2: string): boolean {
+  if (t1 === t2) return true
+  if (t1.length >= 3 && t2.length >= 3) {
+    if (t1.includes(t2) || t2.includes(t1)) return true
+    if (t1.startsWith(t2) || t2.startsWith(t1)) return true
+  }
+  return false
+}
+
+/** Autonomous cascading search for model texture file with diffuse prioritization across any mod */
 async function resolveModelTexture(
   modelPath: string,
-  hints: string[] = []
+  hints: string[] = [],
+  gameDir?: string
 ): Promise<{ path: string; name: string; url: string } | undefined> {
-  const candidateExtensions = ['.png', '.tga', '.jpg', '.jpeg', '.webp', '.dds']
+  const candidateExtensions = ['.png', '.tga', '.jpg', '.jpeg', '.webp']
   const modelDir = dirname(modelPath)
   const baseName = basename(modelPath, extname(modelPath))
   const strippedName = cleanPzModelName(baseName)
-  const norm = modelPath.replace(/\\/g, '/')
+  const roots = await findCandidateMediaRoots(modelPath, gameDir)
+  const indexedTextures = await indexTextures(roots, modelDir, candidateExtensions)
 
-  const roots = await findCandidateMediaRoots(modelPath)
+  const candidateRelPaths = new Set<string>()
+  const candidateBaseNames = new Set<string>()
+  const modelDefAliases = new Set<string>()
 
-  // Subfolder relative to models/models_X (e.g. "weapons", "clothing", "vehicles")
-  let subDir = ''
-  const m = norm.match(/\/(?:models_X|models)\/(.+)\/[^/]+$/i)
-  if (m && m[1]) subDir = m[1]
+  candidateBaseNames.add(baseName.toLowerCase())
+  if (strippedName) candidateBaseNames.add(strippedName.toLowerCase())
 
-  const candidateNames = new Map<string, number>() // name (lowercase) -> priority score
-  candidateNames.set(baseName.toLowerCase(), 80)
-  if (strippedName && strippedName.toLowerCase() !== baseName.toLowerCase()) {
-    candidateNames.set(strippedName.toLowerCase(), 70)
-  }
-
-  // 1. Direct hints from 3D model file (FBX relative filenames, X texture filenames, MTL)
+  // Direct hints from 3D model file (FBX relative filenames, X texture filenames, MTL)
   for (const h of hints) {
-    const raw = h.replace(/\\/g, '/').trim()
+    const raw = h.replace(/\\/g, '/').trim().replace(/^\/+/, '')
+    if (!raw) continue
+    const cleanRel = raw.replace(/\.[^/.]+$/, '').toLowerCase()
+    candidateRelPaths.add(cleanRel)
     const f = basename(raw, extname(raw))
-    if (f) candidateNames.set(f.toLowerCase(), 95)
+    if (f) candidateBaseNames.add(f.toLowerCase())
   }
 
-  // 2. Scan clothingItems XML definitions (for clothing/armor/accessories)
+  // 1. Scan clothingItems XML definitions
   for (const root of roots) {
     const clothingDir = join(root, 'clothing', 'clothingItems')
     if (await exists(clothingDir)) {
-      try {
-        const files = await readdirSafe(clothingDir)
-        for (const f of files) {
-          if (!f.name.endsWith('.xml')) continue
-          const text = await readTextSafe(join(clothingDir, f.name), 64 * 1024)
-          if (!text) continue
-          if (
-            text.includes(`<m_MaleModel>${baseName}</m_MaleModel>`) ||
-            text.includes(`<m_FemaleModel>${baseName}</m_FemaleModel>`) ||
-            text.includes(`<m_StaticModel>${baseName}</m_StaticModel>`) ||
-            text.includes(`>${baseName}<`) ||
-            (strippedName && text.includes(`>${strippedName}<`))
-          ) {
-            const matches = text.matchAll(/<(?:textureChoices|m_Textures|textureName)>([^<]+)<\//gi)
-            for (const match of matches) {
-              const rawTex = match[1].trim()
-              const texBase = basename(rawTex, extname(rawTex))
-              if (texBase) candidateNames.set(texBase.toLowerCase(), 100)
+      const xmls = await findFilesRecursive(clothingDir, (n, isD) => isD || n.toLowerCase().endsWith('.xml'))
+      for (const x of xmls) {
+        try {
+          const txt = await readTextSafe(x, 128 * 1024)
+          if (!txt) continue
+          const hasMatch =
+            txt.toLowerCase().includes(baseName.toLowerCase()) ||
+            (strippedName ? txt.toLowerCase().includes(strippedName.toLowerCase()) : false)
+          if (!hasMatch) continue
+
+          const modelMatches = txt.matchAll(/<(?:m_MaleModel|m_FemaleModel|m_StaticModel|m_Model)>([^<]+)<\//gi)
+          let matchedXml = false
+          for (const mm of modelMatches) {
+            const mVal = basename(mm[1].trim().replace(/\\/g, '/')).toLowerCase()
+            if (mVal === baseName.toLowerCase() || (strippedName && mVal === strippedName.toLowerCase())) {
+              matchedXml = true
+              break
             }
           }
+          if (matchedXml) {
+            const texMatches = txt.matchAll(/<(?:textureChoices|m_Textures|textureName)>([^<]+)<\//gi)
+            for (const tm of texMatches) {
+              const raw = tm[1].trim().replace(/\\/g, '/').replace(/^\/+/, '')
+              candidateRelPaths.add(raw.replace(/\.[^/.]+$/, '').toLowerCase())
+              candidateBaseNames.add(basename(raw, extname(raw)).toLowerCase())
+            }
+          }
+        } catch {
+          // Safe skip
         }
-      } catch {
-        // Safe skip
       }
     }
   }
 
-  // 3. Scan scripts txt definitions (for weapons, vehicles, items)
+  // 2. Scan scripts txt definitions (recursive)
   for (const root of roots) {
     const scriptsDir = join(root, 'scripts')
     if (await exists(scriptsDir)) {
-      try {
-        const sFiles = await readdirSafe(scriptsDir)
-        for (const sf of sFiles) {
-          if (!sf.name.endsWith('.txt')) continue
-          const text = await readTextSafe(join(scriptsDir, sf.name), 256 * 1024)
-          if (!text) continue
-          const meshRegex = new RegExp(`\\bmesh\\s*=\\s*(?:[\\w/]+\\/)?${baseName}\\b[\\s\\S]*?\\btexture\\s*=\\s*([\\w/.-]+)`, 'i')
-          const match = meshRegex.exec(text)
-          if (match && match[1]) {
-            const tBase = basename(match[1].trim(), extname(match[1].trim()))
-            if (tBase) candidateNames.set(tBase.toLowerCase(), 100)
+      const txts = await findFilesRecursive(scriptsDir, (n, isD) => isD || n.toLowerCase().endsWith('.txt'))
+      for (const t of txts) {
+        try {
+          const txt = await readTextSafe(t, 256 * 1024)
+          if (!txt) continue
+          const baseLower = baseName.toLowerCase()
+          const stripLower = strippedName ? strippedName.toLowerCase() : ''
+
+          // Pass A: model blocks
+          const modelBlocks = txt.matchAll(/\bmodel\s+([A-Za-z0-9_.-]+)\s*\{([^}]+)\}/gi)
+          for (const mb of modelBlocks) {
+            const modelDefName = mb[1]
+            const blockContent = mb[2]
+            const meshM = /mesh\s*=\s*([^,;\r\n]+)/i.exec(blockContent)
+            const texM = /texture\s*=\s*([^,;\r\n]+)/i.exec(blockContent)
+            if (meshM) {
+              const rawMesh = meshM[1].trim().replace(/\\/g, '/')
+              const meshBase = basename(rawMesh, extname(rawMesh)).toLowerCase()
+              if (meshBase === baseLower || (stripLower && meshBase === stripLower)) {
+                modelDefAliases.add(modelDefName.toLowerCase())
+                if (texM) {
+                  const rawTex = texM[1].trim().replace(/\\/g, '/').replace(/["']/g, '')
+                  candidateRelPaths.add(rawTex.replace(/\.[^/.]+$/, '').toLowerCase())
+                  candidateBaseNames.add(basename(rawTex, extname(rawTex)).toLowerCase())
+                }
+              }
+            }
           }
+
+          // Pass B: item blocks
+          const itemBlocks = txt.matchAll(/\bitem\s+([A-Za-z0-9_.-]+)\s*\{([^}]+)\}/gi)
+          for (const ib of itemBlocks) {
+            const itemContent = ib[2]
+            let itemMatches = false
+            for (const alias of [baseLower, stripLower, ...modelDefAliases]) {
+              if (alias && itemContent.toLowerCase().includes(alias)) {
+                itemMatches = true
+                break
+              }
+            }
+            if (itemMatches) {
+              const texM = /(?:Texture|Icon)\s*=\s*([^,;\r\n]+)/i.exec(itemContent)
+              if (texM) {
+                const rawTex = texM[1].trim().replace(/\\/g, '/').replace(/["']/g, '')
+                candidateRelPaths.add(rawTex.replace(/\.[^/.]+$/, '').toLowerCase())
+                candidateBaseNames.add(basename(rawTex, extname(rawTex)).toLowerCase())
+              }
+            }
+          }
+
+          // Pass C: vehicle definitions with skin/texture
+          if (modelDefAliases.size > 0 || txt.toLowerCase().includes(baseLower)) {
+            for (const alias of [baseLower, stripLower, ...modelDefAliases]) {
+              if (!alias) continue
+              let searchIdx = txt.toLowerCase().indexOf(alias)
+              while (searchIdx !== -1) {
+                const endIdx = txt.indexOf('}\n}', searchIdx)
+                const chunk = txt.slice(searchIdx, endIdx !== -1 ? endIdx + 3 : searchIdx + 800)
+                const texMatches = chunk.matchAll(/(?:texture|textureMask|textureLights)\s*=\s*([^,;\r\n]+)/gi)
+                for (const tm of texMatches) {
+                  const rawTex = tm[1].trim().replace(/\\/g, '/').replace(/["']/g, '')
+                  candidateRelPaths.add(rawTex.replace(/\.[^/.]+$/, '').toLowerCase())
+                  candidateBaseNames.add(basename(rawTex, extname(rawTex)).toLowerCase())
+                }
+                searchIdx = txt.toLowerCase().indexOf(alias, searchIdx + alias.length)
+              }
+            }
+          }
+        } catch {
+          // Safe skip
         }
-      } catch {
-        // Safe skip
       }
     }
   }
 
-  // Search directories ordered by preference
-  interface SearchDir {
-    dir: string
-    bonus: number
-  }
-  const searchDirs: SearchDir[] = []
-  searchDirs.push({ dir: modelDir, bonus: 20 })
-
-  for (const root of roots) {
-    if (subDir) {
-      searchDirs.push({ dir: join(root, 'textures', subDir), bonus: 30 })
-    }
-    searchDirs.push({ dir: join(root, 'textures'), bonus: 15 })
-    searchDirs.push({ dir: join(root, 'textures', 'weapons'), bonus: 10 })
-    searchDirs.push({ dir: join(root, 'textures', 'clothing'), bonus: 10 })
-    searchDirs.push({ dir: join(root, 'textures', 'WorldItems'), bonus: 10 })
-    searchDirs.push({ dir: join(root, 'clothing'), bonus: 5 })
-  }
-
+  const modelTokens = tokenize(baseName)
   let bestFile: string | null = null
   let bestScore = -Infinity
 
-  for (const { dir, bonus: dirBonus } of searchDirs) {
-    if (!(await exists(dir))) continue
-    try {
-      const files = await readdirSafe(dir)
-      for (const ent of files) {
-        if (ent.isDirectory()) continue
-        const ext = extname(ent.name).toLowerCase()
-        if (!candidateExtensions.includes(ext)) continue
-        const nameWithoutExt = basename(ent.name, ext).toLowerCase()
+  for (const tex of indexedTextures) {
+    let score = 0
 
-        let matchScore = 0
-        if (candidateNames.has(nameWithoutExt)) {
-          matchScore = candidateNames.get(nameWithoutExt)!
-        } else if (strippedName && nameWithoutExt.startsWith(strippedName.toLowerCase())) {
-          matchScore = 30
-        } else if (nameWithoutExt.startsWith(baseName.toLowerCase())) {
-          matchScore = 35
-        } else {
-          continue
-        }
-
-        let score = matchScore + dirBonus
-        if (ext === '.png') score += 10
-        else if (ext === '.tga') score += 8
-        else if (ext === '.jpg' || ext === '.jpeg') score += 6
-        else if (ext === '.webp') score += 4
-
-        if (isNonDiffuseMap(ent.name)) {
-          score -= 300 // Heavy penalty for normal maps / masks / specular
-        }
-
-        if (score > bestScore) {
-          bestScore = score
-          bestFile = join(dir, ent.name)
+    if (candidateRelPaths.has(tex.relPathNorm)) {
+      score += 1000
+    } else if (candidateBaseNames.has(tex.baseNameLower)) {
+      score += 700
+    } else if (tex.inModelDir && tex.baseNameLower === baseName.toLowerCase()) {
+      score += 800
+    } else if (tex.baseNameLower === baseName.toLowerCase()) {
+      score += 600
+    } else if (strippedName && tex.baseNameLower === strippedName.toLowerCase()) {
+      score += 500
+    } else if (
+      tex.baseNameLower === 'item_' + baseName.toLowerCase() ||
+      (strippedName && tex.baseNameLower === 'item_' + strippedName.toLowerCase())
+    ) {
+      score += 480
+    } else if (tex.baseNameLower === 'vehicle_' + baseName.toLowerCase()) {
+      score += 480
+    } else {
+      // Token overlap
+      const texTokens = tokenize(tex.baseNameLower)
+      let matchCount = 0
+      for (const mt of modelTokens) {
+        for (const tt of texTokens) {
+          if (tokenMatch(mt, tt)) {
+            matchCount++
+            break
+          }
         }
       }
-    } catch {
-      // Ignore
+      if (matchCount >= 2) {
+        score += 250 + matchCount * 80
+      } else if (tex.baseNameLower.includes(baseName.toLowerCase()) || baseName.toLowerCase().includes(tex.baseNameLower)) {
+        score += 200
+      } else {
+        continue
+      }
+    }
+
+    if (tex.isAuxiliary) score -= 450
+    if (tex.ext === '.png') score += 20
+    if (tex.inModelDir) score += 50
+    if (tex.isVanilla) score -= 150
+
+    if (score > bestScore) {
+      bestScore = score
+      bestFile = tex.fullPath
     }
   }
 
-  // Fallback: If no match found by score, but model directory has exactly one image file
+  // Fallback: single diffuse texture in model directory
   if (!bestFile || bestScore <= 0) {
-    try {
-      const dirFiles = await readdirSafe(modelDir)
-      const imgFiles = dirFiles.filter((f) => {
-        const e = extname(f.name).toLowerCase()
-        return candidateExtensions.includes(e) && !isNonDiffuseMap(f.name)
-      })
-      if (imgFiles.length === 1 && imgFiles[0]) {
-        bestFile = join(modelDir, imgFiles[0].name)
-      }
-    } catch {
-      // Ignore
+    const dirImages = indexedTextures.filter((t) => t.inModelDir && !t.isAuxiliary)
+    if (dirImages.length === 1 && dirImages[0]) {
+      bestFile = dirImages[0].fullPath
     }
   }
 
@@ -727,7 +934,7 @@ async function resolveModelTexture(
   return undefined
 }
 
-export async function parseMeshForPreview(filePath: string): Promise<MeshPreviewData> {
+export async function parseMeshForPreview(filePath: string, settings?: AppSettings): Promise<MeshPreviewData> {
   if (!(await exists(filePath))) {
     return {
       ok: false,
@@ -818,7 +1025,8 @@ export async function parseMeshForPreview(filePath: string): Promise<MeshPreview
   }
 
   // Auto-resolve attached texture
-  const resolvedTexture = await resolveModelTexture(filePath, textureHints)
+  const gameDir = settings ? await detectGameDir(settings) : undefined
+  const resolvedTexture = await resolveModelTexture(filePath, textureHints, gameDir)
 
   return {
     ok: true,

@@ -225,7 +225,7 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.fsMeshPreview, async (_e, path: string) => {
-    return parseMeshForPreview(await assertPathAllowed(path))
+    return parseMeshForPreview(await assertPathAllowed(path), await getSettings())
   })
 
   ipcMain.handle(IPC.explorerGrep, async (_e, req: ModGrepRequest) => {
