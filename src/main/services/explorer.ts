@@ -4,9 +4,9 @@
 import { promises as fs } from 'node:fs'
 import { basename, dirname, extname, join, relative } from 'node:path'
 import { deflateSync } from 'node:zlib'
-import type { AppSettings, MeshPreviewData } from '../../shared/types'
+import type { AppSettings, MeshPreviewData, PathsReport } from '../../shared/types'
 import { exists, extOf, isDir, readTextSafe, readdirSafe } from './fsx'
-import { detectGameDir } from './paths'
+import { detectGameDir, detectPaths } from './paths'
 import { getCachedMods } from './scanner'
 import { importObj, importPly, importStl, meshName, newMesh, type MeshImport, type RawMesh } from './mesh'
 import { importCollada, importDirectX, importGltf } from './meshdcc'
@@ -546,14 +546,111 @@ async function findFilesRecursive(
   return results
 }
 
-/** Find all candidate media root directories for a model file (supports B41, B42 42/media, common/media, legacy) */
-async function findCandidateMediaRoots(modelPath: string, gameDir?: string): Promise<string[]> {
+interface MediaRootInfo {
+  path: string
+  tier: 1 | 2 | 3
+}
+
+let cachedExternalRoots: { timestamp: number; roots: MediaRootInfo[] } | null = null
+
+/** Discover external media roots from sibling local mods, steam workshop libraries, and vanilla game */
+async function getExternalMediaRoots(pathsReport?: PathsReport): Promise<MediaRootInfo[]> {
+  const now = Date.now()
+  if (cachedExternalRoots && now - cachedExternalRoots.timestamp < 60_000) {
+    return cachedExternalRoots.roots
+  }
+
+  const results: MediaRootInfo[] = []
+  const seen = new Set<string>()
+
+  const addRoot = (p: string, tier: 1 | 2 | 3): void => {
+    const norm = p.replace(/\\/g, '/').toLowerCase()
+    if (!seen.has(norm)) {
+      seen.add(norm)
+      results.push({ path: p, tier })
+    }
+  }
+
+  // 1. Sibling local mods in zomboidDir/mods
+  if (pathsReport?.zomboidDir) {
+    const localModsDir = join(pathsReport.zomboidDir, 'mods')
+    if (await exists(localModsDir)) {
+      try {
+        const ents = await readdirSafe(localModsDir)
+        for (const ent of ents) {
+          if (!ent.isDirectory() || ent.name.startsWith('.')) continue
+          const modP = join(localModsDir, ent.name)
+          for (const sub of ['media', join('42', 'media'), join('common', 'media'), join('41', 'media')]) {
+            const full = join(modP, sub)
+            if (await exists(full)) addRoot(full, 2)
+          }
+        }
+      } catch {
+        // Safe skip
+      }
+    }
+  }
+
+  // 2. Steam Workshop mods
+  if (pathsReport?.workshopDirs) {
+    for (const wsDir of pathsReport.workshopDirs) {
+      if (!(await exists(wsDir))) continue
+      try {
+        const itemIds = await readdirSafe(wsDir)
+        for (const itemId of itemIds) {
+          if (!itemId.isDirectory() || itemId.name.startsWith('.')) continue
+          const modsDir = join(wsDir, itemId.name, 'mods')
+          if (!(await exists(modsDir))) continue
+          const modEntries = await readdirSafe(modsDir)
+          for (const mEnt of modEntries) {
+            if (!mEnt.isDirectory()) continue
+            const mPath = join(modsDir, mEnt.name)
+            for (const sub of [
+              'media',
+              join('common', 'media'),
+              join('42', 'media'),
+              join('42.0', 'media'),
+              join('42.13', 'media'),
+              join('41', 'media')
+            ]) {
+              const full = join(mPath, sub)
+              if (await exists(full)) addRoot(full, 2)
+            }
+          }
+        }
+      } catch {
+        // Safe skip
+      }
+    }
+  }
+
+  // 3. Vanilla game media fallback
+  if (pathsReport?.gameDir) {
+    const vanillaMedia = join(pathsReport.gameDir, 'media')
+    if (await exists(vanillaMedia)) addRoot(vanillaMedia, 3)
+  }
+
+  cachedExternalRoots = { timestamp: now, roots: results }
+  return results
+}
+
+/** Find all candidate media root directories for a model file (supports current mod, external siblings, workshop and vanilla) */
+async function findCandidateMediaRoots(modelPath: string, pathsReport?: PathsReport): Promise<MediaRootInfo[]> {
   const norm = modelPath.replace(/\\/g, '/')
-  const roots: string[] = []
+  const roots: MediaRootInfo[] = []
+  const seen = new Set<string>()
+
+  const add = (p: string, tier: 1 | 2 | 3): void => {
+    const k = p.replace(/\\/g, '/').toLowerCase()
+    if (!seen.has(k)) {
+      seen.add(k)
+      roots.push({ path: p, tier })
+    }
+  }
 
   const mediaIdx = norm.toLowerCase().lastIndexOf('/media/')
   if (mediaIdx !== -1) {
-    roots.push(modelPath.slice(0, mediaIdx + 6))
+    add(modelPath.slice(0, mediaIdx + 6), 1)
   }
 
   let curr = dirname(modelPath)
@@ -583,9 +680,7 @@ async function findCandidateMediaRoots(modelPath: string, gameDir?: string): Pro
     ]
     for (const sub of knownSubs) {
       const p = join(modDir, sub)
-      if (!roots.includes(p) && (await exists(p))) {
-        roots.push(p)
-      }
+      if (await exists(p)) add(p, 1)
     }
 
     try {
@@ -593,17 +688,13 @@ async function findCandidateMediaRoots(modelPath: string, gameDir?: string): Pro
       for (const ent of subEntries) {
         if (!ent.isDirectory()) continue
         const candidateP = join(modDir, ent.name, 'media')
-        if (!roots.includes(candidateP) && (await exists(candidateP))) {
-          roots.push(candidateP)
-        }
+        if (await exists(candidateP)) add(candidateP, 1)
         if (ent.name.toLowerCase() === 'legacy') {
           const legEntries = await readdirSafe(join(modDir, ent.name))
           for (const lent of legEntries) {
             if (!lent.isDirectory()) continue
             const legP = join(modDir, ent.name, lent.name, 'media')
-            if (!roots.includes(legP) && (await exists(legP))) {
-              roots.push(legP)
-            }
+            if (await exists(legP)) add(legP, 1)
           }
         }
       }
@@ -612,10 +703,11 @@ async function findCandidateMediaRoots(modelPath: string, gameDir?: string): Pro
     }
   }
 
-  if (gameDir) {
-    const vanillaMedia = join(gameDir, 'media')
-    if (!roots.includes(vanillaMedia) && (await exists(vanillaMedia))) {
-      roots.push(vanillaMedia)
+  // Tier 2 & 3: external roots (sibling local mods, workshop libraries, vanilla fallback)
+  if (pathsReport) {
+    const externalRoots = await getExternalMediaRoots(pathsReport)
+    for (const ext of externalRoots) {
+      add(ext.path, ext.tier)
     }
   }
 
@@ -629,19 +721,19 @@ interface IndexedTexture {
   baseNameLower: string
   ext: string
   isAuxiliary: boolean
-  isVanilla: boolean
+  tier: 1 | 2 | 3
   inModelDir: boolean
 }
 
 async function indexTextures(
-  roots: string[],
+  rootInfos: MediaRootInfo[],
   modelDir: string,
   candidateExtensions: string[]
 ): Promise<IndexedTexture[]> {
   const textures: IndexedTexture[] = []
   const seenPaths = new Set<string>()
 
-  async function scanFolder(dir: string, isVanilla = false): Promise<void> {
+  async function scanFolder(dir: string, tier: 1 | 2 | 3): Promise<void> {
     const files = await findFilesRecursive(
       dir,
       (name, isDir) => {
@@ -675,19 +767,18 @@ async function indexTextures(
         baseNameLower: baseName.toLowerCase(),
         ext,
         isAuxiliary: isNonDiffuseMap(f),
-        isVanilla,
+        tier,
         inModelDir: dirname(f).toLowerCase() === modelDir.toLowerCase()
       })
     }
   }
 
-  await scanFolder(modelDir, false)
+  await scanFolder(modelDir, 1)
 
-  for (const root of roots) {
-    const texDir = join(root, 'textures')
+  for (const root of rootInfos) {
+    const texDir = join(root.path, 'textures')
     if (await exists(texDir)) {
-      const isVanilla = root.includes('common\\ProjectZomboid') || root.includes('common/ProjectZomboid')
-      await scanFolder(texDir, isVanilla)
+      await scanFolder(texDir, root.tier)
     }
   }
 
@@ -720,14 +811,14 @@ function tokenMatch(t1: string, t2: string): boolean {
 async function resolveModelTexture(
   modelPath: string,
   hints: string[] = [],
-  gameDir?: string
+  pathsReport?: PathsReport
 ): Promise<{ path: string; name: string; url: string } | undefined> {
   const candidateExtensions = ['.png', '.tga', '.jpg', '.jpeg', '.webp']
   const modelDir = dirname(modelPath)
   const baseName = basename(modelPath, extname(modelPath))
   const strippedName = cleanPzModelName(baseName)
-  const roots = await findCandidateMediaRoots(modelPath, gameDir)
-  const indexedTextures = await indexTextures(roots, modelDir, candidateExtensions)
+  const rootInfos = await findCandidateMediaRoots(modelPath, pathsReport)
+  const indexedTextures = await indexTextures(rootInfos, modelDir, candidateExtensions)
 
   const candidateRelPaths = new Set<string>()
   const candidateBaseNames = new Set<string>()
@@ -746,9 +837,9 @@ async function resolveModelTexture(
     if (f) candidateBaseNames.add(f.toLowerCase())
   }
 
-  // 1. Scan clothingItems XML definitions
-  for (const root of roots) {
-    const clothingDir = join(root, 'clothing', 'clothingItems')
+  // 1. Scan clothingItems XML definitions in candidate roots
+  for (const root of rootInfos) {
+    const clothingDir = join(root.path, 'clothing', 'clothingItems')
     if (await exists(clothingDir)) {
       const xmls = await findFilesRecursive(clothingDir, (n, isD) => isD || n.toLowerCase().endsWith('.xml'))
       for (const x of xmls) {
@@ -784,9 +875,9 @@ async function resolveModelTexture(
     }
   }
 
-  // 2. Scan scripts txt definitions (recursive)
-  for (const root of roots) {
-    const scriptsDir = join(root, 'scripts')
+  // 2. Scan scripts txt definitions (model blocks, item blocks, vehicle skin definitions)
+  for (const root of rootInfos) {
+    const scriptsDir = join(root.path, 'scripts')
     if (await exists(scriptsDir)) {
       const txts = await findFilesRecursive(scriptsDir, (n, isD) => isD || n.toLowerCase().endsWith('.txt'))
       for (const t of txts) {
@@ -844,8 +935,8 @@ async function resolveModelTexture(
               if (!alias) continue
               let searchIdx = txt.toLowerCase().indexOf(alias)
               while (searchIdx !== -1) {
-                const endIdx = txt.indexOf('}\n}', searchIdx)
-                const chunk = txt.slice(searchIdx, endIdx !== -1 ? endIdx + 3 : searchIdx + 800)
+                const blockClose = txt.indexOf('\n\t}', searchIdx)
+                const chunk = txt.slice(searchIdx, blockClose !== -1 ? blockClose + 3 : searchIdx + 400)
                 const texMatches = chunk.matchAll(/(?:texture|textureMask|textureLights)\s*=\s*([^,;\r\n]+)/gi)
                 for (const tm of texMatches) {
                   const rawTex = tm[1].trim().replace(/\\/g, '/').replace(/["']/g, '')
@@ -888,30 +979,50 @@ async function resolveModelTexture(
     } else if (tex.baseNameLower === 'vehicle_' + baseName.toLowerCase()) {
       score += 480
     } else {
-      // Token overlap
-      const texTokens = tokenize(tex.baseNameLower)
-      let matchCount = 0
-      for (const mt of modelTokens) {
-        for (const tt of texTokens) {
-          if (tokenMatch(mt, tt)) {
-            matchCount++
+      // Vehicle skin variant prefix matching (e.g. vehicle_sportscarshell matches vehicle_sportscarbluecrashedshell.png)
+      let isSkinVariant = false
+      for (const cand of candidateBaseNames) {
+        if (cand.endsWith('shell') && cand.length > 8) {
+          const skinPrefix = cand.slice(0, -5)
+          if (tex.baseNameLower.startsWith(skinPrefix) && tex.baseNameLower.endsWith('shell')) {
+            score += 650
+            isSkinVariant = true
             break
           }
         }
       }
-      if (matchCount >= 2) {
-        score += 250 + matchCount * 80
-      } else if (tex.baseNameLower.includes(baseName.toLowerCase()) || baseName.toLowerCase().includes(tex.baseNameLower)) {
-        score += 200
-      } else {
-        continue
+
+      if (!isSkinVariant) {
+        // Token overlap with precision weighting
+        const texTokens = tokenize(tex.baseNameLower)
+        let matchCount = 0
+        for (const mt of modelTokens) {
+          for (const tt of texTokens) {
+            if (tokenMatch(mt, tt)) {
+              matchCount++
+              break
+            }
+          }
+        }
+        if (matchCount >= 2) {
+          score += 250 + matchCount * 80
+          // Precision bonus: if all meaningful tokens in texture match the model name
+          if (matchCount === texTokens.length) {
+            score += 180
+          }
+        } else if (tex.baseNameLower.includes(baseName.toLowerCase()) || baseName.toLowerCase().includes(tex.baseNameLower)) {
+          score += 200
+        } else {
+          continue
+        }
       }
     }
 
     if (tex.isAuxiliary) score -= 450
     if (tex.ext === '.png') score += 20
     if (tex.inModelDir) score += 50
-    if (tex.isVanilla) score -= 150
+    if (tex.tier === 2) score -= 80
+    if (tex.tier === 3) score -= 150
 
     if (score > bestScore) {
       bestScore = score
@@ -919,11 +1030,24 @@ async function resolveModelTexture(
     }
   }
 
-  // Fallback: single diffuse texture in model directory
+  // Fallback 1: single diffuse texture in model directory
   if (!bestFile || bestScore <= 0) {
     const dirImages = indexedTextures.filter((t) => t.inModelDir && !t.isAuxiliary)
     if (dirImages.length === 1 && dirImages[0]) {
       bestFile = dirImages[0].fullPath
+    }
+  }
+
+  // Fallback 2: Hair / Beard models in PZ use base game hair textures
+  if (!bestFile || bestScore <= 0) {
+    const normModel = modelPath.replace(/\\/g, '/').toLowerCase()
+    if (normModel.includes('/hair') || normModel.includes('hair_') || normModel.includes('_hair') || normModel.includes('/beard')) {
+      const hairTex = indexedTextures.find((t) =>
+        ['f_hair_blonde.png', 'f_hair_white.png', 'hair_blonde.png', 'f_hair.png'].includes(t.fileNameLower)
+      )
+      if (hairTex) {
+        bestFile = hairTex.fullPath
+      }
     }
   }
 
@@ -1024,9 +1148,9 @@ export async function parseMeshForPreview(filePath: string, settings?: AppSettin
     totalTris += flattenMeshTriangles(m, allPositions, allNormals, allUvs)
   }
 
-  // Auto-resolve attached texture
-  const gameDir = settings ? await detectGameDir(settings) : undefined
-  const resolvedTexture = await resolveModelTexture(filePath, textureHints, gameDir)
+  // Auto-resolve attached texture across current mod, sibling mods, workshop and vanilla
+  const pathsReport = settings ? await detectPaths(settings) : undefined
+  const resolvedTexture = await resolveModelTexture(filePath, textureHints, pathsReport)
 
   return {
     ok: true,
