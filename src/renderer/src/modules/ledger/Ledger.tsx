@@ -13,6 +13,7 @@ import { LaunchTimeline } from './LaunchTimeline'
 import { LogDetail } from './LogDetail'
 import { LogDiagnostics } from './LogDiagnostics'
 import { LogDiffModal } from './LogDiffModal'
+import { ModIssuesModal } from './ModIssuesModal'
 import { LEVEL_ICON, LEVEL_KEY, LogList, type LogRow } from './LogList'
 import { buildModIndex, deduplicateIncidents, parseLog, resolveSourcePath, type LogIncident, type LogLevel } from './parseLog'
 import { useLogs } from './useLogs'
@@ -46,6 +47,7 @@ export function Ledger({ onExit }: { onExit: () => void }) {
   const [selectedDiagId, setSelectedDiagId] = useState<string>()
   const [showExport, setShowExport] = useState<boolean>(false)
   const [showDiff, setShowDiff] = useState<boolean>(false)
+  const [showModIssues, setShowModIssues] = useState<boolean>(false)
   const [selectedStageId, setSelectedStageId] = useState<LaunchStageId | undefined>(undefined)
   const [diffFilterQueries, setDiffFilterQueries] = useState<string[] | undefined>(undefined)
 
@@ -97,6 +99,20 @@ export function Ledger({ onExit }: { onExit: () => void }) {
     () => parsed.incidents.filter((i) => !i.modName).length,
     [parsed.incidents]
   )
+
+  const modIssuesSummary = useMemo(() => {
+    let modsWithErrors = 0
+    let modsWithWarnings = 0
+    for (const m of parsed.modAttributions) {
+      if (m.errors > 0) modsWithErrors++
+      if (m.warnings > 0) modsWithWarnings++
+    }
+    return {
+      modsWithErrors,
+      modsWithWarnings,
+      totalModsWithIssues: parsed.modAttributions.length
+    }
+  }, [parsed.modAttributions])
 
   /**
    * Visible rows with all active filters applied:
@@ -383,6 +399,26 @@ export function Ledger({ onExit }: { onExit: () => void }) {
           >
             <Icon name="diff" size={12} />
             {t('led.compareSessions')}
+          </button>
+
+          {/* Mod Issues Overview */}
+          <button
+            className={`btn btn--tiny led-btn-modissues ${modIssuesSummary.totalModsWithIssues > 0 ? 'led-btn-modissues--has-issues' : ''}`}
+            onClick={() => setShowModIssues(true)}
+            title={t('led.modIssuesBtnTitle')}
+          >
+            <Icon name="alert-circle" size={12} />
+            {t('led.modIssuesBtn')}
+            {modIssuesSummary.totalModsWithIssues > 0 && (
+              <span className="led-btn-modissues__badge">
+                {modIssuesSummary.modsWithErrors > 0 && (
+                  <span className="led-badge--err">{modIssuesSummary.modsWithErrors}</span>
+                )}
+                {modIssuesSummary.modsWithWarnings > 0 && (
+                  <span className="led-badge--warn">{modIssuesSummary.modsWithWarnings}</span>
+                )}
+              </span>
+            )}
           </button>
 
           {/* Clean Archive (shown if there are archived logs) */}
@@ -688,6 +724,20 @@ export function Ledger({ onExit }: { onExit: () => void }) {
           }}
         />
       )}
+
+      {/* Mod Issues Overview Modal */}
+      <ModIssuesModal
+        open={showModIssues}
+        onClose={() => setShowModIssues(false)}
+        modAttributions={parsed.modAttributions}
+        incidents={parsed.incidents}
+        scannedMods={scan?.mods ?? []}
+        onSelectMod={(modName) => {
+          setSelectedMod(modName)
+          setShowModIssues(false)
+        }}
+        coreCount={coreCount}
+      />
     </div>
   )
 }
