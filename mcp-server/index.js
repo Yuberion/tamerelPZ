@@ -30,13 +30,17 @@ const TOOLS = [
   },
   {
     name: 'pz_lookup_event',
-    description: 'Search and inspect the canonical 232 LuaEventManager engine events in Project Zomboid B41/B42.',
+    description: 'Search and inspect the canonical 262 LuaEventManager engine events in Project Zomboid B41/B42.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
           description: 'Keyword or event prefix (e.g. Hit, Weapon, Tick, Render, Craft)'
+        },
+        name: {
+          type: 'string',
+          description: 'Exact or partial event name (alias for query)'
         }
       }
     }

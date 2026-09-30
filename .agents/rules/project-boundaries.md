@@ -34,7 +34,7 @@ description: Boundaries between PZ Management project and the original Project Z
 📖 [**`PZ_KNOWLEDGE_BASE.md`**](file:///E:/PZ%20Management/PZ_KNOWLEDGE_BASE.md).
 
 Документ содержит:
-- Полный белый список **217 встроенных событий Lua** (`LuaEventManager`).
+- Полный белый список **262 встроенных событий Lua** (`LuaEventManager`).
 - Новый синтаксис Build 42: `craftRecipe`, `entity` (ECS), `fluid`, `item` (неймспейсы `base:`), `PZAPI.ModOptions`.
 - Спецификации 34 костей скелета (`Master_Bones.xml`), привязки оружия/рук (`Prop1`, `Prop2`).
 - Официальный список 31 тега для Workshop (`WorkshopTags.txt`).
@@ -69,7 +69,7 @@ description: Boundaries between PZ Management project and the original Project Z
 
 2. **`pz_lookup_event` (События Lua)**:
    - **Триггер**: Всегда перед добавлением или изменением любого обработчика событий Lua (`Events.<EventName>.Add(...)`).
-   - **Цель**: Проверить существование события и точные аргументы колбэка по официальному реестру 232 событий `LuaEventManager`.
+   - **Цель**: Проверить существование события и точные аргументы колбэка по официальному реестру 262 событий `LuaEventManager`.
    - **Вызов**: `pz_lookup_event` с параметром `name`.
 
 3. **`pz_validate_item_script` (Скрипты предметов B42)**:

@@ -6,13 +6,14 @@ const GAME_JAR = process.env.PZ_GAME_JAR || 'E:\\SteamLibrary\\steamapps\\common
 const USER_MODS_DIR = process.env.PZ_USER_MODS || 'C:\\Users\\tamer\\Zomboid\\mods';
 const CACHE_DIR = join(resolve('.'), '.cache', 'decompile');
 
-// Load canonical events
-let CANONICAL_EVENTS = [];
-try {
-  const evPath = new URL('./events.json', import.meta.url);
-  CANONICAL_EVENTS = JSON.parse(readFileSync(evPath, 'utf8'));
-} catch {
-  CANONICAL_EVENTS = [];
+// Load canonical events dynamically to reflect game updates without server restart
+function getCanonicalEvents() {
+  try {
+    const evPath = new URL('./events.json', import.meta.url);
+    return JSON.parse(readFileSync(evPath, 'utf8'));
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -28,7 +29,8 @@ export function decompileClass({ className, methodFilter }) {
   const cacheFile = join(CACHE_DIR, `${cleanName.replace(/[^a-zA-Z0-9_]/g, '_')}.txt`);
 
   let fullOutput = '';
-  if (existsSync(cacheFile)) {
+  const isCacheValid = existsSync(cacheFile) && existsSync(GAME_JAR) && statSync(cacheFile).mtimeMs >= statSync(GAME_JAR).mtimeMs;
+  if (isCacheValid) {
     fullOutput = readFileSync(cacheFile, 'utf8');
   } else {
     try {
@@ -95,19 +97,21 @@ export function decompileClass({ className, methodFilter }) {
 /**
  * Tool 2: Lookup Lua Events in canonical engine database
  */
-export function lookupEvent({ query }) {
-  if (!query) {
+export function lookupEvent({ query, name }) {
+  const events = getCanonicalEvents();
+  const qStr = query || name;
+  if (!qStr) {
     return {
-      totalEvents: CANONICAL_EVENTS.length,
-      sampleEvents: CANONICAL_EVENTS.slice(0, 25)
+      totalEvents: events.length,
+      sampleEvents: events.slice(0, 25)
     };
   }
 
-  const q = query.toLowerCase();
-  const matched = CANONICAL_EVENTS.filter((e) => e.toLowerCase().includes(q));
+  const q = qStr.toLowerCase();
+  const matched = events.filter((e) => e.toLowerCase().includes(q));
 
   return {
-    query,
+    query: qStr,
     matchedCount: matched.length,
     events: matched
   };
