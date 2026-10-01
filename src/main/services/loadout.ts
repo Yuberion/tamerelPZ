@@ -489,10 +489,30 @@ export async function saveGamePresets(
   if (!zomboidDir) return false
 
   const cfgPath = join(zomboidDir, GAME_PRESETS_REL)
+  let favLines: string[] = []
+  if (await exists(cfgPath)) {
+    const existing = await readTextSafe(cfgPath)
+    if (existing) {
+      favLines = existing
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith('!fav!'))
+    }
+  }
+
   const lines: string[] = []
+  if (favLines.length > 0) {
+    lines.push(...favLines)
+  }
   for (const [name, ids] of Object.entries(presets)) {
-    if (!name || ids.length === 0) continue
-    lines.push(`${name}:${ids.join(';')};`)
+    const cleanName = name.trim()
+    if (!cleanName || !ids || ids.length === 0) continue
+    const cleanIds = ids
+      .filter((id) => id && !id.startsWith('__SEP__:'))
+      .map((id) => id.trim().replace(/^\\/, ''))
+      .filter(Boolean)
+    if (cleanIds.length === 0) continue
+    lines.push(`${cleanName}:${cleanIds.join(';')};`)
   }
   const text = lines.join('\r\n') + '\r\n'
 

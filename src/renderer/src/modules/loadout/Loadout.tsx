@@ -573,6 +573,37 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
     notify(t('lo.profileSavedToast', { name }), 'ok')
   }, [profileName, kind, store.lists, profiles, saveSettings, notify, t])
 
+  const saveToGamePreset = useCallback(async () => {
+    const name = profileName.trim()
+    if (!name) {
+      notify(isRu ? 'Введите название пресета' : 'Please enter a preset name', 'warn')
+      return
+    }
+    const cleanMods = store.lists.mods
+      .filter((m) => m && !m.startsWith('__SEP__:'))
+      .map((m) => m.trim())
+    if (cleanMods.length === 0) {
+      notify(isRu ? 'Список модов пуст' : 'Mod list is empty', 'warn')
+      return
+    }
+    const next = { ...store.gamePresets, [name]: cleanMods }
+    const ok = await store.saveGamePresets(next)
+    if (ok) {
+      notify(
+        isRu
+          ? `Пресет «${name}» сохранён в Mod Manager (${cleanMods.length} модов)`
+          : `Preset "${name}" saved to Mod Manager (${cleanMods.length} mods)`,
+        'ok'
+      )
+      setProfileName('')
+    } else {
+      notify(
+        isRu ? 'Не удалось сохранить в pz_modlist_settings.cfg' : 'Failed to save to game cfg',
+        'warn'
+      )
+    }
+  }, [profileName, store, notify, isRu])
+
   /**
    * Load a profile into the editor, never straight to disk.
    *
@@ -798,6 +829,18 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
           <button className="btn" onClick={() => void saveProfile()} title={t('lo.profileSaveTitle')}>
             <Icon name="save" size={12} />
             {t('lo.profileSave')}
+          </button>
+          <button
+            className="btn"
+            onClick={() => void saveToGamePreset()}
+            title={
+              isRu
+                ? 'Сохранить текущий порядок модов в файл [B42] Mod Manager (pz_modlist_settings.cfg)'
+                : 'Save current active order to in-game Mod Manager'
+            }
+          >
+            <Icon name="package" size={12} />
+            {isRu ? 'В Mod Manager' : 'To Mod Manager'}
           </button>
           <Hint title={t('lo.profiles')} body={t('help.lo.profiles')} />
           {profiles.length === 0 ? (
@@ -1302,6 +1345,51 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
                 : `Preset deleted from game cfg`,
               'ok'
             )
+          }}
+          onSaveGamePreset={async (name, ids) => {
+            const cleanIds = ids
+              .filter((id) => id && !id.startsWith('__SEP__:'))
+              .map((id) => id.trim())
+            const next = { ...store.gamePresets, [name]: cleanIds }
+            const ok = await store.saveGamePresets(next)
+            if (ok) {
+              notify(
+                isRu
+                  ? `Пресет «${name}» сохранён в Mod Manager (${cleanIds.length} модов)`
+                  : `Preset "${name}" saved to Mod Manager (${cleanIds.length} mods)`,
+                'ok'
+              )
+            } else {
+              notify(
+                isRu
+                  ? 'Ошибка сохранения в pz_modlist_settings.cfg'
+                  : 'Failed to save to pz_modlist_settings.cfg',
+                'warn'
+              )
+            }
+            return ok
+          }}
+          onRenameGamePreset={async (oldName, newName) => {
+            const trimmed = newName.trim()
+            if (!trimmed || oldName === trimmed) return false
+            const next: Record<string, string[]> = {}
+            for (const [k, v] of Object.entries(store.gamePresets)) {
+              if (k === oldName) {
+                next[trimmed] = v
+              } else {
+                next[k] = v
+              }
+            }
+            const ok = await store.saveGamePresets(next)
+            if (ok) {
+              notify(
+                isRu
+                  ? `Пресет «${oldName}» переименован в «${trimmed}»`
+                  : `Preset renamed to "${trimmed}"`,
+                'ok'
+              )
+            }
+            return ok
           }}
           onImportCustomList={(_name, modIds) => {
             store.patch({ mods: modIds })

@@ -479,28 +479,94 @@
   gap: 5px;
   padding-right: 9px;
   color: var(--ash);
+  --tree-guide: #343c49;
 }
 .fsrow:hover {
   background: #1c2129;
   color: var(--bone);
+  --tree-guide: #475365;
 }
 .fsrow.is-selected {
   background: #24211b;
   color: #ecdfcd;
   box-shadow: inset 0 0 0 1px #a8613a2b;
+  --tree-guide: #5c4e3f;
 }
-.fsrow__rail {
-  flex: 0 0 13px;
+
+/* Tree indentation container */
+.fsrow__tree {
+  display: flex;
+  align-items: center;
   height: 100%;
-  border-left: 1px solid #1f242b;
-  margin-left: 5px;
+  flex: 0 0 auto;
 }
+
+/* Ancestor vertical lines */
+.fsrow__tree-pipe {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 100%;
+  position: relative;
+}
+.fsrow__tree-pipe.is-pipe::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 1px;
+  background: var(--tree-guide);
+}
+
+/* Branch connector (├── or └──) */
+.fsrow__tree-branch {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 100%;
+  position: relative;
+}
+.fsrow__tree-branch::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 1px;
+  background: var(--tree-guide);
+}
+.fsrow__tree-branch.is-last::before {
+  bottom: 50%;
+}
+.fsrow__tree-branch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  right: 0;
+  height: 1px;
+  background: var(--tree-guide);
+  transform: translateY(-50%);
+}
+
+/* Caret / icon connector */
 .fsrow__caret {
-  flex: 0 0 12px;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 100%;
   display: grid;
   place-items: center;
   color: var(--ash-dim);
-  margin-left: 3px;
+  position: relative;
+}
+.fsrow__caret.no-caret::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 2px;
+  height: 1px;
+  background: var(--tree-guide);
+  transform: translateY(-50%);
 }
 .fsrow__name {
   flex: 1 1 auto;

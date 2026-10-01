@@ -16,6 +16,8 @@ interface FlatNode {
   node: FsNode
   depth: number
   expanded: boolean
+  isLast: boolean
+  guidePipes: boolean[]
 }
 
 interface SkeletonProps {
@@ -171,23 +173,26 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
     const hasMatchInside = (nodes: FsNode[]): boolean =>
       nodes.some((n) => matches(n) || hasMatchInside(cache.get(n.path) ?? []))
 
-    const walk = (nodes: FsNode[], depth: number): void => {
-      for (const n of nodes) {
+    const walk = (nodes: FsNode[], depth: number, guidePipes: boolean[] = []): void => {
+      const visible = needle
+        ? nodes.filter((n) => matches(n) || (n.dir && hasMatchInside(cache.get(n.path) ?? [])))
+        : nodes
+
+      for (let i = 0; i < visible.length; i++) {
+        const n = visible[i]
+        const isLast = i === visible.length - 1
         const children = cache.get(n.path) ?? []
         if (needle) {
-          const self = matches(n)
-          const inside = n.dir && hasMatchInside(children)
-          if (!self && !inside) continue
-          out.push({ node: n, depth, expanded: n.dir })
-          if (n.dir) walk(children, depth + 1)
+          out.push({ node: n, depth, expanded: n.dir, isLast, guidePipes })
+          if (n.dir) walk(children, depth + 1, [...guidePipes, !isLast])
           continue
         }
         const isOpen = expanded.has(n.path)
-        out.push({ node: n, depth, expanded: isOpen })
-        if (n.dir && isOpen) walk(children, depth + 1)
+        out.push({ node: n, depth, expanded: isOpen, isLast, guidePipes })
+        if (n.dir && isOpen) walk(children, depth + 1, [...guidePipes, !isLast])
       }
     }
-    walk(roots, 0)
+    walk(roots, 0, [])
     return out
   }, [roots, cache, expanded, filter])
 
@@ -320,10 +325,11 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
       <div className="pane__scroll" ref={v.ref}>
         <div style={{ height: v.totalHeight, position: 'relative' }}>
           <div style={{ transform: `translateY(${v.offset}px)` }}>
-            {flat.slice(v.start, v.end).map(({ node, depth, expanded: isOpen }) => {
+            {flat.slice(v.start, v.end).map(({ node, depth: _depth, expanded: isOpen, isLast, guidePipes }) => {
               const color = node.dir ? 'var(--ash)' : fileColor(node.ext)
               const icon = node.dir ? (isOpen ? 'folder-open' : 'folder') : fileIcon(node.ext)
               const isLoading = loading.has(node.path)
+              const hasCaret = node.dir && node.childCount > 0
               return (
                 <div
                   key={node.path}
@@ -346,17 +352,20 @@ export function Skeleton({ mod, selectedPath, onSelectNode }: SkeletonProps) {
                   }}
                   title={node.path}
                 >
-                  {Array.from({ length: depth }).map((_, i) => (
-                    <span key={i} className="fsrow__rail" />
-                  ))}
-                  <span className="fsrow__caret">
-                    {node.dir && node.childCount > 0 && (
-                      <Icon
-                        name={isLoading ? 'refresh' : isOpen ? 'chevron-down' : 'chevron-right'}
-                        size={11}
-                        className={isLoading ? 'spin' : undefined}
-                      />
-                    )}
+                  <span className="fsrow__tree">
+                    {guidePipes.map((hasPipe, i) => (
+                      <span key={i} className={`fsrow__tree-pipe ${hasPipe ? 'is-pipe' : ''}`} />
+                    ))}
+                    <span className={`fsrow__tree-branch ${isLast ? 'is-last' : ''}`} />
+                    <span className={`fsrow__caret ${hasCaret ? 'has-caret' : 'no-caret'}`}>
+                      {hasCaret && (
+                        <Icon
+                          name={isLoading ? 'refresh' : isOpen ? 'chevron-down' : 'chevron-right'}
+                          size={11}
+                          className={isLoading ? 'spin' : undefined}
+                        />
+                      )}
+                    </span>
                   </span>
                   <Icon name={icon} size={13} color={color} />
                   <span className="fsrow__name truncate">{node.name}</span>
