@@ -53,6 +53,7 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
   const [autoRotate, setAutoRotate] = useState(true)
   const [showTexture, setShowTexture] = useState(true)
   const [flipV, setFlipV] = useState(false)
+  const [cutout, setCutout] = useState(false)
   const [customTextureUrl, setCustomTextureUrl] = useState<string | null>(null)
   const [customTextureName, setCustomTextureName] = useState<string | null>(null)
 
@@ -66,6 +67,7 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
   useEffect(() => {
     setCustomTextureUrl(null)
     setCustomTextureName(null)
+    setCutout(false)
   }, [path])
 
   useEffect(() => {
@@ -85,6 +87,7 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         }
       })
       .catch((err) => {
+        console.error('[MeshPreview] meshPreview error:', err)
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       })
       .finally(() => {
@@ -118,6 +121,7 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       const x = rawPos[i]
       const y = rawPos[i + 1]
       const z = rawPos[i + 2]
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue
       if (x < minX) minX = x
       if (x > maxX) maxX = x
       if (y < minY) minY = y
@@ -204,9 +208,10 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       uniform sampler2D uTexture;
       uniform int uHasTexture;
       uniform int uFlipV;
+      uniform int uCutout;
       void main() {
         if (uWire == 1) {
-          gl_FragColor = vec4(0.95, 0.65, 0.25, 0.95);
+          gl_FragColor = vec4(0.95, 0.65, 0.25, 1.0);
           return;
         }
         vec3 n = normalize(vNormal);
@@ -219,11 +224,11 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         if (uHasTexture == 1) {
           vec2 uv = uFlipV == 1 ? vec2(vUv.x, 1.0 - vUv.y) : vUv;
           vec4 texCol = texture2D(uTexture, uv);
-          if (texCol.a < 0.05) discard;
-          baseCol = texCol;
+          if (uCutout == 1 && texCol.a < 0.1) discard;
+          baseCol = vec4(texCol.rgb, 1.0);
         }
         vec3 col = baseCol.rgb * (d1 + d2 + 0.38);
-        gl_FragColor = vec4(col, baseCol.a);
+        gl_FragColor = vec4(col, 1.0);
       }
     `
 
@@ -241,6 +246,14 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
     gl.attachShader(prog, fs)
     gl.linkProgram(prog)
     gl.useProgram(prog)
+
+    // Initial viewport setup
+    const rect = canvasBoxRef.current?.getBoundingClientRect()
+    const initW = Math.max(1, Math.floor(canvas.clientWidth || rect?.width || 380))
+    const initH = Math.max(1, Math.floor(canvas.clientHeight || rect?.height || 280))
+    canvas.width = initW
+    canvas.height = initH
+    gl.viewport(0, 0, initW, initH)
 
     // Buffers
     const posBuffer = gl.createBuffer()
@@ -265,6 +278,13 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
     const uTextureLoc = gl.getUniformLocation(prog, 'uTexture')
     const uHasTextureLoc = gl.getUniformLocation(prog, 'uHasTexture')
     const uFlipVLoc = gl.getUniformLocation(prog, 'uFlipV')
+    const uCutoutLoc = gl.getUniformLocation(prog, 'uCutout')
+
+    // Bind default fallback 1x1 white texture to TEXTURE0 immediately
+    const defaultTex = gl.createTexture()
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, defaultTex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([220, 220, 220, 255]))
 
     // WebGL Texture loading
     let glTex: WebGLTexture | null = null
@@ -272,12 +292,13 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
 
     if (activeTextureUrl) {
       const img = new Image()
-      if (activeTextureUrl.startsWith('http://') || activeTextureUrl.startsWith('https://')) {
+      if (!activeTextureUrl.startsWith('data:')) {
         img.crossOrigin = 'anonymous'
       }
       img.onload = () => {
         if (!gl || !canvasRef.current) return
         glTex = gl.createTexture()
+        gl.activeTexture(gl.TEXTURE0)
         gl.bindTexture(gl.TEXTURE_2D, glTex)
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
 
@@ -319,9 +340,12 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         rotRef.current.y += dt * 0.6
       }
 
-      // Handle resize
-      const width = canvas.clientWidth
-      const height = canvas.clientHeight
+      // Handle resize with safe non-zero bounds
+      const boxRect = canvasBoxRef.current?.getBoundingClientRect()
+      const rawW = canvas.clientWidth || (boxRect ? Math.floor(boxRect.width) : 0)
+      const rawH = canvas.clientHeight || (boxRect ? Math.floor(boxRect.height) : 0)
+      const width = Math.max(1, rawW)
+      const height = Math.max(1, rawH)
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width
         canvas.height = height
@@ -364,6 +388,7 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
       gl.uniform1i(uWireLoc, wireframe ? 1 : 0)
       gl.uniform3f(uColorLoc, 0.78, 0.82, 0.88)
       gl.uniform1i(uFlipVLoc, flipV ? 1 : 0)
+      gl.uniform1i(uCutoutLoc, cutout ? 1 : 0)
 
       if (showTexture && textureReady && glTex) {
         gl.activeTexture(gl.TEXTURE0)
@@ -371,6 +396,9 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         gl.uniform1i(uTextureLoc, 0)
         gl.uniform1i(uHasTextureLoc, 1)
       } else {
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, defaultTex)
+        gl.uniform1i(uTextureLoc, 0)
         gl.uniform1i(uHasTextureLoc, 0)
       }
 
@@ -406,10 +434,11 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         gl.deleteBuffer(normBuffer)
         gl.deleteBuffer(uvBuffer)
         if (glTex) gl.deleteTexture(glTex)
+        if (defaultTex) gl.deleteTexture(defaultTex)
         gl.deleteProgram(prog)
       }
     }
-  }, [data, wireframe, autoRotate, showTexture, flipV, activeTextureUrl])
+  }, [data, wireframe, autoRotate, showTexture, flipV, cutout, activeTextureUrl])
 
   // Mouse interaction handlers
   const onMouseDown = (e: React.MouseEvent) => {
@@ -532,6 +561,19 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
             </button>
           )}
 
+          {/* Cutout toggle */}
+          {activeTextureName && showTexture && (
+            <button
+              type="button"
+              className={`btn btn--tiny ${cutout ? 'is-active' : ''}`}
+              onClick={() => setCutout((v) => !v)}
+              title="Альфа-тест для прозрачной листвы и волос (Cutout)"
+            >
+              <Icon name="filter" size={11} />
+              <span>Cutout</span>
+            </button>
+          )}
+
           {/* Change Texture File */}
           <input
             ref={fileInputRef}
@@ -607,7 +649,11 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
         <canvas
           ref={canvasRef}
           className="mesh-preview__canvas"
-          style={{ display: loading || error ? 'none' : 'block' }}
+          style={{
+            opacity: loading || error ? 0 : 1,
+            pointerEvents: loading || error ? 'none' : 'auto',
+            transition: 'opacity 0.2s ease'
+          }}
         />
 
         <div className="mesh-preview__hint is-dim">

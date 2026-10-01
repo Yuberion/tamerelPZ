@@ -904,7 +904,7 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
 
       {isMesh && (
         <Section title="3D Модель · Вьюпорт">
-          <MeshPreview path={node.path} name={node.name} size={node.size} />
+          <MeshPreview key={node.path} path={node.path} name={node.name} size={node.size} />
         </Section>
       )}
 
@@ -932,7 +932,7 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
         </Section>
       )}
 
-      {preview?.kind === 'text' && (
+      {!isMesh && preview?.kind === 'text' && (
         <Section
           title={`${t('ip.preview')}${preview.truncated ? ` · ${t('ip.truncated')}` : ''}`}
           extra={
@@ -983,7 +983,7 @@ function FileInfo({ node }: { node: FsNode | undefined }) {
         </Section>
       )}
 
-      {preview?.kind === 'binary' && (
+      {!isMesh && preview?.kind === 'binary' && (
         <Section title={t('ip.preview')}>
           <div className="binary">
             <Icon name="hard-drive" size={20} />

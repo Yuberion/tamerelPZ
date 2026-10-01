@@ -34,6 +34,9 @@ function flattenMeshTriangles(
   let cornerIdx = 0
   const hasNormals = mesh.normals.length > 0
   const hasUvs = mesh.uvs.length > 0
+  const vertCount = Math.floor(mesh.positions.length / 3)
+  const isPerVertexNormal = hasNormals && mesh.normals.length === mesh.positions.length
+  const isPerVertexUv = hasUvs && mesh.uvs.length === vertCount * 2
 
   for (const poly of mesh.polygons) {
     const polyLen = poly.length
@@ -73,29 +76,54 @@ function flattenMeshTriangles(
 
       // Normals
       if (hasNormals) {
-        outNormals.push(
-          mesh.normals[c0 * 3] ?? 0,
-          mesh.normals[c0 * 3 + 1] ?? 1,
-          mesh.normals[c0 * 3 + 2] ?? 0,
-          mesh.normals[c1 * 3] ?? 0,
-          mesh.normals[c1 * 3 + 1] ?? 1,
-          mesh.normals[c1 * 3 + 2] ?? 0,
-          mesh.normals[c2 * 3] ?? 0,
-          mesh.normals[c2 * 3 + 1] ?? 1,
-          mesh.normals[c2 * 3 + 2] ?? 0
-        )
+        if (isPerVertexNormal) {
+          outNormals.push(
+            mesh.normals[v0 * 3] ?? 0,
+            mesh.normals[v0 * 3 + 1] ?? 1,
+            mesh.normals[v0 * 3 + 2] ?? 0,
+            mesh.normals[v1 * 3] ?? 0,
+            mesh.normals[v1 * 3 + 1] ?? 1,
+            mesh.normals[v1 * 3 + 2] ?? 0,
+            mesh.normals[v2 * 3] ?? 0,
+            mesh.normals[v2 * 3 + 1] ?? 1,
+            mesh.normals[v2 * 3 + 2] ?? 0
+          )
+        } else {
+          outNormals.push(
+            mesh.normals[c0 * 3] ?? 0,
+            mesh.normals[c0 * 3 + 1] ?? 1,
+            mesh.normals[c0 * 3 + 2] ?? 0,
+            mesh.normals[c1 * 3] ?? 0,
+            mesh.normals[c1 * 3 + 1] ?? 1,
+            mesh.normals[c1 * 3 + 2] ?? 0,
+            mesh.normals[c2 * 3] ?? 0,
+            mesh.normals[c2 * 3 + 1] ?? 1,
+            mesh.normals[c2 * 3 + 2] ?? 0
+          )
+        }
       }
 
       // UVs
       if (hasUvs) {
-        outUvs.push(
-          mesh.uvs[c0 * 2] ?? 0,
-          mesh.uvs[c0 * 2 + 1] ?? 0,
-          mesh.uvs[c1 * 2] ?? 0,
-          mesh.uvs[c1 * 2 + 1] ?? 0,
-          mesh.uvs[c2 * 2] ?? 0,
-          mesh.uvs[c2 * 2 + 1] ?? 0
-        )
+        if (isPerVertexUv) {
+          outUvs.push(
+            mesh.uvs[v0 * 2] ?? 0,
+            mesh.uvs[v0 * 2 + 1] ?? 0,
+            mesh.uvs[v1 * 2] ?? 0,
+            mesh.uvs[v1 * 2 + 1] ?? 0,
+            mesh.uvs[v2 * 2] ?? 0,
+            mesh.uvs[v2 * 2 + 1] ?? 0
+          )
+        } else {
+          outUvs.push(
+            mesh.uvs[c0 * 2] ?? 0,
+            mesh.uvs[c0 * 2 + 1] ?? 0,
+            mesh.uvs[c1 * 2] ?? 0,
+            mesh.uvs[c1 * 2 + 1] ?? 0,
+            mesh.uvs[c2 * 2] ?? 0,
+            mesh.uvs[c2 * 2 + 1] ?? 0
+          )
+        }
       }
 
       trianglesAdded++
@@ -465,6 +493,99 @@ function encodeRgbaToPng(width: number, height: number, rgba: Buffer): Buffer {
   ])
 }
 
+/** Convert DDS buffer (DXT1, DXT3, DXT5, RGBA) to a base64 PNG data-url */
+function ddsToPngDataUrl(buf: Buffer): string | undefined {
+  if (buf.length < 128) return undefined
+  if (buf.readUInt32LE(0) !== 0x20534444) return undefined // 'DDS '
+  const height = buf.readUInt32LE(12)
+  const width = buf.readUInt32LE(16)
+  if (width <= 0 || height <= 0) return undefined
+
+  const pfFlags = buf.readUInt32LE(80)
+  const fourCC = buf.toString('ascii', 84, 88)
+  const isFourCC = (pfFlags & 0x04) !== 0
+
+  let offset = 128
+  const totalPixels = width * height
+  const rgba = Buffer.alloc(totalPixels * 4)
+
+  if (isFourCC && (fourCC === 'DXT1' || fourCC === 'DXT3' || fourCC === 'DXT5')) {
+    const isDxt1 = fourCC === 'DXT1'
+    const blockSize = isDxt1 ? 8 : 16
+    const blocksWide = Math.ceil(width / 4)
+    const blocksHigh = Math.ceil(height / 4)
+
+    for (let by = 0; by < blocksHigh; by++) {
+      for (let bx = 0; bx < blocksWide; bx++) {
+        if (offset + blockSize > buf.length) break
+
+        if (!isDxt1) {
+          // Skip alpha block for diffuse RGB reconstruction
+          offset += 8
+        }
+
+        // Color block (2 x 16-bit RGB565 + 4 bytes lookup)
+        const c0 = buf.readUInt16LE(offset)
+        const c1 = buf.readUInt16LE(offset + 2)
+        const lookup = buf.readUInt32LE(offset + 4)
+        offset += 8
+
+        const r0 = ((c0 >> 11) & 0x1f) * 255 / 31
+        const g0 = ((c0 >> 5) & 0x3f) * 255 / 63
+        const b0 = (c0 & 0x1f) * 255 / 31
+        const r1 = ((c1 >> 11) & 0x1f) * 255 / 31
+        const g1 = ((c1 >> 5) & 0x3f) * 255 / 63
+        const b1 = (c1 & 0x1f) * 255 / 31
+
+        const colors = [
+          [r0, g0, b0],
+          [r1, g1, b1],
+          c0 > c1 || !isDxt1
+            ? [(2 * r0 + r1) / 3, (2 * g0 + g1) / 3, (2 * b0 + b1) / 3]
+            : [(r0 + r1) / 2, (g0 + g1) / 2, (b0 + b1) / 2],
+          c0 > c1 || !isDxt1
+            ? [(r0 + 2 * r1) / 3, (g0 + 2 * g1) / 3, (b0 + 2 * b1) / 3]
+            : [0, 0, 0]
+        ]
+
+        for (let py = 0; py < 4; py++) {
+          const y = by * 4 + py
+          if (y >= height) continue
+          for (let px = 0; px < 4; px++) {
+            const x = bx * 4 + px
+            if (x >= width) continue
+            const pIdx = py * 4 + px
+            const cCode = (lookup >> (pIdx * 2)) & 0x03
+            const col = colors[cCode]
+            const outIdx = (y * width + x) * 4
+            rgba[outIdx] = Math.round(col[0])
+            rgba[outIdx + 1] = Math.round(col[1])
+            rgba[outIdx + 2] = Math.round(col[2])
+            rgba[outIdx + 3] = (isDxt1 && c0 <= c1 && cCode === 3) ? 0 : 255
+          }
+        }
+      }
+    }
+  } else if ((pfFlags & 0x40) !== 0) {
+    const bpp = buf.readUInt32LE(88) / 8
+    if (bpp === 4 || bpp === 3) {
+      for (let i = 0; i < totalPixels && offset + bpp <= buf.length; i++) {
+        const b = buf[offset++]
+        const g = buf[offset++]
+        const r = buf[offset++]
+        const a = bpp === 4 ? buf[offset++] : 255
+        const p = i * 4
+        rgba[p] = r; rgba[p + 1] = g; rgba[p + 2] = b; rgba[p + 3] = a
+      }
+    }
+  } else {
+    return undefined
+  }
+
+  const pngBuf = encodeRgbaToPng(width, height, rgba)
+  return `data:image/png;base64,${pngBuf.toString('base64')}`
+}
+
 async function makeTextureResult(texturePath: string): Promise<{ path: string; name: string; url: string }> {
   const ext = extname(texturePath).toLowerCase()
   try {
@@ -473,6 +594,17 @@ async function makeTextureResult(texturePath: string): Promise<{ path: string; n
       const dataUrl = tgaToPngDataUrl(buf)
       if (dataUrl) {
         return { path: texturePath, name: basename(texturePath), url: dataUrl }
+      }
+    } else if (ext === '.dds') {
+      const dataUrl = ddsToPngDataUrl(buf)
+      if (dataUrl) {
+        return { path: texturePath, name: basename(texturePath), url: dataUrl }
+      }
+    } else if (ext === '.bmp') {
+      return {
+        path: texturePath,
+        name: basename(texturePath),
+        url: `data:image/bmp;base64,${buf.toString('base64')}`
       }
     } else if (ext === '.png') {
       return {
