@@ -45,36 +45,36 @@ export const EN = {
   'hub.noUserDir': 'user directory not found',
 
   // ---- module taglines / descriptions -------------------------------------
-  'module.explorer.tagline': 'Mod explorer & inspector',
+  'module.explorer.tagline': 'Mod files & 3D models',
   'module.explorer.desc':
-    'Deep inspection of installed mods: file trees, 3D meshes, mod.info metadata, dependency graphs, global text search and vanilla file collisions.',
-  'module.stalker.tagline': 'Mod explorer & inspector',
+    'Browse installed mods, inspect 3D models, view dependency trees, search code, and find overwritten game files.',
+  'module.stalker.tagline': 'Mod files & 3D models',
   'module.stalker.desc':
-    'Deep inspection of installed mods: file trees, 3D meshes, mod.info metadata, dependency graphs, global text search and vanilla file collisions.',
-  'module.loadout.tagline': 'Load order & profiles',
+    'Browse installed mods, inspect 3D models, view dependency trees, search code, and find overwritten game files.',
+  'module.loadout.tagline': 'Load order & presets',
   'module.loadout.desc':
-    'Manage client and server load order, dependency sorting, map/tile conflict detection and named presets.',
-  'module.workshop.tagline': 'Workshop browser & downloader',
+    'Enable and arrange mods for singleplayer and servers, sort dependencies, fix map conflicts, and export game presets.',
+  'module.workshop.tagline': 'Steam Workshop',
   'module.workshop.desc':
-    'Browse the Steam Workshop, search with B41/B42 filters, inspect details, check for updates, and download mods directly.',
-  'module.workbench.tagline': 'Mod Doctor & B42 Diagnostics',
+    'Search mods on Steam Workshop by B42/B41 tags, read descriptions, check updates, and download directly into the game.',
+  'module.workbench.tagline': 'Diagnostics & 1-click fix',
   'module.workbench.desc':
-    'Deep mod health audit: engine Java API verification (B42), Lua, scripts, XML and mod.info validation, cross-mod asset resolution, and 1-click Quick Fix.',
-  'module.triage.tagline': 'Conflict doctor',
+    'Find errors in scripts, XML, Lua, and game engine Java API (B42), check missing 3D models and textures, fix issues in 1 click.',
+  'module.triage.tagline': 'Conflict resolver',
   'module.triage.desc':
-    'Duplicate ids, missing requirements, overwritten scripts and item collisions.',
-  'module.cartograph.tagline': 'Map manager',
+    'Identify duplicate mod IDs, missing required mods, and overlapping item scripts.',
+  'module.cartograph.tagline': 'World map & zones',
   'module.cartograph.desc':
-    'Map cell overlaps, spawn regions and the map load order that actually works.',
-  'module.tools.tagline': 'Converters, editors & tweaks',
+    'Interactive Knox County map, custom map cell borders, spawn points, and tile collisions.',
+  'module.tools.tagline': 'Utilities & RAM tuning',
   'module.tools.desc':
-    'FBX model forge, Notepad++ syntax pack, PZ Optimization engine tweaks, and RAM memory manager.',
+    'Convert 3D models to FBX, syntax highlighting pack for Notepad++, and game memory (RAM) allocation.',
   'module.outpost.tagline': 'Server & collections',
   'module.outpost.desc':
-    'Generate server ini mod lines, Workshop id lists and shareable collections.',
-  'module.ledger.tagline': 'Logs & diagnostics',
+    'Generate server.ini config lines, Workshop ID lists, and shareable mod collections.',
+  'module.ledger.tagline': 'Crash logs & errors',
   'module.ledger.desc':
-    'Game crash log and console analyzer (console.txt), error-to-mod attribution, Lua and Java stack traces.',
+    'Analyze console.txt logs, pinpoint the exact mod causing crashes or errors, view stack traces and problem code.',
 
   // ---- toolbar ------------------------------------------------------------
   'tb.backToHub': 'Back to hub (Esc)',
@@ -285,7 +285,7 @@ export const EN = {
   'help.toggleOn': 'Explain the interface (F1)',
   'help.toggleOff': 'Stop highlighting the help badges (F1)',
   'help.app':
-    'Every ? badge explains one control: what it does and what it writes. This button lights all of them at once, so they are easy to find. The suite only reads your drive — the Workbench is the one module that writes, and only inside your local mods and Workshop project folders.',
+    'Every ? badge explains one control: what it does and what it writes. This button lights all of them at once, so they are easy to find. The suite only reads your drive — the Mod Doctor is the module that can apply 1-click Quick Fixes, and only inside your mod folders.',
   'help.hotkeys':
     'F1 help · Esc back to the hub · F5 rescan · Ctrl+F search · Ctrl+S save mod.info · Ctrl+Shift+E reveal in Explorer',
 
@@ -293,7 +293,7 @@ export const EN = {
   'help.hub.status':
     'The result of the last drive scan: the detected game build, how many mods were found, and how many of them collide. Duplicate ids and broken requires are counted separately because they are the two faults that actually stop a mod from loading.',
   'help.hub.modules':
-    'Nine modules, finished ones are available. Explorer inspects what is already installed; Workbench creates, edits, checks and packs mods of your own. The sealed tiles are placeholders and open nothing.',
+    'Nine modules, finished ones are available. Explorer inspects installed mods; Loadout arranges load order; Workshop downloads from Steam; Mod Doctor diagnoses and fixes errors; Tools provide 3D FBX conversion and RAM tuning; Ledger investigates crashes.',
 
   // ---- explorer ------------------------------------------------------------
   'help.tb.sources':
@@ -1513,36 +1513,36 @@ export const RU: Record<TKey, string> = {
   'hub.noGameDir': 'каталог игры не найден',
   'hub.noUserDir': 'каталог пользователя не найден',
 
-  'module.explorer.tagline': 'Обозреватель и инспектор модов',
+  'module.explorer.tagline': 'Файлы модов и 3D',
   'module.explorer.desc':
-    'Глубокая инспекция установленных модов: файловое дерево, 3D-модели, метаданные mod.info, граф зависимостей, глобальный поиск и проверка перезаписи файлов игры.',
-  'module.stalker.tagline': 'Обозреватель и инспектор модов',
+    'Просмотр файлов и 3D-моделей модов, проверка зависимостей, сквозной поиск текста и выявление перезаписи файлов игры.',
+  'module.stalker.tagline': 'Файлы модов и 3D',
   'module.stalker.desc':
-    'Глубокая инспекция установленных модов: файловое дерево, 3D-модели, метаданные mod.info, граф зависимостей, глобальный поиск и проверка перезаписи файлов игры.',
-  'module.loadout.tagline': 'Порядок загрузки и профили',
+    'Просмотр файлов и 3D-моделей модов, проверка зависимостей, сквозной поиск текста и выявление перезаписи файлов игры.',
+  'module.loadout.tagline': 'Порядок загрузки и пресеты',
   'module.loadout.desc':
-    'Управление порядком загрузки клиента и сервера, сортировка зависимостей, детектор конфликтов карт/тайлов и пресеты.',
-  'module.workshop.tagline': 'Обозреватель Workshop',
+    'Включение и порядок модов для игры и сервера, сортировка зависимостей, устранение конфликтов карт и экспорт пресетов.',
+  'module.workshop.tagline': 'Мастерская Steam',
   'module.workshop.desc':
-    'Браузер Мастерской Steam. Поиск, фильтры тегов B41/B42, чтение описаний, проверка обновлений и загрузка модов прямо в игру.',
-  'module.workbench.tagline': 'Доктор модов и аудит B42',
+    'Поиск модов в Мастерской Steam по тегам B42/B41, просмотр описаний, проверка обновлений и скачивание прямо в игру.',
+  'module.workbench.tagline': 'Диагностика и лечение модов',
   'module.workbench.desc':
-    'Комплексная диагностика мода: проверка Java API движка игры (B42), валидация синтаксиса Lua, scripts, XML и mod.info, разрешение кросс-модовых зависимостей и 1-клик Quick Fix.',
-  'module.triage.tagline': 'Диагностика конфликтов',
+    'Поиск ошибок в скриптах, XML, Lua и коде движка Java (B42), проверка потерянных текстур и 3D-моделей, исправление в 1 клик.',
+  'module.triage.tagline': 'Устранение конфликтов',
   'module.triage.desc':
-    'Дубли id, отсутствующие зависимости, перекрытые скрипты и коллизии предметов.',
-  'module.cartograph.tagline': 'Менеджер карт',
+    'Поиск дубликатов ID модов, отсутствующих зависимостей и конфликтующих скриптов предметов.',
+  'module.cartograph.tagline': 'Карта мира и зоны',
   'module.cartograph.desc':
-    'Пересечения ячеек карт, зоны спавна и порядок загрузки карт, который действительно работает.',
-  'module.tools.tagline': 'Конвертеры, твики и память',
+    'Интерактивная карта округа Нокс, границы ячеек пользовательских карт, точки спавна и коллизии тайлов.',
+  'module.tools.tagline': 'Утилиты и память RAM',
   'module.tools.desc':
-    'Конвертер моделей в FBX, пакет подсветки Notepad++, оптимизация движка PZ Optimization и менеджер памяти (RAM).',
+    'Конвертер 3D-моделей в формат FBX, подсветка синтаксиса для Notepad++ и настройка выделения оперативной памяти (RAM).',
   'module.outpost.tagline': 'Сервер и коллекции',
   'module.outpost.desc':
-    'Сгенерировать строки модов для server ini, списки id Workshop и коллекции для обмена.',
-  'module.ledger.tagline': 'Логи и диагностика',
+    'Генерация строк для server.ini, списков Workshop ID и коллекций модов для друзей.',
+  'module.ledger.tagline': 'Анализ вылетов и ошибок',
   'module.ledger.desc':
-    'Анализатор краш-логов (console.txt), сопоставление ошибок с установленными модами, стектрейсы Lua и Java.',
+    'Анализ файла console.txt, мгновенное определение мода-виновника вылета или ошибки, стектрейсы и показ проблемного кода.',
 
   'tb.backToHub': 'На главную (Esc)',
   'tb.hub': 'Главная',
@@ -1732,7 +1732,7 @@ export const RU: Record<TKey, string> = {
   'help.toggleOn': 'Объяснить интерфейс (F1)',
   'help.toggleOff': 'Убрать подсветку подсказок (F1)',
   'help.app':
-    'Каждый значок ? объясняет один элемент: что он делает и что записывает. Эта кнопка подсвечивает их все сразу, чтобы их было легко найти. Комплекс только читает диск — писать умеет лишь Workbench, и только в ваши локальные моды и каталоги проектов Workshop.',
+    'Каждый значок ? объясняет один элемент интерфейса. Эта кнопка подсвечивает их все сразу. Комплекс читает диск безопасно, а модуль Mod Doctor позволяет выполнять быстрое исправление найденных ошибок в 1 клик.',
   'help.hotkeys':
     'F1 подсказки · Esc на главную · F5 пересканировать · Ctrl+F поиск · Ctrl+S сохранить mod.info · Ctrl+Shift+E показать в Проводнике',
 
@@ -1740,7 +1740,7 @@ export const RU: Record<TKey, string> = {
   'help.hub.status':
     'Итог последнего сканирования диска: определённая сборка игры, сколько модов найдено и сколько из них конфликтует. Дубли id и битые зависимости считаются отдельно: это две неисправности, из-за которых мод действительно не загрузится.',
   'help.hub.modules':
-    'Девять модулей, готовые открыты для работы. Explorer инспектирует то, что уже установлено; Workbench создаёт, правит, проверяет и упаковывает ваши собственные моды. Закрытые плитки — заготовки, они ничего не открывают.',
+    'Девять модулей комплекса. Explorer инспектирует установленные моды; Loadout настраивает порядок загрузки; Workshop скачивает моды из Steam; Mod Doctor находит и лечит ошибки; Tools содержит 3D-конвертер и настройку памяти; Ledger разбирает краши.',
 
   // ---- explorer ------------------------------------------------------------
   'help.tb.sources':

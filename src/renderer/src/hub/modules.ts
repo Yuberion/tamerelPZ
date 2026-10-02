@@ -56,10 +56,10 @@ export const MODULES: ModuleDef[] = [
   {
     id: 'workbench',
     code: '04',
-    name: 'Workbench',
+    name: 'Mod Doctor',
     taglineKey: 'module.workbench.tagline',
     descKey: 'module.workbench.desc',
-    icon: 'wrench',
+    icon: 'pulse',
     status: 'live'
   },
   {
@@ -68,7 +68,7 @@ export const MODULES: ModuleDef[] = [
     name: 'Triage',
     taglineKey: 'module.triage.tagline',
     descKey: 'module.triage.desc',
-    icon: 'pulse',
+    icon: 'alert',
     status: 'sealed'
   },
   {
