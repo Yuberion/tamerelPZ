@@ -643,6 +643,137 @@ export interface MapScanResult {
   conflicts: MapConflict[]
 }
 
+export interface CartographerSpawnPoint {
+  worldX: number
+  worldY: number
+  posX: number
+  posY: number
+  posZ: number
+  profession?: string
+  desc?: string
+}
+
+export interface CartographerUrbanZone {
+  id: string
+  name: string
+  nameRu: string
+  category: 'metropolis' | 'town' | 'settlement' | 'military' | 'landmark' | 'commercial'
+  cellBounds: { minX: number; maxX: number; minY: number; maxY: number }
+  centerTile: { x: number; y: number }
+  centerCell: { x: number; y: number }
+  description?: string
+  descriptionRu?: string
+  isVanilla: boolean
+  thumbPath?: string
+  lootTier?: 'high' | 'military' | 'civilian' | 'rural'
+}
+
+export interface CartographerWaterway {
+  id: string
+  name: string
+  nameRu: string
+  kind: 'river' | 'lake' | 'creek'
+  points: Array<{ x: number; y: number }> // In cell coordinates or world tile coords
+  width?: number
+}
+
+export interface CartographerMapItem {
+  id: string
+  mapName: string
+  folderName: string
+  modId: string
+  modName?: string
+  isVanilla: boolean
+  folderPath: string
+  title: string
+  description?: string
+  lots?: string
+  fixed2x?: boolean
+  cells: string[]
+  bounds: {
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+  }
+  spawns?: CartographerSpawnPoint[]
+  hasThumbnail: boolean
+  thumbnailPath?: string
+}
+
+export interface CartographerCellConflict {
+  cell: string
+  x: number
+  y: number
+  maps: Array<{
+    mapId: string
+    mapName: string
+    modId: string
+    modName?: string
+    isVanilla: boolean
+    priority: number
+  }>
+  winningMapId: string
+}
+
+export interface CartographerRoad {
+  id: string
+  name: string
+  kind: 'highway' | 'primary' | 'secondary' | 'dirt'
+  width: number
+  points: Array<{ x: number; y: number }>
+}
+
+export interface CartographerWorldData {
+  gameVersion?: string
+  detectedBuild: 'B42' | 'B41'
+  bounds: {
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+  }
+  vanillaMaps: CartographerMapItem[]
+  modMaps: CartographerMapItem[]
+  conflicts: CartographerCellConflict[]
+  activeMapNames: string[]
+  urbanZones: CartographerUrbanZone[]
+  waterways: CartographerWaterway[]
+  roads?: CartographerRoad[]
+}
+
+export interface CartographerScaffoldRequest {
+  modId: string
+  modName: string
+  mapFolderName: string
+  description?: string
+  author?: string
+  version?: string
+  cells: string[]
+  targetLocation: 'localMods' | 'workspace'
+  lots?: string
+  includeSpawnpoint?: boolean
+}
+
+export interface CartographerScaffoldResult {
+  ok: boolean
+  modPath: string
+  mapFolderPath: string
+  createdFiles: string[]
+  error?: string
+}
+
+export interface CartographerSaveSpawnsRequest {
+  mapFolderPath: string
+  spawns: CartographerSpawnPoint[]
+}
+
+export interface CartographerSaveSpawnsResult {
+  ok: boolean
+  savedCount: number
+  error?: string
+}
+
 export interface MergePatchSelection {
   /** Relative path of the colliding file, e.g. "media/textures/jacket.png" */
   relPath: string

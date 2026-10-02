@@ -113,7 +113,13 @@ export const IPC = {
   wsSync: 'ws:sync',
   wsSyncChanged: 'ws:sync-changed',
   wsInstalledCount: 'ws:installed-count',
-  wsTranslate: 'ws:translate'
+  wsTranslate: 'ws:translate',
+
+  /* Cartographer */
+  cartographerScan: 'cartographer:scan',
+  cartographerGetImage: 'cartographer:get-image',
+  cartographerScaffold: 'cartographer:scaffold-map',
+  cartographerSaveSpawns: 'cartographer:save-spawns'
 } as const
 
 /** Custom protocol used to render local images inside the renderer. */

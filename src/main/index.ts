@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, net, protocol, screen, shell } from 'electron'
+import { app, BrowserWindow, Menu, net, protocol, screen, session, shell } from 'electron'
 import { join, normalize } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { PZ_FILE_PREFIX, PZ_FILE_SCHEME } from '../shared/ipc'
@@ -150,6 +150,27 @@ if (!gotLock) {
   void app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
     app.setAppUserModelId('com.pzmanagement.app')
+
+    // Allow iframe embedding of official PZ Map Project
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      const isMapHost =
+        details.url.includes('projectzomboid.com') ||
+        details.url.includes('fanmap42.com') ||
+        details.url.includes('pzmap')
+      if (isMapHost && details.responseHeaders) {
+        const headers: Record<string, string[]> = {}
+        for (const [key, val] of Object.entries(details.responseHeaders)) {
+          const lk = key.toLowerCase()
+          if (lk !== 'x-frame-options' && lk !== 'content-security-policy') {
+            headers[key] = val
+          }
+        }
+        callback({ responseHeaders: headers })
+        return
+      }
+      callback({ responseHeaders: details.responseHeaders })
+    })
+
     registerFileProtocol()
     registerIpc()
     createWindow()

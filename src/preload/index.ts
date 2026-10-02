@@ -154,6 +154,12 @@ const api: PzApi = {
     apply: (req) => ipcRenderer.invoke(IPC.memApply, req),
     setEnv: (val) => ipcRenderer.invoke(IPC.memSetEnv, val),
     setReadOnly: (req) => ipcRenderer.invoke(IPC.memSetReadOnly, req)
+  },
+  cartographer: {
+    scan: () => ipcRenderer.invoke(IPC.cartographerScan),
+    getImage: (filePath: string) => ipcRenderer.invoke(IPC.cartographerGetImage, filePath),
+    scaffoldMap: (req) => ipcRenderer.invoke(IPC.cartographerScaffold, req),
+    saveSpawns: (req) => ipcRenderer.invoke(IPC.cartographerSaveSpawns, req)
   }
 }
 

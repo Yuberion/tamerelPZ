@@ -10,6 +10,7 @@ import './styles/loadout.css'
 import './styles/ledger.css'
 import './styles/tools.css'
 import './styles/workshop.css'
+import './styles/cartographer.css'
 
 const container = document.getElementById('root')
 if (!container) throw new Error('Root container missing')

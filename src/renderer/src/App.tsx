@@ -11,6 +11,7 @@ import { Explorer } from './modules/explorer/Explorer'
 import { Tools } from './modules/tools/Tools'
 import { Workbench } from './modules/workbench/Workbench'
 import { WorkshopOverview } from './modules/workshop/WorkshopOverview'
+import { Cartographer } from './modules/cartographer/Cartographer'
 import { useAppStore } from './state/store'
 
 type View = 'hub' | ModuleId
@@ -54,6 +55,7 @@ export default function App() {
               {view === 'loadout' ? <Loadout onExit={goHome} /> : null}
               {view === 'workshop' ? <WorkshopOverview onExit={goHome} /> : null}
               {view === 'workbench' ? <Workbench onExit={goHome} /> : null}
+              {view === 'cartograph' ? <Cartographer onExit={goHome} /> : null}
               {view === 'tools' ? <Tools onExit={goHome} /> : null}
               {view === 'ledger' ? <Ledger onExit={goHome} /> : null}
             </main>

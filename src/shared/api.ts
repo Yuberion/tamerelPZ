@@ -17,6 +17,11 @@ import type {
   LoadoutApplyResult,
   LoadoutFile,
   MapScanResult,
+  CartographerWorldData,
+  CartographerScaffoldRequest,
+  CartographerScaffoldResult,
+  CartographerSaveSpawnsRequest,
+  CartographerSaveSpawnsResult,
   ModOverwritesSummary,
   SortingRule,
   LogCleanResult,
@@ -277,5 +282,14 @@ export interface PzApi {
     apply(req: ApplyMemoryRequest): Promise<ApplyMemoryResult>
     setEnv(val: string | null): Promise<SetEnvOptionsResult>
     setReadOnly(req: ToggleReadOnlyRequest): Promise<ToggleReadOnlyResult>
+  }
+  /**
+   * Cartographer: Full interactive Knox County world map, cell visualizer, and collision detector.
+   */
+  cartographer: {
+    scan(): Promise<CartographerWorldData>
+    getImage(filePath: string): Promise<string | undefined>
+    scaffoldMap(req: CartographerScaffoldRequest): Promise<CartographerScaffoldResult>
+    saveSpawns(req: CartographerSaveSpawnsRequest): Promise<CartographerSaveSpawnsResult>
   }
 }

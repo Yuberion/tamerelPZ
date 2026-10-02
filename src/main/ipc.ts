@@ -108,6 +108,12 @@ import { scanMods, type ScanOptions } from './services/scanner'
 import { getSettings, setSettings } from './services/settings'
 import { shovelMods } from './services/shovel'
 import { validateMod } from './services/validate'
+import {
+  scanCartographerWorld,
+  getCartographerMapImage,
+  scaffoldMapMod,
+  saveSpawnpoints
+} from './services/cartographer'
 
 /**
  * Extensions Windows *executes* rather than opens.
@@ -721,6 +727,26 @@ export function registerIpc(): void {
       }
     }
   )
+
+  /* Cartographer */
+  ipcMain.handle(IPC.cartographerScan, async () => {
+    return scanCartographerWorld(await getSettings())
+  })
+
+  ipcMain.handle(IPC.cartographerGetImage, async (_e, filePath: string) => {
+    await assertPathAllowed(filePath)
+    return getCartographerMapImage(filePath)
+  })
+
+  ipcMain.handle(IPC.cartographerScaffold, async (_e, req) => {
+    const res = await scaffoldMapMod(await getSettings(), req)
+    invalidateGuard()
+    return res
+  })
+
+  ipcMain.handle(IPC.cartographerSaveSpawns, async (_e, req) => {
+    return saveSpawnpoints(req)
+  })
 
   // Start background live watcher for appworkshop_108600.acf
   void getSettings().then((settings) => {
