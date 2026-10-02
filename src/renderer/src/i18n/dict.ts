@@ -57,9 +57,9 @@ export const EN = {
   'module.workshop.tagline': 'Steam Workshop',
   'module.workshop.desc':
     'Search mods on Steam Workshop by B42/B41 tags, read descriptions, check updates, and download directly into the game.',
-  'module.workbench.tagline': 'Diagnostics & 1-click fix',
+  'module.workbench.tagline': 'Diagnostics & health check',
   'module.workbench.desc':
-    'Find errors in scripts, XML, Lua, and game engine Java API (B42), check missing 3D models and textures, fix issues in 1 click.',
+    'Find errors in scripts, XML, Lua, and game engine Java API (B42), check missing 3D models and textures, evaluate mod health.',
   'module.triage.tagline': 'Conflict resolver',
   'module.triage.desc':
     'Identify duplicate mod IDs, missing required mods, and overlapping item scripts.',
@@ -285,7 +285,7 @@ export const EN = {
   'help.toggleOn': 'Explain the interface (F1)',
   'help.toggleOff': 'Stop highlighting the help badges (F1)',
   'help.app':
-    'Every ? badge explains one control: what it does and what it writes. This button lights all of them at once, so they are easy to find. The suite only reads your drive — the Mod Doctor is the module that can apply 1-click Quick Fixes, and only inside your mod folders.',
+    'Every ? badge explains one control: what it does and what it writes. This button lights all of them at once, so they are easy to find. The suite operates safely and only reads your drive without making unrequested changes.',
   'help.hotkeys':
     'F1 help · Esc back to the hub · F5 rescan · Ctrl+F search · Ctrl+S save mod.info · Ctrl+Shift+E reveal in Explorer',
 
@@ -293,7 +293,7 @@ export const EN = {
   'help.hub.status':
     'The result of the last drive scan: the detected game build, how many mods were found, and how many of them collide. Duplicate ids and broken requires are counted separately because they are the two faults that actually stop a mod from loading.',
   'help.hub.modules':
-    'Nine modules, finished ones are available. Explorer inspects installed mods; Loadout arranges load order; Workshop downloads from Steam; Mod Doctor diagnoses and fixes errors; Tools provide 3D FBX conversion and RAM tuning; Ledger investigates crashes.',
+    'Nine modules, finished ones are available. Explorer inspects installed mods; Loadout arranges load order; Workshop downloads from Steam; Mod Doctor diagnoses errors and checks mod health; Tools provide 3D FBX conversion and RAM tuning; Ledger investigates crashes.',
 
   // ---- explorer ------------------------------------------------------------
   'help.tb.sources':
@@ -1525,9 +1525,9 @@ export const RU: Record<TKey, string> = {
   'module.workshop.tagline': 'Мастерская Steam',
   'module.workshop.desc':
     'Поиск модов в Мастерской Steam по тегам B42/B41, просмотр описаний, проверка обновлений и скачивание прямо в игру.',
-  'module.workbench.tagline': 'Диагностика и лечение модов',
+  'module.workbench.tagline': 'Диагностика и здоровье модов',
   'module.workbench.desc':
-    'Поиск ошибок в скриптах, XML, Lua и коде движка Java (B42), проверка потерянных текстур и 3D-моделей, исправление в 1 клик.',
+    'Поиск ошибок в скриптах, XML, Lua и коде движка Java (B42), проверка потерянных текстур и 3D-моделей, оценка здоровья мода.',
   'module.triage.tagline': 'Устранение конфликтов',
   'module.triage.desc':
     'Поиск дубликатов ID модов, отсутствующих зависимостей и конфликтующих скриптов предметов.',
@@ -1732,7 +1732,7 @@ export const RU: Record<TKey, string> = {
   'help.toggleOn': 'Объяснить интерфейс (F1)',
   'help.toggleOff': 'Убрать подсветку подсказок (F1)',
   'help.app':
-    'Каждый значок ? объясняет один элемент интерфейса. Эта кнопка подсвечивает их все сразу. Комплекс читает диск безопасно, а модуль Mod Doctor позволяет выполнять быстрое исправление найденных ошибок в 1 клик.',
+    'Каждый значок ? объясняет один элемент интерфейса. Эта кнопка подсвечивает их все сразу. Комплекс работает в безопасном режиме чтения диска без автоматических изменений файлов.',
   'help.hotkeys':
     'F1 подсказки · Esc на главную · F5 пересканировать · Ctrl+F поиск · Ctrl+S сохранить mod.info · Ctrl+Shift+E показать в Проводнике',
 
@@ -1740,7 +1740,7 @@ export const RU: Record<TKey, string> = {
   'help.hub.status':
     'Итог последнего сканирования диска: определённая сборка игры, сколько модов найдено и сколько из них конфликтует. Дубли id и битые зависимости считаются отдельно: это две неисправности, из-за которых мод действительно не загрузится.',
   'help.hub.modules':
-    'Девять модулей комплекса. Explorer инспектирует установленные моды; Loadout настраивает порядок загрузки; Workshop скачивает моды из Steam; Mod Doctor находит и лечит ошибки; Tools содержит 3D-конвертер и настройку памяти; Ledger разбирает краши.',
+    'Девять модулей комплекса. Explorer инспектирует установленные моды; Loadout настраивает порядок загрузки; Workshop скачивает моды из Steam; Mod Doctor диагностирует ошибки и здоровье модов; Tools содержит 3D-конвертер и настройку памяти; Ledger разбирает краши.',
 
   // ---- explorer ------------------------------------------------------------
   'help.tb.sources':
