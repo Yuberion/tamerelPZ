@@ -131,13 +131,31 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
               style={{
                 fontSize: 11,
                 color: 'var(--ash)',
-                maxWidth: 320,
+                maxWidth: 380,
                 padding: '2px 8px',
                 borderRadius: 4,
-                background: 'rgba(255, 255, 255, 0.04)'
+                background: 'rgba(255, 255, 255, 0.04)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
               }}
             >
-              {selected.name}
+              <span className="truncate">{selected.name}</span>
+              {getModVersionText(selected) && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    padding: '0 4px',
+                    borderRadius: 3,
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    color: '#38bdf8',
+                    flexShrink: 0
+                  }}
+                  title={selected.modVersion ? `${t('wb.sc.modVersion')}: ${selected.modVersion}` : undefined}
+                >
+                  {getModVersionText(selected)}
+                </span>
+              )}
             </div>
           )}
 
@@ -279,6 +297,7 @@ function ModList({
           {rows.slice(v.start, v.end).map(({ mod, writable, indices }) => {
             const src = SOURCE_META[mod.sourceKind]
             const segments = query ? segmentByIndices(mod.name, indices) : null
+            const ver = getModVersionText(mod)
             return (
               <div
                 key={mod.key}
@@ -301,7 +320,17 @@ function ModList({
                         )
                       : mod.name}
                   </span>
-                  <span className="wbrow__id mono truncate">{mod.modId ?? mod.folderName}</span>
+                  <span className="wbrow__sub">
+                    <span className="wbrow__id mono truncate">{mod.modId ?? mod.folderName}</span>
+                    {ver && (
+                      <span
+                        className="wbrow__ver mono"
+                        title={mod.modVersion ? `${t('wb.sc.modVersion')}: ${mod.modVersion}` : ver}
+                      >
+                        {ver}
+                      </span>
+                    )}
+                  </span>
                 </span>
                 {!writable && <Icon name="lock" size={11} className="wbrow__lock" title={t('wb.locked')} />}
               </div>
@@ -311,4 +340,19 @@ function ModList({
       </div>
     </div>
   )
+}
+
+/** Formats a mod's version for display (e.g. "v1.2.0" or "PZ 41.78") */
+export function getModVersionText(mod: ModEntry): string | null {
+  if (mod.modVersion) {
+    const v = mod.modVersion.trim()
+    if (!v) return null
+    return /^[vV]/.test(v) ? v : `v${v}`
+  }
+  if (mod.pzVersion) {
+    const v = mod.pzVersion.trim()
+    if (!v) return null
+    return `PZ ${v}`
+  }
+  return null
 }

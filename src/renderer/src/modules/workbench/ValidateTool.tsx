@@ -208,7 +208,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
   return (
     <Panel
       title={t('wb.doctor.title')}
-      lede={`${mod.name} (${mod.modId || 'No ID'}) · ${mod.path}`}
+      lede={`${mod.name} (${mod.modId || 'No ID'})${mod.modVersion ? ` · v${mod.modVersion.replace(/^[vV]/, '')}` : mod.pzVersion ? ` · PZ ${mod.pzVersion}` : ''} · ${mod.path}`}
       icon="pulse"
       actions={
         <>
