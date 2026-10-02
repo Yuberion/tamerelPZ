@@ -892,12 +892,47 @@ export async function queryWorkshop(
       )
     }
 
-    // 2. Tag / Category filter
+    // 2. Multi-Tag / Category faceted filter
     if (query.tags && query.tags.length > 0) {
-      const targetTags = query.tags.map((t) => t.toLowerCase())
-      filtered = filtered.filter((item) =>
-        item.tags.some((t) => targetTags.some((target) => t.toLowerCase() === target))
+      const selected = query.tags.map((t) => t.toLowerCase().trim()).filter(Boolean)
+      const buildTags = selected.filter(
+        (t) => t.startsWith('build ') || t === 'b42' || t === 'b41' || t === 'b40'
       )
+      const hasLocal = selected.includes('local')
+      const contentTags = selected.filter(
+        (t) => !t.startsWith('build ') && t !== 'b42' && t !== 'b41' && t !== 'b40' && t !== 'local'
+      )
+
+      filtered = filtered.filter((item) => {
+        const itemTagsLower = item.tags.map((t) => t.toLowerCase())
+
+        // 1. Build check (if any build tag was selected, item must match at least one)
+        if (buildTags.length > 0) {
+          const matchesBuild = buildTags.some((bt) => {
+            const num = bt.replace(/[^0-9]/g, '')
+            return (
+              itemTagsLower.some((it) => it.includes(bt) || it === bt || (num && it.includes(num))) ||
+              (item.builds && item.builds.some((b) => (num && b.includes(num)) || b.toLowerCase().includes(bt)))
+            )
+          })
+          if (!matchesBuild) return false
+        }
+
+        // 2. Local check (if 'Local' was selected)
+        if (hasLocal && !item.isLocal && !itemTagsLower.includes('local')) {
+          return false
+        }
+
+        // 3. Content category check (if any content category was selected, item must match at least one)
+        if (contentTags.length > 0) {
+          const matchesContent = contentTags.some((ct) =>
+            itemTagsLower.some((it) => it === ct || it.includes(ct))
+          )
+          if (!matchesContent) return false
+        }
+
+        return true
+      })
     }
 
     // 3. Updates only
@@ -967,7 +1002,9 @@ export async function queryWorkshop(
   // Tags filter
   if (query.tags && query.tags.length > 0) {
     for (const tag of query.tags) {
-      browseUrl.searchParams.append('requiredtags[]', tag)
+      if (tag && tag.toLowerCase() !== 'local') {
+        browseUrl.searchParams.append('requiredtags[]', tag)
+      }
     }
   }
 

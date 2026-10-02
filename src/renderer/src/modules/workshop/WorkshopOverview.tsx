@@ -1,4 +1,4 @@
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import type {
   WorkshopItemDetails,
   WorkshopItemSummary,
@@ -72,8 +72,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
 
   // Search & Filter state
   const [search, setSearch] = useState('')
-  const [selectedTag, setSelectedTag] = useState<string>('')
-  const [updatesOnly, setUpdatesOnly] = useState(false)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [page, setPage] = useState(1)
 
   // Sidebar / Category drawer state
@@ -95,9 +94,10 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
   const [translating, setTranslating] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
 
-  // Selected Category Object
-  const currentCategory = WORKSHOP_CATEGORIES.find(
-    (c) => c.tag.toLowerCase() === selectedTag.toLowerCase()
+  // Selected Category Objects
+  const selectedCategories = useMemo(
+    () => WORKSHOP_CATEGORIES.filter((c) => c.tag && selectedTags.includes(c.tag)),
+    [selectedTags]
   )
 
   // Query executor
@@ -109,8 +109,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
         search: search.trim() || undefined,
         page: targetPage,
         numPerPage: 32,
-        tags: selectedTag ? [selectedTag] : undefined,
-        updatesOnly,
+        tags: selectedTags.length > 0 ? selectedTags : undefined,
         forceRefresh
       }
 
@@ -161,12 +160,12 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
       unsub()
       window.removeEventListener('focus', onFocus)
     }
-  }, [mode, selectedTag, updatesOnly, search])
+  }, [mode, selectedTags, search])
 
-  // Trigger query on mode, tag, filter changes
+  // Trigger query on mode or tags changes
   useEffect(() => {
     void runQuery(1)
-  }, [mode, selectedTag, updatesOnly])
+  }, [mode, selectedTags])
 
   // Open item details
   const handleOpenDetails = async (item: WorkshopItemSummary): Promise<void> => {
@@ -376,7 +375,6 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               onClick={() => {
                 if (mode !== 'workshop') {
                   setMode('workshop')
-                  setUpdatesOnly(false)
                 }
               }}
               title={isRu ? 'Каталог Мастерской Steam онлайн' : 'Steam Workshop Online Catalogue'}
@@ -399,19 +397,6 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               {installedCount > 0 && <span className="ws-mode-btn__badge">{installedCount}</span>}
             </button>
           </div>
-
-          {/* Slide-out Category Menu Toggle Button */}
-          <button
-            className={`ws-btn-category-toggle ${sidebarOpen ? 'is-active' : ''} ${selectedTag ? 'is-filtered' : ''}`}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={isRu ? 'Выбрать категорию модов' : 'Choose mod category'}
-          >
-            <Icon name={currentCategory ? currentCategory.icon : 'grid'} size={13} color="var(--amber)" />
-            <span className="ws-btn-category-label">
-              {currentCategory ? (isRu ? currentCategory.ru : currentCategory.en) : isRu ? 'Категории' : 'Categories'}
-            </span>
-            <Icon name={sidebarOpen ? 'chevron-down' : 'chevron-right'} size={11} />
-          </button>
 
           {/* Search box */}
           <form
@@ -451,20 +436,6 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
             )}
           </form>
 
-          {/* Updates Filter Toggle */}
-          <button
-            className={`btn btn--tiny ${updatesOnly ? 'btn--active' : 'btn--subtle'}`}
-            onClick={() => setUpdatesOnly(!updatesOnly)}
-            title={
-              isRu
-                ? 'Фильтр: показывать только моды с доступными обновлениями в Steam'
-                : 'Filter: show only mods with pending updates in Steam'
-            }
-          >
-            <Icon name="arrow-up" size={11} color={updatesOnly ? '#f59e0b' : undefined} />
-            <span>{isRu ? 'Есть обновления' : 'Need updates'}</span>
-          </button>
-
           {/* Refresh / Force Rescan Button */}
           <button
             className="btn btn--subtle btn--tiny"
@@ -495,8 +466,11 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
             onClick={() => setSidebarOpen(true)}
             title={isRu ? 'Вытянуть меню категорий' : 'Pull out categories menu'}
           >
-            <Icon name="chevron-right" size={12} />
+            <Icon name="layers" size={12} />
             <span>{isRu ? 'Категории' : 'Categories'}</span>
+            {selectedTags.length > 0 && (
+              <span className="ws-sidebar-pull-tab__badge">{selectedTags.length}</span>
+            )}
           </button>
         )}
 
@@ -508,6 +482,9 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
             <div className="ws-sidebar__title">
               <Icon name="layers" size={14} color="var(--amber)" />
               <span>{isRu ? 'КАТЕГОРИИ МОДОВ' : 'MOD CATEGORIES'}</span>
+              {selectedTags.length > 0 && (
+                <span className="ws-sidebar__count-badge">{selectedTags.length}</span>
+              )}
             </div>
 
             <div className="ws-sidebar__actions">
@@ -532,45 +509,54 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
             </div>
           </div>
 
-          {/* Categories List */}
+          {/* Categories List (Multi-Selectable) */}
           <div className="ws-sidebar__list">
             {WORKSHOP_CATEGORIES.map((cat) => {
-              const isActive = selectedTag.toLowerCase() === cat.tag.toLowerCase()
+              const isAll = cat.tag === ''
+              const isActive = isAll ? selectedTags.length === 0 : selectedTags.includes(cat.tag)
               const label = isRu ? cat.ru : cat.en
+
+              const handleToggle = (): void => {
+                if (isAll) {
+                  setSelectedTags([])
+                } else {
+                  setSelectedTags((prev) =>
+                    prev.includes(cat.tag) ? prev.filter((t) => t !== cat.tag) : [...prev, cat.tag]
+                  )
+                }
+              }
 
               return (
                 <button
                   key={cat.tag || 'all'}
                   className={`ws-sidebar-item ${isActive ? 'is-active' : ''} ${cat.isBuild ? 'is-build' : ''}`}
-                  onClick={() => {
-                    setSelectedTag(isActive ? '' : cat.tag)
-                    if (!sidebarPinned) {
-                      setSidebarOpen(false)
-                    }
-                  }}
+                  onClick={handleToggle}
                   title={label}
                 >
+                  <div className={`ws-sidebar-item__check ${isActive ? 'is-checked' : ''}`}>
+                    {isActive && <Icon name="check" size={10} strokeWidth={2.8} />}
+                  </div>
                   <Icon name={cat.icon} size={14} />
                   <span className="ws-sidebar-item__label">{label}</span>
-                  {isActive && <div className="ws-sidebar-item__dot" />}
                 </button>
               )
             })}
           </div>
 
           {/* Sidebar Footer */}
-          {selectedTag && (
+          {selectedTags.length > 0 && (
             <div className="ws-sidebar__footer">
               <button
                 className="btn btn--subtle btn--tiny"
                 style={{ width: '100%' }}
-                onClick={() => {
-                  setSelectedTag('')
-                  if (!sidebarPinned) setSidebarOpen(false)
-                }}
+                onClick={() => setSelectedTags([])}
               >
                 <Icon name="rotate" size={11} />
-                <span>{isRu ? 'Сбросить фильтр' : 'Reset filter'}</span>
+                <span>
+                  {isRu
+                    ? `Сбросить выбор (${selectedTags.length})`
+                    : `Reset selection (${selectedTags.length})`}
+                </span>
               </button>
             </div>
           )}
@@ -597,52 +583,36 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               </span>
             </div>
           ) : items.length === 0 ? (
-            updatesOnly ? (
-              <div className="pane__empty" style={{ padding: '60px 0' }}>
-                <Icon name="check-circle" size={36} color="#22c55e" />
-                <span className="label bold">{isRu ? 'Все моды актуальны' : 'All mods are up to date'}</span>
-                <span className="label wbmuted">
-                  {isRu
-                    ? 'В вашей библиотеке нет модов, требующих обновления в Steam.'
-                    : 'No installed mods have pending Steam updates.'}
-                </span>
+            <div className="pane__empty" style={{ padding: '60px 0' }}>
+              <Icon name="download" size={36} color="var(--text-muted)" />
+              <span className="label bold">{isRu ? 'Моды не найдены' : 'No mods found'}</span>
+              <span className="label wbmuted">
+                {mode === 'installed'
+                  ? isRu
+                    ? 'В вашей библиотеке не найдено модов по выбранному фильтру или категориям.'
+                    : 'No installed mods found matching the selected filter or categories.'
+                  : isRu
+                    ? 'Попробуйте изменить поисковый запрос или категории.'
+                    : 'Try adjusting your search query or categories.'}
+              </span>
+              {selectedTags.length > 0 && (
                 <button
                   className="btn btn--subtle btn--tiny"
                   style={{ marginTop: 12 }}
-                  onClick={() => setUpdatesOnly(false)}
+                  onClick={() => setSelectedTags([])}
                 >
-                  <Icon name="grid" size={12} />
-                  <span>{isRu ? 'Показать все установленные моды' : 'Show all installed mods'}</span>
+                  <Icon name="rotate" size={12} />
+                  <span>
+                    {isRu
+                      ? `Сбросить категории (${selectedTags.length})`
+                      : `Reset categories (${selectedTags.length})`}
+                  </span>
                 </button>
-              </div>
-            ) : (
-              <div className="pane__empty" style={{ padding: '60px 0' }}>
-                <Icon name="download" size={36} color="var(--text-muted)" />
-                <span className="label bold">{isRu ? 'Моды не найдены' : 'No mods found'}</span>
-                <span className="label wbmuted">
-                  {mode === 'installed'
-                    ? isRu
-                      ? 'В вашей библиотеке не найдено модов по выбранному фильтру или категории.'
-                      : 'No installed mods found matching the selected filter or category.'
-                    : isRu
-                      ? 'Попробуйте изменить поисковый запрос или категорию.'
-                      : 'Try adjusting your search query or category.'}
-                </span>
-                {selectedTag && (
-                  <button
-                    className="btn btn--subtle btn--tiny"
-                    style={{ marginTop: 12 }}
-                    onClick={() => setSelectedTag('')}
-                  >
-                    <Icon name="rotate" size={12} />
-                    <span>{isRu ? 'Сбросить фильтр категории' : 'Reset category filter'}</span>
-                  </button>
-                )}
-              </div>
-            )
+              )}
+            </div>
           ) : (
             <>
-              {/* Active Filter Bar Info */}
+              {/* Active Filter Bar Info with Category Chips */}
               <div className="ws-results-header">
                 <span className="ws-results-count">
                   {mode === 'installed'
@@ -652,9 +622,35 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                     : isRu
                       ? `Найдено в Мастерской: ${totalCount.toLocaleString()}`
                       : `Found in Workshop: ${totalCount.toLocaleString()}`}
-                  {currentCategory && ` • ${isRu ? currentCategory.ru : currentCategory.en}`}
-                  {updatesOnly && (isRu ? ' • Только с обновлениями' : ' • Updates only')}
                 </span>
+
+                {selectedCategories.length > 0 && (
+                  <div className="ws-active-chips">
+                    {selectedCategories.map((cat) => (
+                      <span key={cat.tag} className="ws-chip">
+                        <Icon name={cat.icon} size={11} />
+                        <span>{isRu ? cat.ru : cat.en}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedTags((prev) => prev.filter((t) => t !== cat.tag))
+                          }}
+                          title={isRu ? 'Убрать фильтр' : 'Remove filter'}
+                        >
+                          <Icon name="close" size={10} />
+                        </button>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      className="ws-chip-clear"
+                      onClick={() => setSelectedTags([])}
+                    >
+                      {isRu ? 'Сбросить все' : 'Clear all'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Mod Cards Grid */}

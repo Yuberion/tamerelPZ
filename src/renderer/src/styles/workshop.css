@@ -323,6 +323,25 @@
   white-space: nowrap;
 }
 
+.ws-sidebar-item__check {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  border: 1px solid var(--border, #3b4252);
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
+  color: #0f1115;
+}
+
+.ws-sidebar-item__check.is-checked {
+  background: var(--amber, #f59e0b);
+  border-color: var(--amber, #f59e0b);
+}
+
 .ws-sidebar-item__dot {
   width: 6px;
   height: 6px;
@@ -332,11 +351,91 @@
   flex-shrink: 0;
 }
 
+.ws-sidebar__count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--amber, #f59e0b);
+  color: #0f1115;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+
+.ws-sidebar-pull-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--amber, #f59e0b);
+  color: #0f1115;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-left: 4px;
+}
+
 .ws-sidebar__footer {
   padding: 8px 12px;
   border-top: 1px solid var(--border, #2d333f);
   background: #14171d;
   flex-shrink: 0;
+}
+
+/* Active Category Chips in Results Header */
+.ws-active-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--amber, #f59e0b);
+  user-select: none;
+}
+
+.ws-chip button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  margin-left: 2px;
+  opacity: 0.7;
+  transition: opacity 0.1s ease;
+}
+
+.ws-chip button:hover {
+  opacity: 1;
+}
+
+.ws-chip-clear {
+  background: transparent;
+  border: none;
+  font-size: 0.72rem;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 6px;
+}
+
+.ws-chip-clear:hover {
+  color: var(--text-normal, #f1f5f9);
 }
 
 /* Content Area & Grid */
