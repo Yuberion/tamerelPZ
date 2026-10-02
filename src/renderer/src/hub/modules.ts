@@ -5,6 +5,7 @@ export type ModuleId =
   | 'explorer'
   | 'loadout'
   | 'workshop'
+  | 'auditor'
   | 'workbench'
   | 'triage'
   | 'cartograph'
@@ -24,7 +25,7 @@ export interface ModuleDef {
   status: 'live' | 'sealed'
 }
 
-/** The nine hub tiles. EXPLORER, LOADOUT, WORKSHOP, WORKBENCH, TOOLS and LEDGER are wired up in this build. */
+/** The nine hub tiles. EXPLORER, LOADOUT, WORKSHOP, AUDITOR, TOOLS and LEDGER are wired up in this build. */
 export const MODULES: ModuleDef[] = [
   {
     id: 'explorer',
@@ -54,12 +55,12 @@ export const MODULES: ModuleDef[] = [
     status: 'live'
   },
   {
-    id: 'workbench',
+    id: 'auditor',
     code: '04',
     name: 'Mod Auditor',
     taglineKey: 'module.workbench.tagline',
     descKey: 'module.workbench.desc',
-    icon: 'shield',
+    icon: 'pulse',
     status: 'live'
   },
   {
@@ -86,7 +87,7 @@ export const MODULES: ModuleDef[] = [
     name: 'Tools',
     taglineKey: 'module.tools.tagline',
     descKey: 'module.tools.desc',
-    icon: 'hammer',
+    icon: 'tools',
     status: 'live'
   },
   {

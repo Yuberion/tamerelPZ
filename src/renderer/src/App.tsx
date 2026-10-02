@@ -9,7 +9,7 @@ import { Ledger } from './modules/ledger/Ledger'
 import { Loadout } from './modules/loadout/Loadout'
 import { Explorer } from './modules/explorer/Explorer'
 import { Tools } from './modules/tools/Tools'
-import { Workbench } from './modules/workbench/Workbench'
+import { Auditor } from './modules/auditor/Auditor'
 import { WorkshopOverview } from './modules/workshop/WorkshopOverview'
 import { Cartographer } from './modules/cartographer/Cartographer'
 import { useAppStore } from './state/store'
@@ -54,7 +54,7 @@ export default function App() {
               {view === 'explorer' ? <Explorer onExit={goHome} /> : null}
               {view === 'loadout' ? <Loadout onExit={goHome} /> : null}
               {view === 'workshop' ? <WorkshopOverview onExit={goHome} /> : null}
-              {view === 'workbench' ? <Workbench onExit={goHome} /> : null}
+              {view === 'auditor' || view === 'workbench' ? <Auditor onExit={goHome} /> : null}
               {view === 'cartograph' ? <Cartographer onExit={goHome} /> : null}
               {view === 'tools' ? <Tools onExit={goHome} /> : null}
               {view === 'ledger' ? <Ledger onExit={goHome} /> : null}

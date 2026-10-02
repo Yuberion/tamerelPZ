@@ -209,7 +209,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
     <Panel
       title={t('wb.doctor.title')}
       lede={`${mod.name} (${mod.modId || 'No ID'})${mod.modVersion ? ` · v${mod.modVersion.replace(/^[vV]/, '')}` : mod.pzVersion ? ` · PZ ${mod.pzVersion}` : ''} · ${mod.path}`}
-      icon="shield"
+      icon="pulse"
       actions={
         <>
           {report && (
@@ -229,7 +229,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
 
       {!report && !running && !error && (
         <div className="pane__empty pane__empty--big">
-          <Icon name="shield" size={32} strokeWidth={1.2} />
+          <Icon name="pulse" size={32} strokeWidth={1.2} />
           <span className="stencil">{t('wb.val.neverRun')}</span>
           <span className="label">{t('wb.val.neverRunBody')}</span>
         </div>

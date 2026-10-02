@@ -1,5 +1,6 @@
-/* ============================ workbench layout ============================ */
+/* ============================= auditor layout ============================= */
 
+.auditor,
 .workbench {
   position: absolute;
   inset: 0;
@@ -8,6 +9,7 @@
   background: var(--void);
 }
 
+.auditor__body,
 .workbench__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -16,8 +18,9 @@
 }
 
 /* The tool panels are `position: absolute; inset: 0`, so this pane has to be their
-   containing block. Without it they resolve against `.workbench` and paint over the
+   containing block. Without it they resolve against `.auditor` and paint over the
    toolbar and the mod list. */
+.auditor__main,
 .workbench__main {
   position: relative;
   min-width: 0;

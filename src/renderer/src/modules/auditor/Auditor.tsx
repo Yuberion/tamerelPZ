@@ -21,15 +21,17 @@ function readWidth(fallback: number): number {
   return Number.isFinite(raw) && raw > 200 ? raw : fallback
 }
 
-export function Workbench({ onExit }: { onExit: () => void }) {
+export function Auditor({ onExit }: { onExit: () => void }) {
   return (
     <MenuProvider>
-      <WorkbenchBody onExit={onExit} />
+      <AuditorBody onExit={onExit} />
     </MenuProvider>
   )
 }
 
-function WorkbenchBody({ onExit }: { onExit: () => void }) {
+export const Workbench = Auditor
+
+function AuditorBody({ onExit }: { onExit: () => void }) {
   const { scan, scanning, refresh, byKey, paths } = useAppStore()
   const { t } = useI18n()
 
@@ -85,7 +87,7 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
   }, [refresh])
 
   return (
-    <div className="workbench">
+    <div className="auditor workbench">
       <div className="toolbar">
         <div className="toolbar__row">
           <button className="btn" onClick={onExit} title={t('tb.backToHub')}>
@@ -96,7 +98,7 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
 
           {/* Module branding */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 6px' }}>
-            <Icon name="shield" size={16} color="var(--rust-hot)" />
+            <Icon name="pulse" size={16} color="var(--rust-hot)" />
             <span
               className="stencil"
               style={{
@@ -221,7 +223,7 @@ function PickPrompt() {
   const { t } = useI18n()
   return (
     <div className="pane__empty pane__empty--big">
-      <Icon name="shield" size={36} strokeWidth={1.2} color="var(--rust-hot)" />
+      <Icon name="pulse" size={36} strokeWidth={1.2} color="var(--rust-hot)" />
       <span className="stencil">{t('wb.pickMod')}</span>
       <span className="label">{t('wb.pickModHint')}</span>
     </div>
@@ -248,7 +250,7 @@ function ModList({
     return (
       <div className="pane__scroll">
         <div className="pane__empty">
-          <Icon name="shield" size={22} />
+          <Icon name="pulse" size={22} />
           <span className="label">{t('wb.noMods')}</span>
           <span className="label wbmuted">{t('wb.noModsHint')}</span>
         </div>
