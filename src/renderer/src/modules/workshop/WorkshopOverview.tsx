@@ -613,7 +613,11 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
           ) : (
             <>
               {/* Active Filter Bar Info with Category Chips */}
-              <div className="ws-results-header">
+              <div
+                className={`ws-results-header ${
+                  !sidebarOpen && !sidebarPinned ? 'has-pull-tab' : ''
+                }`}
+              >
                 <span className="ws-results-count">
                   {mode === 'installed'
                     ? isRu

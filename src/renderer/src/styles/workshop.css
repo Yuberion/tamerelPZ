@@ -174,17 +174,18 @@
 /* Pull-Out Edge Handle Tab */
 .ws-sidebar-pull-tab {
   position: absolute;
-  top: 14px;
+  top: 17px;
   left: 0;
   z-index: 15;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: #1e232d;
+  gap: 6px;
+  height: 28px;
+  background: #1c212b;
   border: 1px solid var(--border, #333a48);
   border-left: none;
-  border-radius: 0 6px 6px 0;
-  padding: 6px 10px 6px 6px;
+  border-radius: 0 5px 5px 0;
+  padding: 0 10px 0 8px;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--amber, #f59e0b);
@@ -384,13 +385,32 @@
   flex-shrink: 0;
 }
 
-/* Active Category Chips in Results Header */
+/* Results Header & Active Category Chips */
+.ws-results-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 32px;
+  transition: padding-left 0.18s ease;
+}
+
+.ws-results-header.has-pull-tab {
+  padding-left: 135px;
+}
+
+.ws-results-count {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted, #94a3b8);
+  white-space: nowrap;
+}
+
 .ws-active-chips {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 4px;
 }
 
 .ws-chip {
