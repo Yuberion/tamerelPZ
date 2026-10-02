@@ -40,7 +40,7 @@ const WORKSHOP_CATEGORIES: CategoryDef[] = [
   // Systems & Tech
   { tag: 'Framework', ru: 'Фреймворки', en: 'Frameworks', icon: 'code' },
   { tag: 'Interface', ru: 'Интерфейс', en: 'Interface', icon: 'monitor' },
-  { tag: 'QOL', ru: 'Удобство (QoL)', en: 'Quality of Life', icon: 'check-circle' },
+  { tag: 'QoL', ru: 'Удобство (QoL)', en: 'Quality of Life', icon: 'check-circle' },
   { tag: 'Multiplayer', ru: 'Мультиплеер', en: 'Multiplayer', icon: 'user' },
   { tag: 'Military', ru: 'Военное', en: 'Military', icon: 'shield' },
   { tag: 'Models', ru: '3D-Модели', en: '3D Models', icon: 'cube' },
@@ -118,16 +118,32 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     [selectedTags]
   )
 
-  // Query executor: loads a specific page (defaulting to 1)
-  const runQuery = async (targetPage = 1, forceRefresh = false): Promise<void> => {
+  // Active state ref to eliminate stale closures and race conditions
+  const queryStateRef = useRef({ mode, search, selectedTags, page })
+  useEffect(() => {
+    queryStateRef.current = { mode, search, selectedTags, page }
+  }, [mode, search, selectedTags, page])
+
+  // Query executor: loads a specific page (defaulting to 1) with explicit or state params
+  const runQuery = async (
+    targetPage = 1,
+    forceRefresh = false,
+    overrideTags?: string[],
+    overrideMode?: WorkshopViewMode,
+    overrideSearch?: string
+  ): Promise<void> => {
+    const activeMode = overrideMode ?? queryStateRef.current.mode
+    const activeTags = overrideTags ?? queryStateRef.current.selectedTags
+    const activeSearch = overrideSearch ?? queryStateRef.current.search
+
     setLoading(true)
     try {
       const q: WorkshopSearchQuery = {
-        mode,
-        search: search.trim() || undefined,
+        mode: activeMode,
+        search: activeSearch.trim() || undefined,
         page: targetPage,
         numPerPage: 30,
-        tags: selectedTags.length > 0 ? selectedTags : undefined,
+        tags: activeTags.length > 0 ? activeTags : undefined,
         forceRefresh
       }
 
@@ -165,42 +181,63 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     }
   }
 
-  // 100% Autonomous Synchronization:
-  // - Sync on mount
-  // - Sync on window focus
-  // - Listen to fs.watch on appworkshop_108600.acf
+  // Category toggle handler with immediate deterministic query trigger
+  const handleToggleCategory = (catTag: string): void => {
+    let nextTags: string[] = []
+    if (catTag === '') {
+      nextTags = []
+    } else {
+      nextTags = selectedTags.includes(catTag)
+        ? selectedTags.filter((t) => t !== catTag)
+        : [...selectedTags, catTag]
+    }
+    setSelectedTags(nextTags)
+    void runQuery(1, false, nextTags)
+  }
+
+  // Mode switch handler with immediate deterministic query trigger
+  const handleSwitchMode = (nextMode: WorkshopViewMode): void => {
+    if (mode === nextMode) return
+    setMode(nextMode)
+    void runQuery(1, false, selectedTags, nextMode)
+  }
+
+  // Category clear handler
+  const handleResetCategories = (): void => {
+    setSelectedTags([])
+    void runQuery(1, false, [])
+  }
+
+  // Autonomous Steam Sync on Mount & Background File Watcher
   useEffect(() => {
     // Initial silent autonomous scan & count
     void window.pz.workshop.syncSteam().then((res) => {
       setInstalledCount(res.installedCount)
     })
 
-    // Listen to background file watcher
+    // Listen to background file watcher (Steam downloads in background)
     const unsub = window.pz.workshop.onSyncChanged((syncRes) => {
       setInstalledCount(syncRes.installedCount)
-      // When Steam downloads/updates in background, refresh list silently
-      void runQuery(page)
+      const { page: currPage } = queryStateRef.current
+      void runQuery(currPage)
     })
 
-    // Sync silently on window focus (e.g. user just subscribed in Steam browser and returned to app)
+    // When returning to window after subscribing in Steam external browser
     const onFocus = (): void => {
       void window.pz.workshop.syncSteam().then((res) => {
         setInstalledCount(res.installedCount)
-        void runQuery(page)
       })
     }
     window.addEventListener('focus', onFocus)
+
+    // Initial load on mount
+    void runQuery(1)
 
     return () => {
       unsub()
       window.removeEventListener('focus', onFocus)
     }
-  }, [mode, selectedTags, search, page])
-
-  // Trigger query on mode or tags changes
-  useEffect(() => {
-    void runQuery(1)
-  }, [mode, selectedTags])
+  }, [])
 
   // Open item details
   const handleOpenDetails = async (item: WorkshopItemSummary): Promise<void> => {
@@ -407,11 +444,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
           <div className="ws-mode-switcher">
             <button
               className={`ws-mode-btn ${mode === 'workshop' ? 'is-active' : ''}`}
-              onClick={() => {
-                if (mode !== 'workshop') {
-                  setMode('workshop')
-                }
-              }}
+              onClick={() => handleSwitchMode('workshop')}
               title={isRu ? 'Каталог Мастерской Steam онлайн' : 'Steam Workshop Online Catalogue'}
             >
               <Icon name="globe" size={13} />
@@ -420,11 +453,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
 
             <button
               className={`ws-mode-btn ${mode === 'installed' ? 'is-active' : ''}`}
-              onClick={() => {
-                if (mode !== 'installed') {
-                  setMode('installed')
-                }
-              }}
+              onClick={() => handleSwitchMode('installed')}
               title={isRu ? 'Все установленные моды на диске' : 'All locally installed mods on disk'}
             >
               <Icon name="folder" size={13} />
@@ -463,7 +492,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 className="ws-search__clear"
                 onClick={() => {
                   setSearch('')
-                  void runQuery(1)
+                  void runQuery(1, false, selectedTags, mode, '')
                 }}
               >
                 <Icon name="close" size={11} />
@@ -551,21 +580,11 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               const isActive = isAll ? selectedTags.length === 0 : selectedTags.includes(cat.tag)
               const label = isRu ? cat.ru : cat.en
 
-              const handleToggle = (): void => {
-                if (isAll) {
-                  setSelectedTags([])
-                } else {
-                  setSelectedTags((prev) =>
-                    prev.includes(cat.tag) ? prev.filter((t) => t !== cat.tag) : [...prev, cat.tag]
-                  )
-                }
-              }
-
               return (
                 <button
                   key={cat.tag || 'all'}
                   className={`ws-sidebar-item ${isActive ? 'is-active' : ''} ${cat.isBuild ? 'is-build' : ''}`}
-                  onClick={handleToggle}
+                  onClick={() => handleToggleCategory(cat.tag)}
                   title={label}
                 >
                   <div className={`ws-sidebar-item__check ${isActive ? 'is-checked' : ''}`}>
@@ -584,7 +603,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
               <button
                 className="btn btn--subtle btn--tiny"
                 style={{ width: '100%' }}
-                onClick={() => setSelectedTags([])}
+                onClick={handleResetCategories}
               >
                 <Icon name="rotate" size={11} />
                 <span>
@@ -634,7 +653,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 <button
                   className="btn btn--subtle btn--tiny"
                   style={{ marginTop: 12 }}
-                  onClick={() => setSelectedTags([])}
+                  onClick={handleResetCategories}
                 >
                   <Icon name="rotate" size={12} />
                   <span>
@@ -673,7 +692,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setSelectedTags((prev) => prev.filter((t) => t !== cat.tag))
+                            handleToggleCategory(cat.tag)
                           }}
                           title={isRu ? 'Убрать фильтр' : 'Remove filter'}
                         >
@@ -684,7 +703,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                     <button
                       type="button"
                       className="ws-chip-clear"
-                      onClick={() => setSelectedTags([])}
+                      onClick={handleResetCategories}
                     >
                       {isRu ? 'Сбросить все' : 'Clear all'}
                     </button>

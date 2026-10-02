@@ -19,7 +19,7 @@ export function getSteamworks(): any {
     console.log('[steamworks] Connected to Steam client. User:', steamClient.localplayer.getName())
     return steamClient
   } catch (err) {
-    console.warn('[steamworks] Could not connect to Steam client (Steam may be offline):', err)
+    console.warn('[steamworks] Steam client is offline or not running (native subscribe unavailable):', (err as Error)?.message || String(err))
     steamClient = null
     return null
   }

@@ -861,6 +861,69 @@ export function initSteamWorkshopWatcher(
 }
 
 /* =========================================================================
+   Steam Workshop HTML Browse Scraper Helper
+   ========================================================================= */
+
+interface SteamBrowsePageResult {
+  total: number
+  ids: string[]
+}
+
+async function fetchSteamBrowsePage(
+  baseBrowseUrl: URL,
+  page: number,
+  tags: string[]
+): Promise<SteamBrowsePageResult> {
+  const url = new URL(baseBrowseUrl.toString())
+  url.searchParams.set('p', page.toString())
+  for (const tag of tags) {
+    if (tag) url.searchParams.append('requiredtags[]', tag)
+  }
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml'
+      }
+    })
+    if (!res.ok) {
+      console.warn(`[workshop] Steam browse HTTP ${res.status} for ${url.search}`)
+      return { total: 0, ids: [] }
+    }
+    const html = await res.text()
+
+    const idRegex = /sharedfiles\/filedetails\/\?id=(\d+)/g
+    const seenIds = new Set<string>()
+    const ids: string[] = []
+    let match: RegExpExecArray | null
+
+    while ((match = idRegex.exec(html)) !== null) {
+      const id = match[1]
+      if (id === '2872282653') continue
+      if (!seenIds.has(id)) {
+        seenIds.add(id)
+        ids.push(id)
+      }
+    }
+
+    let total = ids.length
+    const totalMatch = html.match(/(\d[\d,]*)\s+entries/i) || html.match(/Showing\s+\d+-\d+\s+of\s+([0-9,]+)/i)
+    if (totalMatch) {
+      total = parseInt(totalMatch[1].replace(/,/g, ''), 10) || total
+    } else if (ids.length >= 30) {
+      total = page * 30 + 1
+    }
+
+    return { total, ids }
+  } catch (err) {
+    console.error('[workshop] Failed to fetch Steam browse page:', err)
+    return { total: 0, ids: [] }
+  }
+}
+
+/* =========================================================================
    Query Workshop (Dual Mode: 'workshop' online or 'installed' local library)
    ========================================================================= */
 
@@ -974,7 +1037,6 @@ export async function queryWorkshop(
   const browseUrl = new URL('https://steamcommunity.com/workshop/browse/')
   browseUrl.searchParams.set('appid', PZ_APP_ID)
   browseUrl.searchParams.set('section', 'readytouseitems')
-  browseUrl.searchParams.set('p', page.toString())
 
   if (query.search && query.search.trim()) {
     browseUrl.searchParams.set('searchtext', query.search.trim())
@@ -999,55 +1061,90 @@ export async function queryWorkshop(
       break
   }
 
-  // Tags filter
-  if (query.tags && query.tags.length > 0) {
-    for (const tag of query.tags) {
-      if (tag && tag.toLowerCase() !== 'local') {
-        browseUrl.searchParams.append('requiredtags[]', tag)
+  // Tags filter decomposition
+  const rawTags = (query.tags ?? []).filter(Boolean)
+  const buildTags = rawTags.filter(
+    (t) =>
+      t.toLowerCase().startsWith('build ') ||
+      t.toLowerCase() === 'b42' ||
+      t.toLowerCase() === 'b41' ||
+      t.toLowerCase() === 'b40'
+  )
+  const hasLocal = rawTags.some((t) => t.toLowerCase() === 'local')
+  const contentTags = rawTags.filter(
+    (t) =>
+      !t.toLowerCase().startsWith('build ') &&
+      t.toLowerCase() !== 'b42' &&
+      t.toLowerCase() !== 'b41' &&
+      t.toLowerCase() !== 'b40' &&
+      t.toLowerCase() !== 'local'
+  )
+
+  // If user selected only "Local Mods", serve from installed list
+  if (hasLocal && buildTags.length === 0 && contentTags.length === 0) {
+    const installedList = await scanAllInstalledWorkshopItems(settings, query.forceRefresh)
+    const localOnly = installedList.filter((item) => item.isLocal)
+    const total = localOnly.length
+    const startIdx = (page - 1) * numPerPage
+    const paged = localOnly.slice(startIdx, startIdx + numPerPage)
+    return {
+      items: paged,
+      total,
+      page,
+      hasMore: page < Math.max(1, Math.ceil(total / numPerPage))
+    }
+  }
+
+  let orderedIds: string[] = []
+  let totalCount = 0
+
+  if (contentTags.length > 1) {
+    // Multi-category faceted search: fetch content categories in parallel to form a true UNION (OR)
+    const primaryBuild = buildTags[0]
+    const catResults = await Promise.all(
+      contentTags.map((ct) =>
+        fetchSteamBrowsePage(browseUrl, page, primaryBuild ? [primaryBuild, ct] : [ct])
+      )
+    )
+
+    totalCount = catResults.reduce((acc, r) => acc + r.total, 0)
+
+    // Interleave IDs across categories so each selected category is represented on every page
+    const combinedIds: string[] = []
+    const maxLen = Math.max(...catResults.map((r) => r.ids.length), 0)
+    for (let i = 0; i < maxLen; i++) {
+      for (const r of catResults) {
+        if (r.ids[i] && !combinedIds.includes(r.ids[i]) && combinedIds.length < numPerPage) {
+          combinedIds.push(r.ids[i])
+        }
       }
     }
-  }
-
-  let html = ''
-  try {
-    const res = await fetch(browseUrl.toString(), {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml'
+    orderedIds = combinedIds
+  } else if (buildTags.length > 1 && contentTags.length === 0) {
+    // Multi-build search (e.g. Build 41 OR Build 42)
+    const buildResults = await Promise.all(
+      buildTags.map((bt) => fetchSteamBrowsePage(browseUrl, page, [bt]))
+    )
+    totalCount = buildResults.reduce((acc, r) => acc + r.total, 0)
+    const combinedIds: string[] = []
+    const maxLen = Math.max(...buildResults.map((r) => r.ids.length), 0)
+    for (let i = 0; i < maxLen; i++) {
+      for (const r of buildResults) {
+        if (r.ids[i] && !combinedIds.includes(r.ids[i]) && combinedIds.length < numPerPage) {
+          combinedIds.push(r.ids[i])
+        }
       }
-    })
-    if (!res.ok) {
-      throw new Error(`Steam community returned HTTP ${res.status} ${res.statusText}`)
     }
-    html = await res.text()
-  } catch (err) {
-    console.error('[workshop] Failed to query Steam browse:', err)
-    return { items: [], total: 0, page, hasMore: false }
-  }
+    orderedIds = combinedIds
+  } else {
+    // Single tag combination (e.g. Build 42 + Weapons, or Weapons only, or Build 42 only, or no tags)
+    const queryTags: string[] = []
+    if (buildTags[0]) queryTags.push(buildTags[0])
+    if (contentTags[0]) queryTags.push(contentTags[0])
 
-  // Extract item IDs
-  const idRegex = /sharedfiles\/filedetails\/\?id=(\d+)/g
-  const seenIds = new Set<string>()
-  const orderedIds: string[] = []
-  let match: RegExpExecArray | null
-
-  while ((match = idRegex.exec(html)) !== null) {
-    const id = match[1]
-    // Skip sticky Indie Stone modding policy announcement guide (2872282653)
-    if (id === '2872282653') continue
-    if (!seenIds.has(id)) {
-      seenIds.add(id)
-      orderedIds.push(id)
-    }
-  }
-
-  let totalCount = orderedIds.length
-  const totalMatch = html.match(/(\d[\d,]*)\s+entries/i) || html.match(/Showing\s+\d+-\d+\s+of\s+([0-9,]+)/i)
-  if (totalMatch) {
-    totalCount = parseInt(totalMatch[1].replace(/,/g, ''), 10) || totalCount
-  } else if (orderedIds.length >= 30) {
-    totalCount = page * 30 + 1
+    const res = await fetchSteamBrowsePage(browseUrl, page, queryTags)
+    orderedIds = res.ids
+    totalCount = res.total
   }
 
   if (orderedIds.length === 0) {
