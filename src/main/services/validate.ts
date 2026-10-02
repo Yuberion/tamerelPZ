@@ -555,7 +555,8 @@ async function checkModInfo(
   root: string,
   infoFile: string | undefined,
   knownIds: Set<string>,
-  add: (issue: ValidationIssue) => void
+  add: (issue: ValidationIssue) => void,
+  gameVersion?: string
 ): Promise<Set<string>> {
   const declaredRequires = new Set<string>()
   if (!infoFile) {
@@ -640,7 +641,29 @@ async function checkModInfo(
 
   const versionMaxEntry = keyLines.get('versionmax')?.[0]
   if (versionMaxEntry) {
-    emit('modinfo.b42-versionmax', 'error', versionMaxEntry.line, undefined, 'critical')
+    const isB42Game = gameVersion ? gameVersion.startsWith('42') : true
+    if (isB42Game) {
+      emit('modinfo.b42-versionmax', 'error', versionMaxEntry.line, { max: versionMaxEntry.rawVal }, 'critical')
+    }
+  }
+
+  // Compatibility comparison against the installed game engine version
+  if (gameVersion) {
+    const minEntry = keyLines.get('versionmin')?.[0] ?? keyLines.get('pzversion')?.[0]
+    if (minEntry) {
+      const minVal = parseFloat(minEntry.rawVal)
+      const gameVal = parseFloat(gameVersion)
+      if (!isNaN(minVal) && !isNaN(gameVal) && minVal > gameVal) {
+        emit('modinfo.game-version-mismatch', 'error', minEntry.line, { required: minEntry.rawVal, installed: gameVersion }, 'critical')
+      }
+    }
+    if (versionMaxEntry) {
+      const maxVal = parseFloat(versionMaxEntry.rawVal)
+      const gameVal = parseFloat(gameVersion)
+      if (!isNaN(maxVal) && !isNaN(gameVal) && maxVal < gameVal) {
+        emit('modinfo.game-version-outdated', 'warn', versionMaxEntry.line, { max: versionMaxEntry.rawVal, installed: gameVersion }, 'critical')
+      }
+    }
   }
 
   // Tiledef check: ensure mod tiledefs use custom id >= 100
@@ -1723,7 +1746,7 @@ export async function validateMod(
 
   const infoFile = opts.infoFile ?? (await resolveInfo(modPath))
   const knownIds = new Set((opts.knownIds ?? []).map((id) => id.toLowerCase()))
-  const declaredRequires = await checkModInfo(modPath, infoFile, knownIds, add)
+  const declaredRequires = await checkModInfo(modPath, infoFile, knownIds, add, opts.gameVersion)
 
   // Resolve declared dependencies and other installed mods for cross-mod asset resolution
   const installedMods = opts.installedMods ?? []

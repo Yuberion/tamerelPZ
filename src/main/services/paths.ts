@@ -110,6 +110,10 @@ export async function detectPaths(settings: AppSettings): Promise<PathsReport> {
     const v = await readTextSafe(join(zomboidDir, 'version.txt'), 512)
     gameVersion = v?.split(/\r?\n/)[0]?.trim()
   }
+  if (!gameVersion && gameDir) {
+    const v = await readTextSafe(join(gameDir, 'version.txt'), 512)
+    gameVersion = v?.split(/\r?\n/)[0]?.trim()
+  }
 
   return { homeDir: homedir(), zomboidDir, steamRoot, steamLibraries, gameDir, gameVersion, workshopDirs }
 }

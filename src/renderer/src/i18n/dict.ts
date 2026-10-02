@@ -56,10 +56,10 @@ export const EN = {
     'Enable and arrange mods for singleplayer and servers, sort dependencies, fix map conflicts, and export game presets.',
   'module.workshop.tagline': 'Steam Workshop',
   'module.workshop.desc':
-    'Search mods on Steam Workshop by B42/B41 tags, read descriptions, check updates, and download directly into the game.',
-  'module.workbench.tagline': 'Diagnostics & health check',
+    'Search mods on Steam Workshop with version filters, read descriptions, check updates, and download directly into the game.',
+  'module.workbench.tagline': 'Diagnostics & compatibility',
   'module.workbench.desc':
-    'Find errors in scripts, XML, Lua, and game engine Java API (B42), check missing 3D models and textures, evaluate mod health.',
+    'Audit mod against your installed game version: check engine Java API, item scripts, XML, Lua, and missing assets.',
   'module.triage.tagline': 'Conflict resolver',
   'module.triage.desc':
     'Identify duplicate mod IDs, missing required mods, and overlapping item scripts.',
@@ -579,7 +579,7 @@ export const EN = {
     'JSON translations must be one object of key/text pairs',
   'wbrule.translate.json-non-string':
     '{key} is not a text value ({n} in total) — those keys never resolve',
-  'wbrule.lua.unknown-engine-class': 'Java class "{className}" was not found in installed projectzomboid.jar (Build 42)',
+  'wbrule.lua.unknown-engine-class': 'Java class "{className}" was not found in installed projectzomboid.jar',
   'wbrule.lua.global-function-leak': 'Function "{name}" is declared globally without local or namespace (pollutes _G)',
   'wbrule.script.invalid-swing-anim': 'Invalid weapon swing animation "{anim}" on {name} (may freeze character)',
   'wbrule.script.weapon-damage-inverted': 'MinDamage ({min}) exceeds MaxDamage ({max}) on {name}',
@@ -597,8 +597,10 @@ export const EN = {
   'wbrule.conflict.vanilla-overwrite': 'Mod file "{file}" overwrites a vanilla Project Zomboid file',
   'wbrule.hygiene.bom': 'File starts with a UTF-8 BOM — can break game parser or Kahlua loader',
   'wbrule.hygiene.non-ascii-code': 'Non-ASCII characters detected in Lua code outside Translate/',
-  'wbrule.modinfo.b42-versionmax': 'versionMax= in mod.info blocks mod loading in Build 42!',
-  'wbrule.lua.unknown-event': 'Event "{event}" is not in the canonical 262 engine events whitelist for B42',
+  'wbrule.modinfo.b42-versionmax': 'versionMax={max} in mod.info blocks mod loading in Build 42+',
+  'wbrule.modinfo.game-version-mismatch': 'Mod requires PZ {required}, but installed game is {installed}',
+  'wbrule.modinfo.game-version-outdated': 'Mod is limited to PZ {max}, but installed game is {installed}',
+  'wbrule.lua.unknown-event': 'Event "{event}" is not in the recognized game engine events registry',
   'wbrule.sandbox.missing-version': 'media/sandbox-options.txt must start with VERSION = 1,',
   'wbrule.sandbox.missing-trailing-comma': 'VERSION = 1 is missing the mandatory trailing comma (must be: VERSION = 1,)',
   'wbrule.sandbox.empty-option': 'Empty sandbox option value',
@@ -606,6 +608,7 @@ export const EN = {
 
   // ---- doctor / workbench --------------------------------------------------
   'wb.doctor.title': 'Mod Doctor',
+  'wb.gameEngine': 'Installed Game',
   'wb.doctor.healthTitle': 'Mod Health Rating',
   'wb.doctor.healthGrade': 'Grade {grade}',
   'wb.doctor.quickFixAll': 'Auto-Fix All Issues (1-Click)',
@@ -615,7 +618,7 @@ export const EN = {
   'wb.doctor.category.all': 'All Issues',
   'wb.doctor.category.critical': 'Critical',
   'wb.doctor.category.engineApi': 'Java Engine API',
-  'wb.doctor.category.b42Syntax': 'B42 Scripts',
+  'wb.doctor.category.b42Syntax': 'Item & Craft Scripts',
   'wb.doctor.category.assets': '3D & Assets',
   'wb.doctor.category.overwrites': 'Overwrites',
   'wb.doctor.category.hygiene': 'Hygiene',
@@ -1524,10 +1527,10 @@ export const RU: Record<TKey, string> = {
     'Включение и порядок модов для игры и сервера, сортировка зависимостей, устранение конфликтов карт и экспорт пресетов.',
   'module.workshop.tagline': 'Мастерская Steam',
   'module.workshop.desc':
-    'Поиск модов в Мастерской Steam по тегам B42/B41, просмотр описаний, проверка обновлений и скачивание прямо в игру.',
-  'module.workbench.tagline': 'Диагностика и здоровье модов',
+    'Поиск модов в Мастерской Steam по тегам версий игры, просмотр описаний, проверка обновлений и скачивание прямо в игру.',
+  'module.workbench.tagline': 'Диагностика и совместимость',
   'module.workbench.desc':
-    'Поиск ошибок в скриптах, XML, Lua и коде движка Java (B42), проверка потерянных текстур и 3D-моделей, оценка здоровья мода.',
+    'Сверка мода с установленной версией игры: проверка Java API движка, скриптов предметов, XML, Lua и связей ассетов.',
   'module.triage.tagline': 'Устранение конфликтов',
   'module.triage.desc':
     'Поиск дубликатов ID модов, отсутствующих зависимостей и конфликтующих скриптов предметов.',
@@ -2024,13 +2027,15 @@ export const RU: Record<TKey, string> = {
     '{key} — не текстовое значение (всего {n}): такие ключи не будут найдены',
   'wbrule.hygiene.bom': 'Файл начинается с UTF-8 BOM — парсер игры или Kahlua могут дать сбой при чтении',
   'wbrule.hygiene.non-ascii-code': 'В коде Lua обнаружены не-ASCII символы (кириллица вне папки Translate)',
-  'wbrule.modinfo.b42-versionmax': 'В mod.info указан versionMax= — в Build 42 этот тег блокирует загрузку мода!',
-  'wbrule.lua.unknown-event': 'Событие «{event}» отсутствует в каноническом реестре 262 событий движка B42',
+  'wbrule.modinfo.b42-versionmax': 'Тег versionMax={max} в mod.info блокирует запуск мода в Build 42+',
+  'wbrule.modinfo.game-version-mismatch': 'Мод требует версию PZ {required}, но установлена версия {installed}',
+  'wbrule.modinfo.game-version-outdated': 'Мод ограничен версией PZ {max}, но установлена версия {installed}',
+  'wbrule.lua.unknown-event': 'Событие «{event}» отсутствует в реестре событий движка игры',
   'wbrule.sandbox.missing-version': 'В media/sandbox-options.txt отсутствует обязательная первая строка VERSION = 1,',
   'wbrule.sandbox.missing-trailing-comma': 'В VERSION = 1 отсутствует обязательная завершающая запятая (нужно: VERSION = 1,)',
   'wbrule.sandbox.empty-option': 'Пустое значение параметра песочницы',
   'wbrule.script.craftrecipe-no-time': 'В craftRecipe {name} не указано свойство Time = <число>,',
-  'wbrule.lua.unknown-engine-class': 'Java-класс «{className}» не найден в движке игры (projectzomboid.jar B42)',
+  'wbrule.lua.unknown-engine-class': 'Java-класс «{className}» не найден в установленной версии движка игры (projectzomboid.jar)',
   'wbrule.lua.global-function-leak': 'Функция «{name}» объявлена глобально без local и без таблицы-неймспейса (засоряет _G)',
   'wbrule.script.invalid-swing-anim': 'Недопустимая анимация замаха оружия «{anim}» у {name} (приведёт к багу анимации персонажа)',
   'wbrule.script.weapon-damage-inverted': 'MinDamage ({min}) больше MaxDamage ({max}) у оружия {name}',
@@ -2049,6 +2054,7 @@ export const RU: Record<TKey, string> = {
 
   // ---- доктор модов / workbench --------------------------------------------
   'wb.doctor.title': 'Доктор Модов',
+  'wb.gameEngine': 'Установленная игра',
   'wb.doctor.healthTitle': 'Рейтинг здоровья мода',
   'wb.doctor.healthGrade': 'Оценка {grade}',
   'wb.doctor.quickFixAll': 'Устранить все авто-ошибки (1 клик)',
@@ -2058,7 +2064,7 @@ export const RU: Record<TKey, string> = {
   'wb.doctor.category.all': 'Все проблемы',
   'wb.doctor.category.critical': 'Критические',
   'wb.doctor.category.engineApi': 'Java API',
-  'wb.doctor.category.b42Syntax': 'B42 Скрипты',
+  'wb.doctor.category.b42Syntax': 'Скрипты и крафт',
   'wb.doctor.category.assets': '3D и Ассеты',
   'wb.doctor.category.overwrites': 'Оверрайты',
   'wb.doctor.category.hygiene': 'Гигиена',

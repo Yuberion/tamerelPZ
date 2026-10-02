@@ -30,7 +30,7 @@ export function Workbench({ onExit }: { onExit: () => void }) {
 }
 
 function WorkbenchBody({ onExit }: { onExit: () => void }) {
-  const { scan, scanning, refresh, byKey } = useAppStore()
+  const { scan, scanning, refresh, byKey, paths } = useAppStore()
   const { t } = useI18n()
 
   const [targets, setTargets] = useState<AuthoringTarget[]>([])
@@ -117,8 +117,9 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
                 color: '#38bdf8',
                 fontWeight: 600
               }}
+              title={paths?.gameVersion ? `${t('wb.gameEngine')}: ${paths.gameVersion}` : t('wb.gameEngine')}
             >
-              BUILD 42
+              {paths?.gameVersion ? `PZ ${paths.gameVersion}` : t('wb.gameEngine')}
             </span>
           </div>
 

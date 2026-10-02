@@ -309,7 +309,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
                 }}
               >
                 <Icon name="terminal" size={12} color="#38bdf8" />
-                <span style={{ color: 'var(--ash-dim)' }}>Java API:</span>
+                <span style={{ color: 'var(--ash-dim)' }}>{t('wb.doctor.category.engineApi')}:</span>
                 <span style={{ fontWeight: 600, color: '#38bdf8' }}>{score?.engineApi ?? 0}%</span>
               </div>
 
@@ -326,7 +326,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
                 }}
               >
                 <Icon name="code" size={12} color="#a78bfa" />
-                <span style={{ color: 'var(--ash-dim)' }}>B42 Скрипты:</span>
+                <span style={{ color: 'var(--ash-dim)' }}>{t('wb.doctor.category.b42Syntax')}:</span>
                 <span style={{ fontWeight: 600, color: '#a78bfa' }}>{score?.b42Syntax ?? 0}%</span>
               </div>
 
@@ -343,7 +343,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
                 }}
               >
                 <Icon name="cube" size={12} color="#34d399" />
-                <span style={{ color: 'var(--ash-dim)' }}>3D & Ассеты:</span>
+                <span style={{ color: 'var(--ash-dim)' }}>{t('wb.doctor.category.assets')}:</span>
                 <span style={{ fontWeight: 600, color: '#34d399' }}>{score?.assets ?? 0}%</span>
               </div>
 
@@ -360,7 +360,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
                 }}
               >
                 <Icon name="layers" size={12} color="#fbbf24" />
-                <span style={{ color: 'var(--ash-dim)' }}>Оверрайты:</span>
+                <span style={{ color: 'var(--ash-dim)' }}>{t('wb.doctor.category.overwrites')}:</span>
                 <span style={{ fontWeight: 600, color: '#fbbf24' }}>{score?.overwrites ?? 0}%</span>
               </div>
 
@@ -377,7 +377,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
                 }}
               >
                 <Icon name="shield" size={12} color="#94a3b8" />
-                <span style={{ color: 'var(--ash-dim)' }}>Гигиена:</span>
+                <span style={{ color: 'var(--ash-dim)' }}>{t('wb.doctor.category.hygiene')}:</span>
                 <span style={{ fontWeight: 600, color: '#94a3b8' }}>{score?.hygiene ?? 0}%</span>
               </div>
             </div>

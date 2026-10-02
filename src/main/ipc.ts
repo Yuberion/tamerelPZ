@@ -322,6 +322,7 @@ export function registerIpc(): void {
     const effectiveOpts: ValidateOptions = {
       ...opts,
       gameDir: opts.gameDir || paths.gameDir,
+      gameVersion: opts.gameVersion || paths.gameVersion,
       checkVanillaOverwrites: opts.checkVanillaOverwrites ?? true,
       installedMods: opts.installedMods ?? installed.map((m) => ({
         modId: m.modId,

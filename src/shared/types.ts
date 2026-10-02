@@ -444,6 +444,8 @@ export interface ValidateOptions {
   infoFile?: string
   /** Project Zomboid installation directory containing projectzomboid.jar */
   gameDir?: string
+  /** Detected version of the installed game, e.g. 41.78.16 or 42.21 */
+  gameVersion?: string
   /** Whether to check for overwrites against vanilla game files */
   checkVanillaOverwrites?: boolean
   /** Installed mods on this machine for cross-mod dependency asset resolution */
