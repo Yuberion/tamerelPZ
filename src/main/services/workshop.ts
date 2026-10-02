@@ -869,7 +869,7 @@ export async function queryWorkshop(
   query: WorkshopSearchQuery
 ): Promise<WorkshopSearchResult> {
   const page = Math.max(1, query.page ?? 1)
-  const numPerPage = query.numPerPage ?? 32
+  const numPerPage = Math.max(query.numPerPage ?? 60, 60)
   const isInstalledMode = query.mode === 'installed' || query.installedOnly
 
   // Ensure installed cache is fresh (support explicit forceRefresh)
@@ -970,82 +970,100 @@ export async function queryWorkshop(
   // -----------------------------------------------------------------------
   // MODE: WORKSHOP (Steam Community Online Browse)
   // -----------------------------------------------------------------------
-  const browseUrl = new URL('https://steamcommunity.com/workshop/browse/')
-  browseUrl.searchParams.set('appid', PZ_APP_ID)
-  browseUrl.searchParams.set('section', 'readytouseitems')
-  browseUrl.searchParams.set('p', page.toString())
-  browseUrl.searchParams.set('numperpage', numPerPage.toString())
+  // Steam Workshop browse renders ~30 items per page.
+  // To provide a fast, rich, continuous browsing experience, we fetch 2 Steam pages
+  // concurrently per app request (~60 items per batch).
+  const steamPage1 = (page - 1) * 2 + 1
+  const steamPage2 = (page - 1) * 2 + 2
 
-  if (query.search && query.search.trim()) {
-    browseUrl.searchParams.set('searchtext', query.search.trim())
-  }
+  const fetchSteamHtml = async (
+    p: number
+  ): Promise<{ html: string; totalEntries?: number }> => {
+    const browseUrl = new URL('https://steamcommunity.com/workshop/browse/')
+    browseUrl.searchParams.set('appid', PZ_APP_ID)
+    browseUrl.searchParams.set('section', 'readytouseitems')
+    browseUrl.searchParams.set('p', p.toString())
 
-  // Sort
-  switch (query.sort) {
-    case 'popular':
-      browseUrl.searchParams.set('browsesort', 'toprated')
-      browseUrl.searchParams.set('days', String(query.days ?? -1))
-      break
-    case 'recent':
-      browseUrl.searchParams.set('browsesort', 'mostrecent')
-      break
-    case 'updated':
-      browseUrl.searchParams.set('browsesort', 'lastupdated')
-      break
-    case 'trend':
-    default:
-      browseUrl.searchParams.set('browsesort', 'trend')
-      browseUrl.searchParams.set('days', String(query.days ?? 7))
-      break
-  }
+    if (query.search && query.search.trim()) {
+      browseUrl.searchParams.set('searchtext', query.search.trim())
+    }
 
-  // Tags filter
-  if (query.tags && query.tags.length > 0) {
-    for (const tag of query.tags) {
-      if (tag && tag.toLowerCase() !== 'local') {
-        browseUrl.searchParams.append('requiredtags[]', tag)
+    switch (query.sort) {
+      case 'popular':
+        browseUrl.searchParams.set('browsesort', 'toprated')
+        browseUrl.searchParams.set('days', String(query.days ?? -1))
+        break
+      case 'recent':
+        browseUrl.searchParams.set('browsesort', 'mostrecent')
+        break
+      case 'updated':
+        browseUrl.searchParams.set('browsesort', 'lastupdated')
+        break
+      case 'trend':
+      default:
+        browseUrl.searchParams.set('browsesort', 'trend')
+        browseUrl.searchParams.set('days', String(query.days ?? 7))
+        break
+    }
+
+    if (query.tags && query.tags.length > 0) {
+      for (const tag of query.tags) {
+        if (tag && tag.toLowerCase() !== 'local') {
+          browseUrl.searchParams.append('requiredtags[]', tag)
+        }
       }
+    }
+
+    try {
+      const res = await fetch(browseUrl.toString(), {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml'
+        }
+      })
+      if (!res.ok) {
+        return { html: '' }
+      }
+      const pageHtml = await res.text()
+      const totalMatch =
+        pageHtml.match(/(\d[\d,]*)\s+entries/i) ||
+        pageHtml.match(/Showing\s+\d+-\d+\s+of\s+([0-9,]+)/i)
+      const totalEntries = totalMatch ? parseInt(totalMatch[1].replace(/,/g, ''), 10) : undefined
+      return { html: pageHtml, totalEntries }
+    } catch (err) {
+      console.warn(`[workshop] Failed to fetch Steam browse page ${p}:`, err)
+      return { html: '' }
     }
   }
 
-  let html = ''
-  try {
-    const res = await fetch(browseUrl.toString(), {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml'
-      }
-    })
-    if (!res.ok) {
-      throw new Error(`Steam community returned HTTP ${res.status} ${res.statusText}`)
-    }
-    html = await res.text()
-  } catch (err) {
-    console.error('[workshop] Failed to query Steam browse:', err)
-    return { items: [], total: 0, page, hasMore: false }
-  }
+  const [p1Res, p2Res] = await Promise.all([
+    fetchSteamHtml(steamPage1),
+    fetchSteamHtml(steamPage2)
+  ])
 
-  // Extract item IDs
+  let totalCount = p1Res.totalEntries || p2Res.totalEntries || 0
+
   const idRegex = /sharedfiles\/filedetails\/\?id=(\d+)/g
   const seenIds = new Set<string>()
   const orderedIds: string[] = []
-  let match: RegExpExecArray | null
 
-  while ((match = idRegex.exec(html)) !== null) {
-    const id = match[1]
-    if (!seenIds.has(id)) {
-      seenIds.add(id)
-      orderedIds.push(id)
+  for (const pageRes of [p1Res, p2Res]) {
+    if (!pageRes.html) continue
+    let match: RegExpExecArray | null
+    while ((match = idRegex.exec(pageRes.html)) !== null) {
+      const id = match[1]
+      // Skip sticky Indie Stone modding policy announcement guide (2872282653)
+      if (id === '2872282653') continue
+      if (!seenIds.has(id)) {
+        seenIds.add(id)
+        orderedIds.push(id)
+      }
     }
   }
 
-  let totalCount = orderedIds.length
-  const totalMatch = html.match(/(\d[\d,]*)\s+entries/i) || html.match(/Showing\s+\d+-\d+\s+of\s+([0-9,]+)/i)
-  if (totalMatch) {
-    totalCount = parseInt(totalMatch[1].replace(/,/g, ''), 10) || totalCount
-  } else if (orderedIds.length >= numPerPage) {
-    totalCount = page * numPerPage + 1
+  if (totalCount === 0) {
+    totalCount = orderedIds.length
   }
 
   if (orderedIds.length === 0) {
@@ -1094,11 +1112,13 @@ export async function queryWorkshop(
     items.push(summary)
   }
 
+  const hasMore = orderedIds.length > 0 && (steamPage2 * 30 < totalCount || totalCount === 0)
+
   return {
     items,
     total: Math.max(totalCount, items.length),
     page,
-    hasMore: orderedIds.length >= numPerPage
+    hasMore
   }
 }
 

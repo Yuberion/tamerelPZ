@@ -1014,19 +1014,88 @@
   text-decoration: underline;
 }
 
-/* Pagination Bar */
-.ws-pagination {
+/* Load More & Infinite Scroll */
+.ws-load-more-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px 0 28px;
+}
+
+.ws-btn-load-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--amber, #f59e0b);
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.ws-btn-load-more:hover {
+  background: var(--amber, #f59e0b);
+  color: #0f1115;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+.ws-load-more-spinner {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 16px 0 24px;
+  gap: 10px;
+  padding: 20px 0 28px;
+  color: var(--amber, #f59e0b);
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
-.ws-page-indicator {
-  font-size: 0.82rem;
-  font-weight: 600;
+.ws-end-of-results {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 0 32px;
   color: var(--text-muted, #94a3b8);
+  font-size: 0.8rem;
+  font-weight: 500;
+  user-select: none;
+}
+
+/* Floating Scroll to Top button */
+.ws-scroll-top-btn {
+  position: absolute;
+  bottom: 24px;
+  right: 28px;
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: #1e2430;
+  border: 1px solid var(--border, #333a48);
+  color: var(--text-normal, #f1f5f9);
+  font-size: 0.76rem;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  animation: fadeIn 0.15s ease;
+}
+
+.ws-scroll-top-btn:hover {
+  background: var(--amber, #f59e0b);
+  color: #0f1115;
+  border-color: var(--amber, #f59e0b);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
 }
 
 /* Results Info Bar */

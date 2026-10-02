@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type {
   WorkshopItemDetails,
   WorkshopItemSummary,
@@ -81,10 +81,13 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
 
   // Data state
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [installedCount, setInstalledCount] = useState<number>(0)
   const [items, setItems] = useState<WorkshopItemSummary[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
+  const mainRef = useRef<HTMLDivElement>(null)
 
   // Detail drawer state
   const [selectedItem, setSelectedItem] = useState<WorkshopItemDetails | null>(null)
@@ -100,15 +103,15 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     [selectedTags]
   )
 
-  // Query executor
-  const runQuery = async (targetPage = page, forceRefresh = false): Promise<void> => {
+  // Query executor: resets and loads page 1
+  const runQuery = async (forceRefresh = false): Promise<void> => {
     setLoading(true)
     try {
       const q: WorkshopSearchQuery = {
         mode,
         search: search.trim() || undefined,
-        page: targetPage,
-        numPerPage: 32,
+        page: 1,
+        numPerPage: 60,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
         forceRefresh
       }
@@ -118,8 +121,9 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
         setItems(res.items)
         setTotalCount(res.total)
         setHasMore(res.hasMore)
-        setPage(targetPage)
+        setPage(1)
       })
+      mainRef.current?.scrollTo({ top: 0 })
     } catch (err) {
       notify(
         isRu ? `Ошибка загрузки Workshop: ${String(err)}` : `Failed to load Workshop: ${String(err)}`,
@@ -127,6 +131,46 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
       )
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Load next batch and append seamlessly (infinite scroll / load more)
+  const loadMore = async (): Promise<void> => {
+    if (loading || loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const nextPage = page + 1
+    try {
+      const q: WorkshopSearchQuery = {
+        mode,
+        search: search.trim() || undefined,
+        page: nextPage,
+        numPerPage: 60,
+        tags: selectedTags.length > 0 ? selectedTags : undefined
+      }
+
+      const res = await window.pz.workshop.query(q)
+      startTransition(() => {
+        setItems((prev) => {
+          const seen = new Set(prev.map((i) => i.id))
+          const fresh = res.items.filter((i) => !seen.has(i.id))
+          return [...prev, ...fresh]
+        })
+        setTotalCount(res.total)
+        setHasMore(res.hasMore)
+        setPage(nextPage)
+      })
+    } catch (err) {
+      console.warn('[workshop] Load more error:', err)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    setShowScrollTop(scrollTop > 500)
+    if (scrollHeight - scrollTop - clientHeight < 500) {
+      void loadMore()
     }
   }
 
@@ -164,7 +208,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
 
   // Trigger query on mode or tags changes
   useEffect(() => {
-    void runQuery(1)
+    void runQuery()
   }, [mode, selectedTags])
 
   // Open item details
@@ -282,7 +326,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     try {
       const syncRes = await window.pz.workshop.syncSteam()
       setInstalledCount(syncRes.installedCount)
-      await runQuery(1, true)
+      await runQuery(true)
       notify(
         isRu
           ? `Список обновлен (установлено модов: ${syncRes.installedCount})`
@@ -403,7 +447,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
             className="ws-search"
             onSubmit={(e) => {
               e.preventDefault()
-              void runQuery(1)
+              void runQuery()
             }}
           >
             <Icon name="search" size={13} color="var(--text-muted)" />
@@ -428,7 +472,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 className="ws-search__clear"
                 onClick={() => {
                   setSearch('')
-                  void runQuery(1)
+                  void runQuery()
                 }}
               >
                 <Icon name="close" size={11} />
@@ -568,7 +612,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
         )}
 
         {/* Main Grid View */}
-        <main className="ws-main">
+        <main className="ws-main" ref={mainRef} onScroll={handleScroll}>
           {loading && items.length === 0 ? (
             <div className="pane__empty" style={{ padding: '60px 0' }}>
               <Icon name="refresh" size={32} className="spin" color="var(--amber)" />
@@ -621,11 +665,11 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 <span className="ws-results-count">
                   {mode === 'installed'
                     ? isRu
-                      ? `Установлено модов: ${totalCount.toLocaleString()}`
-                      : `Installed mods: ${totalCount.toLocaleString()}`
+                      ? `Показано: ${items.length.toLocaleString()} из ${totalCount.toLocaleString()} установленных`
+                      : `Showing: ${items.length.toLocaleString()} of ${totalCount.toLocaleString()} installed`
                     : isRu
-                      ? `Найдено в Мастерской: ${totalCount.toLocaleString()}`
-                      : `Found in Workshop: ${totalCount.toLocaleString()}`}
+                      ? `Показано: ${items.length.toLocaleString()} из ${totalCount.toLocaleString()} в Мастерской`
+                      : `Showing: ${items.length.toLocaleString()} of ${totalCount.toLocaleString()} in Workshop`}
                 </span>
 
                 {selectedCategories.length > 0 && (
@@ -779,34 +823,53 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 })}
               </div>
 
-              {/* Pagination Controls */}
-              <div className="ws-pagination">
-                <button
-                  className="btn btn--subtle"
-                  disabled={page <= 1 || loading}
-                  onClick={() => void runQuery(page - 1)}
-                >
-                  <Icon name="arrow-left" size={12} />
-                  <span>{isRu ? 'Предыдущая' : 'Previous'}</span>
-                </button>
+              {/* Load More & Infinite Scroll Status */}
+              {loadingMore && (
+                <div className="ws-load-more-spinner">
+                  <Icon name="refresh" size={16} className="spin" color="var(--amber)" />
+                  <span>{isRu ? 'Загрузка следующей партии модов…' : 'Loading more mods…'}</span>
+                </div>
+              )}
 
-                <span className="ws-page-indicator">
-                  {isRu ? `Страница ${page}` : `Page ${page}`}
-                  {totalCount > 0 && ` (${totalCount.toLocaleString()} ${isRu ? 'модов' : 'mods'})`}
-                </span>
+              {hasMore && !loadingMore && (
+                <div className="ws-load-more-container">
+                  <button
+                    type="button"
+                    className="btn btn--subtle ws-btn-load-more"
+                    onClick={() => void loadMore()}
+                  >
+                    <Icon name="download" size={13} />
+                    <span>{isRu ? 'Загрузить ещё (+60 модов)' : 'Load more (+60 mods)'}</span>
+                  </button>
+                </div>
+              )}
 
-                <button
-                  className="btn btn--subtle"
-                  disabled={!hasMore || loading}
-                  onClick={() => void runQuery(page + 1)}
-                >
-                  <span>{isRu ? 'Следующая' : 'Next'}</span>
-                  <Icon name="arrow-right" size={12} />
-                </button>
-              </div>
+              {!hasMore && items.length > 0 && (
+                <div className="ws-end-of-results">
+                  <Icon name="check" size={13} color="var(--green, #22c55e)" />
+                  <span>
+                    {isRu
+                      ? `Все доступные моды загружены (${items.length.toLocaleString()} из ${totalCount.toLocaleString()})`
+                      : `All available mods loaded (${items.length.toLocaleString()} of ${totalCount.toLocaleString()})`}
+                  </span>
+                </div>
+              )}
             </>
           )}
         </main>
+
+        {/* Floating Scroll to Top button */}
+        {showScrollTop && (
+          <button
+            type="button"
+            className="ws-scroll-top-btn"
+            onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+            title={isRu ? 'Наверх страницы' : 'Scroll to top'}
+          >
+            <Icon name="arrow-up" size={13} />
+            <span>{isRu ? 'Наверх' : 'Top'}</span>
+          </button>
+        )}
 
         {/* Side-Drawer: Detailed Mod View */}
         {selectedItem && (() => {
