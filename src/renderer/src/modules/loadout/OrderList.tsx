@@ -11,6 +11,8 @@ import { bareId } from './useLoadout'
 import type { ModConflictTarget, ModMissingDepTarget } from './conflicts'
 import { ModStatusTooltip, type ModTooltipData } from './ModStatusTooltip'
 
+import type { IconName } from '@renderer/components/Icon'
+
 export interface OrderEntry {
   value: string
   index: number
@@ -39,6 +41,7 @@ export function parseSeparator(value: string): { title: string; color: string } 
 
 interface OrderListProps {
   entries: OrderEntry[]
+  totalCount?: number
   selected: number | undefined
   onSelect(index: number | undefined): void
   onMove(from: number, to: number): void
@@ -47,6 +50,7 @@ interface OrderListProps {
   resolve: boolean
   emptyLabel: string
   emptyHint: string
+  emptyIcon?: IconName
   disabled?: boolean
   overwritesSummary?: ModOverwritesSummary
   pinnedIds?: Set<string>
@@ -55,6 +59,7 @@ interface OrderListProps {
 
 export function OrderList({
   entries,
+  totalCount,
   selected,
   onSelect,
   onMove,
@@ -63,6 +68,7 @@ export function OrderList({
   resolve,
   emptyLabel,
   emptyHint,
+  emptyIcon = 'list',
   disabled,
   overwritesSummary,
   pinnedIds,
@@ -174,11 +180,13 @@ export function OrderList({
     return { minSafeIndex, minSafeReason, maxSafeIndex, maxSafeReason }
   }, [dragIndex, entries])
 
+  const maxIndex = (totalCount ?? entries.length) - 1
+
   if (entries.length === 0) {
     return (
       <div className="pane__scroll">
         <div className="pane__empty">
-          <Icon name="list" size={22} />
+          <Icon name={emptyIcon} size={22} />
           <span className="label">{emptyLabel}</span>
           <span className="label wbmuted">{emptyHint}</span>
         </div>
@@ -235,8 +243,8 @@ export function OrderList({
       {
         label: t('lo.moveBottom'),
         icon: 'arrow-down',
-        disabled: disabled || entry.index === entries.length - 1,
-        onClick: () => onMove(entry.index, entries.length - 1)
+        disabled: disabled || entry.index === maxIndex,
+        onClick: () => onMove(entry.index, maxIndex)
       },
       { separator: true },
       {
@@ -386,7 +394,7 @@ export function OrderList({
                   <button
                     className="btn btn-icon"
                     title={t('lo.moveDown')}
-                    disabled={disabled || entry.index === entries.length - 1}
+                    disabled={disabled || entry.index === maxIndex}
                     onClick={(e) => {
                       e.stopPropagation()
                       onMove(entry.index, entry.index + 1)
@@ -638,7 +646,7 @@ export function OrderList({
                 <button
                   className="btn btn-icon"
                   title={t('lo.moveDown')}
-                  disabled={disabled || entry.index === entries.length - 1}
+                  disabled={disabled || entry.index === maxIndex}
                   onClick={(e) => {
                     e.stopPropagation()
                     onMove(entry.index, entry.index + 1)

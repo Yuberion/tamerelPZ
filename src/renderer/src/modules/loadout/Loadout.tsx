@@ -10,7 +10,7 @@ import { useI18n, type TKey } from '@renderer/i18n'
 import { copyText, formatBytes, formatCount, formatDate, shortenPath } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/state/store'
 import { AvailablePanel, type Candidate } from './AvailablePanel'
-import { OrderList, isSeparator, type OrderEntry } from './OrderList'
+import { OrderList, isSeparator, parseSeparator, type OrderEntry } from './OrderList'
 import { RulesModal } from './RulesModal'
 import { PresetsModal } from './PresetsModal'
 import { ValidationModal } from './ValidationModal'
@@ -154,6 +154,7 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
 
   const [tab, setTab] = useState<ListKind>('mods')
   const [query, setQuery] = useState('')
+  const [orderQuery, setOrderQuery] = useState('')
   const [selected, setSelected] = useState<number>()
   const [backup, setBackup] = useState(true)
   const [profileName, setProfileName] = useState('')
@@ -307,6 +308,23 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
       }
     })
   }, [values, keyOf, lookup, active, store.rules, validationResult, modsStatus])
+
+  const filteredEntries = useMemo(() => {
+    const q = orderQuery.trim().toLowerCase()
+    if (!q) return entries
+
+    return entries.filter((e) => {
+      if (isSeparator(e.value)) {
+        const { title } = parseSeparator(e.value)
+        return title.toLowerCase().includes(q)
+      }
+      if (e.value.toLowerCase().includes(q)) return true
+      if (e.mod?.name && e.mod.name.toLowerCase().includes(q)) return true
+      if (e.mod?.workshopId && e.mod.workshopId.toLowerCase().includes(q)) return true
+      if (e.category && e.category.toLowerCase().includes(q)) return true
+      return false
+    })
+  }, [entries, orderQuery])
 
   const used = useMemo(() => new Set(values.filter((v) => !isSeparator(v)).map(keyOf)), [values, keyOf])
   const missingCount = resolve ? entries.filter((e) => !isSeparator(e.value) && e.missing).length : 0
@@ -685,10 +703,11 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
     })
   }, [])
 
-  // Reset the cursor and the last write when the pane content changes under it.
+  // Reset the cursor, search query, and the last write when the pane content changes under it.
   useEffect(() => {
     setSelected(undefined)
     setResult(undefined)
+    setOrderQuery('')
   }, [active, store.targetId])
 
   useEffect(() => {
@@ -927,18 +946,44 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             ))}
             <Hint title={t('lo.paneOrder')} body={t('help.lo.order')} />
             <div className="pane__head-spacer" />
-            <span className="pane__count mono">{formatCount(values.length)}</span>
+            <span className="pane__count mono">
+              {orderQuery.trim()
+                ? `${filteredEntries.length} / ${formatCount(values.length)}`
+                : formatCount(values.length)}
+            </span>
           </div>
 
           <div className="lotools">
-            {/* Keyed by tab so a half-typed mod id does not survive into the
-                map list, where it would mean something else entirely. */}
-            <ManualAdd
-              key={active}
-              onAdd={add}
-              placeholder={t(`lo.manual.${active}` as TKey)}
-              disabled={busy}
-            />
+            <div className="lotools__search">
+              <Icon name="search" size={12} className="lotools__search-icon" />
+              <input
+                className="lotools__search-input"
+                type="text"
+                value={orderQuery}
+                onChange={(e) => setOrderQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setOrderQuery('')
+                }}
+                placeholder={
+                  active === 'mods'
+                    ? (isRu ? 'Поиск в списке модов...' : 'Search in mod list...')
+                    : active === 'maps'
+                      ? (isRu ? 'Поиск в списке карт...' : 'Search in map list...')
+                      : (isRu ? 'Поиск в списке Workshop...' : 'Search in workshop list...')
+                }
+                spellCheck={false}
+              />
+              {orderQuery && (
+                <button
+                  type="button"
+                  className="lotools__search-clear"
+                  onClick={() => setOrderQuery('')}
+                  title={isRu ? 'Очистить поиск (Esc)' : 'Clear search (Esc)'}
+                >
+                  <Icon name="close" size={10} />
+                </button>
+              )}
+            </div>
             {active === 'mods' && (
               <button
                 className={`btn btn--tiny lotools__toggle-btn ${showTools ? 'is-active' : ''}`}
@@ -1189,7 +1234,8 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
           )}
 
           <OrderList
-            entries={entries}
+            entries={filteredEntries}
+            totalCount={values.length}
             selected={selected}
             onSelect={(idx) => {
               setSelected(idx)
@@ -1201,8 +1247,19 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
             onRemove={remove}
             onEditRule={(modId) => setRulesModId(modId)}
             resolve={resolve}
-            emptyLabel={t('lo.emptyList')}
-            emptyHint={t('lo.emptyListHint')}
+            emptyLabel={
+              orderQuery.trim()
+                ? (isRu ? 'Ничего не найдено в списке' : 'No matches in list')
+                : t('lo.emptyList')
+            }
+            emptyHint={
+              orderQuery.trim()
+                ? (isRu
+                    ? `По запросу "${orderQuery}" совпадений не обнаружено`
+                    : `No entries match "${orderQuery}" in this preset`)
+                : t('lo.emptyListHint')
+            }
+            emptyIcon={orderQuery.trim() ? 'search' : 'list'}
             disabled={busy}
             overwritesSummary={overwritesSummary}
             pinnedIds={pinnedIds}
@@ -1572,52 +1629,6 @@ function LoadoutBody({ onExit }: { onExit: () => void }) {
           onClose={() => setShowReportModal(false)}
         />
       )}
-    </div>
-  )
-}
-
-/** Free-text entry, for ids and map names that are not installed locally. */
-function ManualAdd({
-  onAdd,
-  placeholder,
-  disabled
-}: {
-  onAdd: (value: string) => void
-  placeholder: string
-  disabled?: boolean
-}) {
-  const { t } = useI18n()
-  const [value, setValue] = useState('')
-
-  const commit = (): void => {
-    const token = value.trim()
-    if (!token) return
-    onAdd(token)
-    setValue('')
-  }
-
-  return (
-    <div className="loadd">
-      <input
-        className="loadd__input mono"
-        value={value}
-        placeholder={placeholder}
-        spellCheck={false}
-        disabled={disabled}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit()
-        }}
-      />
-      <button
-        className="btn btn--tiny"
-        onClick={commit}
-        disabled={disabled || !value.trim()}
-        title={t('lo.manualAddTitle')}
-      >
-        <Icon name="plus" size={11} />
-        {t('lo.manualAdd')}
-      </button>
     </div>
   )
 }

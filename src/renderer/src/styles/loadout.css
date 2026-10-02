@@ -130,27 +130,66 @@
   white-space: nowrap;
 }
 
-.loadd {
+.lotools__search {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 5px;
+  flex: 0 1 240px;
+  min-width: 140px;
+}
+
+.lotools__search-icon {
+  position: absolute;
+  left: 8px;
+  pointer-events: none;
+  color: var(--bone-dim, #7a828e);
   flex-shrink: 0;
 }
-.loadd__input {
-  width: 170px;
-  min-width: 120px;
+
+.lotools__search-input {
+  width: 100%;
   height: 24px;
-  padding: 0 8px;
+  padding: 0 24px 0 26px;
   font-size: 11px;
-  background: var(--void);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  color: var(--bone);
-  flex-shrink: 0;
+  background: var(--void, #0d1014);
+  border: 1px solid var(--edge, #232b35);
+  border-radius: var(--radius, 4px);
+  color: var(--bone, #d8dee9);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.loadd__input:focus {
-  border-color: var(--rust-dim);
-  box-shadow: 0 0 0 1px #a8613a33;
+
+.lotools__search-input:focus {
+  border-color: var(--rust, #d97736);
+  box-shadow: 0 0 0 1px rgba(217, 119, 54, 0.25);
+  outline: none;
+}
+
+.lotools__search-input::placeholder {
+  color: var(--bone-dark, #505a69);
+}
+
+.lotools__search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--bone-dim, #7a828e);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.lotools__search-clear:hover {
+  color: var(--bone, #d8dee9);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ---------------- lotools actions panel ---------------- */
