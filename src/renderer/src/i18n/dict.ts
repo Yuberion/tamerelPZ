@@ -53,13 +53,13 @@ export const EN = {
     'Deep inspection of installed mods: file trees, 3D meshes, mod.info metadata, dependency graphs, global text search and vanilla file collisions.',
   'module.loadout.tagline': 'Load order & profiles',
   'module.loadout.desc':
-    'Order mods, build named profiles and push them into the game config.',
+    'Manage client and server load order, dependency sorting, map/tile conflict detection and named presets.',
   'module.workshop.tagline': 'Workshop browser & downloader',
   'module.workshop.desc':
     'Browse the Steam Workshop, search with B41/B42 filters, inspect details, check for updates, and download mods directly.',
-  'module.workbench.tagline': 'Authoring tools',
+  'module.workbench.tagline': 'Mod Doctor & B42 Diagnostics',
   'module.workbench.desc':
-    'Scaffold mods, edit mod.info, validate scripts and pack builds for upload.',
+    'Deep mod health audit: engine Java API verification (B42), Lua, scripts, XML and mod.info validation, cross-mod asset resolution, and 1-click Quick Fix.',
   'module.triage.tagline': 'Conflict doctor',
   'module.triage.desc':
     'Duplicate ids, missing requirements, overwritten scripts and item collisions.',
@@ -72,8 +72,9 @@ export const EN = {
   'module.outpost.tagline': 'Server & collections',
   'module.outpost.desc':
     'Generate server ini mod lines, Workshop id lists and shareable collections.',
-  'module.ledger.tagline': 'Logs & settings',
-  'module.ledger.desc': 'Crash logs, console noise, lua errors and the suite configuration.',
+  'module.ledger.tagline': 'Logs & diagnostics',
+  'module.ledger.desc':
+    'Game crash log and console analyzer (console.txt), error-to-mod attribution, Lua and Java stack traces.',
 
   // ---- toolbar ------------------------------------------------------------
   'tb.backToHub': 'Back to hub (Esc)',
@@ -1520,13 +1521,13 @@ export const RU: Record<TKey, string> = {
     'Глубокая инспекция установленных модов: файловое дерево, 3D-модели, метаданные mod.info, граф зависимостей, глобальный поиск и проверка перезаписи файлов игры.',
   'module.loadout.tagline': 'Порядок загрузки и профили',
   'module.loadout.desc':
-    'Упорядочить моды, собрать именованные профили и записать их в конфиг игры.',
+    'Управление порядком загрузки клиента и сервера, сортировка зависимостей, детектор конфликтов карт/тайлов и пресеты.',
   'module.workshop.tagline': 'Обозреватель Workshop',
   'module.workshop.desc':
     'Браузер Мастерской Steam. Поиск, фильтры тегов B41/B42, чтение описаний, проверка обновлений и загрузка модов прямо в игру.',
-  'module.workbench.tagline': 'Инструменты автора',
+  'module.workbench.tagline': 'Доктор модов и аудит B42',
   'module.workbench.desc':
-    'Создать каркас мода, править mod.info, проверять скрипты и упаковывать сборки для загрузки.',
+    'Комплексная диагностика мода: проверка Java API движка игры (B42), валидация синтаксиса Lua, scripts, XML и mod.info, разрешение кросс-модовых зависимостей и 1-клик Quick Fix.',
   'module.triage.tagline': 'Диагностика конфликтов',
   'module.triage.desc':
     'Дубли id, отсутствующие зависимости, перекрытые скрипты и коллизии предметов.',
@@ -1539,8 +1540,9 @@ export const RU: Record<TKey, string> = {
   'module.outpost.tagline': 'Сервер и коллекции',
   'module.outpost.desc':
     'Сгенерировать строки модов для server ini, списки id Workshop и коллекции для обмена.',
-  'module.ledger.tagline': 'Логи и настройки',
-  'module.ledger.desc': 'Логи крашей, шум консоли, ошибки lua и конфигурация комплекса.',
+  'module.ledger.tagline': 'Логи и диагностика',
+  'module.ledger.desc':
+    'Анализатор краш-логов (console.txt), сопоставление ошибок с установленными модами, стектрейсы Lua и Java.',
 
   'tb.backToHub': 'На главную (Esc)',
   'tb.hub': 'Главная',
