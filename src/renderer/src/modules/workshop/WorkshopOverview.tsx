@@ -61,6 +61,20 @@ const WORKSHOP_CATEGORIES: CategoryDef[] = [
   { tag: 'Misc', ru: 'Разное', en: 'Miscellaneous', icon: 'folder' }
 ]
 
+// Helper to generate numbered page buttons with smart ellipses
+function getPaginationItems(current: number, total: number): (number | '...')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, '...', total]
+  }
+  if (current >= total - 3) {
+    return [1, '...', total - 4, total - 3, total - 2, total - 1, total]
+  }
+  return [1, '...', current - 1, current, current + 1, '...', total]
+}
+
 export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
   const { lang } = useI18n()
   const isRu = lang === 'ru'
@@ -73,7 +87,6 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
   // Search & Filter state
   const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [page, setPage] = useState(1)
 
   // Sidebar / Category drawer state
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -81,13 +94,15 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
 
   // Data state
   const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [installedCount, setInstalledCount] = useState<number>(0)
   const [items, setItems] = useState<WorkshopItemSummary[]>([])
   const [totalCount, setTotalCount] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
-  const [showScrollTop, setShowScrollTop] = useState(false)
   const mainRef = useRef<HTMLDivElement>(null)
+
+  // Multi-Page Pagination state (Strict Discrete Pages, Zero DOM Bloat)
+  const [page, setPage] = useState(1)
+  const [jumpPageInput, setJumpPageInput] = useState('1')
+  const totalPages = Math.max(1, Math.ceil(totalCount / 30))
 
   // Detail drawer state
   const [selectedItem, setSelectedItem] = useState<WorkshopItemDetails | null>(null)
@@ -103,15 +118,15 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     [selectedTags]
   )
 
-  // Query executor: resets and loads page 1
-  const runQuery = async (forceRefresh = false): Promise<void> => {
+  // Query executor: loads a specific page (defaulting to 1)
+  const runQuery = async (targetPage = 1, forceRefresh = false): Promise<void> => {
     setLoading(true)
     try {
       const q: WorkshopSearchQuery = {
         mode,
         search: search.trim() || undefined,
-        page: 1,
-        numPerPage: 60,
+        page: targetPage,
+        numPerPage: 30,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
         forceRefresh
       }
@@ -120,10 +135,10 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
       startTransition(() => {
         setItems(res.items)
         setTotalCount(res.total)
-        setHasMore(res.hasMore)
-        setPage(1)
+        setPage(targetPage)
+        setJumpPageInput(String(targetPage))
       })
-      mainRef.current?.scrollTo({ top: 0 })
+      mainRef.current?.scrollTo({ top: 0, behavior: 'instant' })
     } catch (err) {
       notify(
         isRu ? `Ошибка загрузки Workshop: ${String(err)}` : `Failed to load Workshop: ${String(err)}`,
@@ -134,43 +149,19 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     }
   }
 
-  // Load next batch and append seamlessly (infinite scroll / load more)
-  const loadMore = async (): Promise<void> => {
-    if (loading || loadingMore || !hasMore) return
-    setLoadingMore(true)
-    const nextPage = page + 1
-    try {
-      const q: WorkshopSearchQuery = {
-        mode,
-        search: search.trim() || undefined,
-        page: nextPage,
-        numPerPage: 60,
-        tags: selectedTags.length > 0 ? selectedTags : undefined
-      }
-
-      const res = await window.pz.workshop.query(q)
-      startTransition(() => {
-        setItems((prev) => {
-          const seen = new Set(prev.map((i) => i.id))
-          const fresh = res.items.filter((i) => !seen.has(i.id))
-          return [...prev, ...fresh]
-        })
-        setTotalCount(res.total)
-        setHasMore(res.hasMore)
-        setPage(nextPage)
-      })
-    } catch (err) {
-      console.warn('[workshop] Load more error:', err)
-    } finally {
-      setLoadingMore(false)
-    }
+  const handleGoToPage = (target: number): void => {
+    const clamped = Math.max(1, Math.min(target, totalPages))
+    if (clamped === page && items.length > 0) return
+    void runQuery(clamped)
   }
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>): void => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    setShowScrollTop(scrollTop > 500)
-    if (scrollHeight - scrollTop - clientHeight < 500) {
-      void loadMore()
+  const handleJumpSubmit = (e: React.FormEvent): void => {
+    e.preventDefault()
+    const parsed = parseInt(jumpPageInput.trim(), 10)
+    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
+      handleGoToPage(parsed)
+    } else {
+      setJumpPageInput(String(page))
     }
   }
 
@@ -188,14 +179,14 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     const unsub = window.pz.workshop.onSyncChanged((syncRes) => {
       setInstalledCount(syncRes.installedCount)
       // When Steam downloads/updates in background, refresh list silently
-      void runQuery()
+      void runQuery(page)
     })
 
     // Sync silently on window focus (e.g. user just subscribed in Steam browser and returned to app)
     const onFocus = (): void => {
       void window.pz.workshop.syncSteam().then((res) => {
         setInstalledCount(res.installedCount)
-        void runQuery()
+        void runQuery(page)
       })
     }
     window.addEventListener('focus', onFocus)
@@ -204,11 +195,11 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
       unsub()
       window.removeEventListener('focus', onFocus)
     }
-  }, [mode, selectedTags, search])
+  }, [mode, selectedTags, search, page])
 
   // Trigger query on mode or tags changes
   useEffect(() => {
-    void runQuery()
+    void runQuery(1)
   }, [mode, selectedTags])
 
   // Open item details
@@ -326,7 +317,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
     try {
       const syncRes = await window.pz.workshop.syncSteam()
       setInstalledCount(syncRes.installedCount)
-      await runQuery(true)
+      await runQuery(page, true)
       notify(
         isRu
           ? `Список обновлен (установлено модов: ${syncRes.installedCount})`
@@ -447,7 +438,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
             className="ws-search"
             onSubmit={(e) => {
               e.preventDefault()
-              void runQuery()
+              void runQuery(1)
             }}
           >
             <Icon name="search" size={13} color="var(--text-muted)" />
@@ -472,7 +463,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 className="ws-search__clear"
                 onClick={() => {
                   setSearch('')
-                  void runQuery()
+                  void runQuery(1)
                 }}
               >
                 <Icon name="close" size={11} />
@@ -612,7 +603,7 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
         )}
 
         {/* Main Grid View */}
-        <main className="ws-main" ref={mainRef} onScroll={handleScroll}>
+        <main className="ws-main" ref={mainRef}>
           {loading && items.length === 0 ? (
             <div className="pane__empty" style={{ padding: '60px 0' }}>
               <Icon name="refresh" size={32} className="spin" color="var(--amber)" />
@@ -665,11 +656,11 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 <span className="ws-results-count">
                   {mode === 'installed'
                     ? isRu
-                      ? `Показано: ${items.length.toLocaleString()} из ${totalCount.toLocaleString()} установленных`
-                      : `Showing: ${items.length.toLocaleString()} of ${totalCount.toLocaleString()} installed`
+                      ? `Найдено среди установленных: ${totalCount.toLocaleString()} • Страница ${page.toLocaleString()} из ${totalPages.toLocaleString()}`
+                      : `Installed mods found: ${totalCount.toLocaleString()} • Page ${page.toLocaleString()} of ${totalPages.toLocaleString()}`
                     : isRu
-                      ? `Показано: ${items.length.toLocaleString()} из ${totalCount.toLocaleString()} в Мастерской`
-                      : `Showing: ${items.length.toLocaleString()} of ${totalCount.toLocaleString()} in Workshop`}
+                      ? `Найдено в Мастерской: ${totalCount.toLocaleString()} • Страница ${page.toLocaleString()} из ${totalPages.toLocaleString()}`
+                      : `Workshop mods found: ${totalCount.toLocaleString()} • Page ${page.toLocaleString()} of ${totalPages.toLocaleString()}`}
                 </span>
 
                 {selectedCategories.length > 0 && (
@@ -823,53 +814,115 @@ export function WorkshopOverview({ onExit }: WorkshopOverviewProps) {
                 })}
               </div>
 
-              {/* Load More & Infinite Scroll Status */}
-              {loadingMore && (
-                <div className="ws-load-more-spinner">
-                  <Icon name="refresh" size={16} className="spin" color="var(--amber)" />
-                  <span>{isRu ? 'Загрузка следующей партии модов…' : 'Loading more mods…'}</span>
-                </div>
-              )}
+              {/* Multi-Page Discrete Pagination Controls */}
+              {totalPages > 1 && (
+                <nav className="ws-pagination" aria-label="Pagination Navigation">
+                  <div className="ws-pagination__nav">
+                    {/* First Page */}
+                    <button
+                      type="button"
+                      className="ws-pagination__btn"
+                      disabled={page <= 1 || loading}
+                      onClick={() => handleGoToPage(1)}
+                      title={isRu ? 'На первую страницу' : 'First page'}
+                    >
+                      <Icon name="chevrons-left" size={12} />
+                      <span>{isRu ? 'Первая' : 'First'}</span>
+                    </button>
 
-              {hasMore && !loadingMore && (
-                <div className="ws-load-more-container">
-                  <button
-                    type="button"
-                    className="btn btn--subtle ws-btn-load-more"
-                    onClick={() => void loadMore()}
-                  >
-                    <Icon name="download" size={13} />
-                    <span>{isRu ? 'Загрузить ещё (+60 модов)' : 'Load more (+60 mods)'}</span>
-                  </button>
-                </div>
-              )}
+                    {/* Previous Page */}
+                    <button
+                      type="button"
+                      className="ws-pagination__btn"
+                      disabled={page <= 1 || loading}
+                      onClick={() => handleGoToPage(page - 1)}
+                      title={isRu ? 'Предыдущая страница' : 'Previous page'}
+                    >
+                      <Icon name="chevron-left" size={12} />
+                      <span>{isRu ? 'Назад' : 'Prev'}</span>
+                    </button>
 
-              {!hasMore && items.length > 0 && (
-                <div className="ws-end-of-results">
-                  <Icon name="check" size={13} color="var(--green, #22c55e)" />
-                  <span>
-                    {isRu
-                      ? `Все доступные моды загружены (${items.length.toLocaleString()} из ${totalCount.toLocaleString()})`
-                      : `All available mods loaded (${items.length.toLocaleString()} of ${totalCount.toLocaleString()})`}
-                  </span>
-                </div>
+                    {/* Numbered Page Buttons with Ellipses */}
+                    <div className="ws-pagination__pages">
+                      {getPaginationItems(page, totalPages).map((p, idx) => {
+                        if (p === '...') {
+                          return (
+                            <span key={`ellipsis-${idx}`} className="ws-pagination__ellipsis">
+                              …
+                            </span>
+                          )
+                        }
+                        const isCurrent = p === page
+                        return (
+                          <button
+                            key={`page-${p}`}
+                            type="button"
+                            className={`ws-pagination__page-btn ${isCurrent ? 'is-active' : ''}`}
+                            disabled={loading || isCurrent}
+                            onClick={() => handleGoToPage(p)}
+                            title={isRu ? `Страница ${p}` : `Page ${p}`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Next Page */}
+                    <button
+                      type="button"
+                      className="ws-pagination__btn"
+                      disabled={page >= totalPages || loading}
+                      onClick={() => handleGoToPage(page + 1)}
+                      title={isRu ? 'Следующая страница' : 'Next page'}
+                    >
+                      <span>{isRu ? 'Вперёд' : 'Next'}</span>
+                      <Icon name="chevron-right" size={12} />
+                    </button>
+
+                    {/* Last Page */}
+                    <button
+                      type="button"
+                      className="ws-pagination__btn"
+                      disabled={page >= totalPages || loading}
+                      onClick={() => handleGoToPage(totalPages)}
+                      title={isRu ? `На последнюю страницу (${totalPages})` : `Last page (${totalPages})`}
+                    >
+                      <span>{isRu ? 'Последняя' : 'Last'}</span>
+                      <Icon name="chevrons-right" size={12} />
+                    </button>
+                  </div>
+
+                  {/* Direct Jump to Page Form */}
+                  <form className="ws-pagination__jump" onSubmit={handleJumpSubmit}>
+                    <span className="ws-pagination__jump-label">
+                      {isRu ? 'К странице:' : 'Go to page:'}
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={jumpPageInput}
+                      onChange={(e) => setJumpPageInput(e.target.value)}
+                      disabled={loading}
+                      className="ws-pagination__jump-input"
+                    />
+                    <span className="ws-pagination__jump-total">
+                      {isRu ? `из ${totalPages.toLocaleString()}` : `of ${totalPages.toLocaleString()}`}
+                    </span>
+                    <button
+                      type="submit"
+                      className="ws-pagination__jump-btn"
+                      disabled={loading}
+                    >
+                      {isRu ? 'Перейти' : 'Go'}
+                    </button>
+                  </form>
+                </nav>
               )}
             </>
           )}
         </main>
-
-        {/* Floating Scroll to Top button */}
-        {showScrollTop && (
-          <button
-            type="button"
-            className="ws-scroll-top-btn"
-            onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
-            title={isRu ? 'Наверх страницы' : 'Scroll to top'}
-          >
-            <Icon name="arrow-up" size={13} />
-            <span>{isRu ? 'Наверх' : 'Top'}</span>
-          </button>
-        )}
 
         {/* Side-Drawer: Detailed Mod View */}
         {selectedItem && (() => {
