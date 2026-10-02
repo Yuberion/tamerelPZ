@@ -56,10 +56,10 @@ export const MODULES: ModuleDef[] = [
   {
     id: 'workbench',
     code: '04',
-    name: 'Mod Doctor',
+    name: 'Mod Auditor',
     taglineKey: 'module.workbench.tagline',
     descKey: 'module.workbench.desc',
-    icon: 'pulse',
+    icon: 'shield',
     status: 'live'
   },
   {

@@ -96,7 +96,7 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
 
           {/* Module branding */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 6px' }}>
-            <Icon name="pulse" size={16} color="var(--rust-hot)" />
+            <Icon name="shield" size={16} color="var(--rust-hot)" />
             <span
               className="stencil"
               style={{
@@ -221,7 +221,7 @@ function PickPrompt() {
   const { t } = useI18n()
   return (
     <div className="pane__empty pane__empty--big">
-      <Icon name="pulse" size={36} strokeWidth={1.2} color="var(--rust-hot)" />
+      <Icon name="shield" size={36} strokeWidth={1.2} color="var(--rust-hot)" />
       <span className="stencil">{t('wb.pickMod')}</span>
       <span className="label">{t('wb.pickModHint')}</span>
     </div>
@@ -248,7 +248,7 @@ function ModList({
     return (
       <div className="pane__scroll">
         <div className="pane__empty">
-          <Icon name="pulse" size={22} />
+          <Icon name="shield" size={22} />
           <span className="label">{t('wb.noMods')}</span>
           <span className="label wbmuted">{t('wb.noModsHint')}</span>
         </div>

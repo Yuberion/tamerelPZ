@@ -57,7 +57,7 @@ export const EN = {
   'module.workshop.tagline': 'Steam Workshop',
   'module.workshop.desc':
     'Search mods on Steam Workshop with version filters, read descriptions, check updates, and download directly into the game.',
-  'module.workbench.tagline': 'Diagnostics & compatibility',
+  'module.workbench.tagline': 'Mod audit & compatibility',
   'module.workbench.desc':
     'Audit mod against your installed game version: check engine Java API, item scripts, XML, Lua, and missing assets.',
   'module.triage.tagline': 'Conflict resolver',
@@ -293,7 +293,7 @@ export const EN = {
   'help.hub.status':
     'The result of the last drive scan: the detected game build, how many mods were found, and how many of them collide. Duplicate ids and broken requires are counted separately because they are the two faults that actually stop a mod from loading.',
   'help.hub.modules':
-    'Nine modules, finished ones are available. Explorer inspects installed mods; Loadout arranges load order; Workshop downloads from Steam; Mod Doctor diagnoses errors and checks mod health; Tools provide 3D FBX conversion and RAM tuning; Ledger investigates crashes.',
+    'Nine modules, finished ones are available. Explorer inspects installed mods; Loadout arranges load order; Workshop downloads from Steam; Mod Auditor audits quality and compatibility; Tools provide 3D FBX conversion and RAM tuning; Ledger investigates crashes.',
 
   // ---- explorer ------------------------------------------------------------
   'help.tb.sources':
@@ -607,14 +607,15 @@ export const EN = {
   'wbrule.script.craftrecipe-no-time': 'craftRecipe {name} is missing Time = <number>,',
 
   // ---- doctor / workbench --------------------------------------------------
-  'wb.doctor.title': 'Mod Doctor',
+  'wb.doctor.title': 'Mod Auditor',
   'wb.gameEngine': 'Installed Game',
-  'wb.doctor.healthTitle': 'Mod Health Rating',
+  'wb.doctor.healthTitle': 'Mod Quality Rating',
   'wb.doctor.healthGrade': 'Grade {grade}',
-  'wb.doctor.quickFixAll': 'Auto-Fix All Issues (1-Click)',
-  'wb.doctor.quickFixAllDesc': 'Automatically fixes BOM, removes versionMax=, and fixes sandbox-options syntax',
-  'wb.doctor.runAudit': 'Run Mod Doctor',
-  'wb.doctor.reAudit': 'Re-run Doctor',
+  'wb.doctor.quickFixAll': 'Fix Basic Hygiene Issues',
+  'wb.doctor.quickFixAllDesc':
+    'Automatically removes UTF-8 BOM, obsolete versionMax=, and fixes sandbox-options trailing comma',
+  'wb.doctor.runAudit': 'Run Mod Audit',
+  'wb.doctor.reAudit': 'Re-run Audit',
   'wb.doctor.category.all': 'All Issues',
   'wb.doctor.category.critical': 'Critical',
   'wb.doctor.category.engineApi': 'Java Engine API',
@@ -1743,7 +1744,7 @@ export const RU: Record<TKey, string> = {
   'help.hub.status':
     'Итог последнего сканирования диска: определённая сборка игры, сколько модов найдено и сколько из них конфликтует. Дубли id и битые зависимости считаются отдельно: это две неисправности, из-за которых мод действительно не загрузится.',
   'help.hub.modules':
-    'Девять модулей комплекса. Explorer инспектирует установленные моды; Loadout настраивает порядок загрузки; Workshop скачивает моды из Steam; Mod Doctor диагностирует ошибки и здоровье модов; Tools содержит 3D-конвертер и настройку памяти; Ledger разбирает краши.',
+    'Девять модулей комплекса. Explorer инспектирует установленные моды; Loadout настраивает порядок загрузки; Workshop скачивает моды из Steam; Mod Auditor проводит аудит качества, гигиены и совместимости модов; Tools содержит 3D-конвертер и настройку памяти; Ledger разбирает краши.',
 
   // ---- explorer ------------------------------------------------------------
   'help.tb.sources':
@@ -2052,18 +2053,19 @@ export const RU: Record<TKey, string> = {
   'wbrule.conflict.tiledef-reserved': 'ID тайлов tiledef {id} ({name}) зарезервирован игрой (0-99). Используйте номер от 100 до 1000',
   'wbrule.conflict.vanilla-overwrite': 'Файл мода «{file}» перекрывает ванильный файл Project Zomboid',
 
-  // ---- доктор модов / workbench --------------------------------------------
-  'wb.doctor.title': 'Доктор Модов',
+  // ---- аудитор модов / workbench -------------------------------------------
+  'wb.doctor.title': 'Аудитор Модов',
   'wb.gameEngine': 'Установленная игра',
-  'wb.doctor.healthTitle': 'Рейтинг здоровья мода',
+  'wb.doctor.healthTitle': 'Рейтинг качества мода',
   'wb.doctor.healthGrade': 'Оценка {grade}',
-  'wb.doctor.quickFixAll': 'Устранить все авто-ошибки (1 клик)',
-  'wb.doctor.quickFixAllDesc': 'Автоматическое исправление BOM, versionMax= и синтаксиса sandbox-options',
+  'wb.doctor.quickFixAll': 'Исправить базовую гигиену',
+  'wb.doctor.quickFixAllDesc':
+    'Автоматическое удаление UTF-8 BOM, устаревшего versionMax= и запятых в sandbox-options',
   'wb.doctor.runAudit': 'Запустить аудит',
   'wb.doctor.reAudit': 'Повторить аудит',
   'wb.doctor.category.all': 'Все проблемы',
   'wb.doctor.category.critical': 'Критические',
-  'wb.doctor.category.engineApi': 'Java API',
+  'wb.doctor.category.engineApi': 'Java API движка',
   'wb.doctor.category.b42Syntax': 'Скрипты и крафт',
   'wb.doctor.category.assets': '3D и Ассеты',
   'wb.doctor.category.overwrites': 'Оверрайты',

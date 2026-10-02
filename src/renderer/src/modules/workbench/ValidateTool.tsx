@@ -173,7 +173,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
   const copyReport = async (): Promise<void> => {
     if (!report) return
     const lines = [
-      `=== ${mod.name} (${mod.modId}) — Mod Doctor Report ===`,
+      `=== ${mod.name} (${mod.modId}) — Mod Auditor Report ===`,
       `Score: ${report.healthScore.overall}% (Grade: ${report.healthScore.grade})`,
       `Path: ${mod.path}`,
       `Scanned: ${report.filesChecked} files, ${formatBytes(report.bytesChecked)}, in ${formatDuration(report.durationMs)}`,
@@ -209,7 +209,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
     <Panel
       title={t('wb.doctor.title')}
       lede={`${mod.name} (${mod.modId || 'No ID'})${mod.modVersion ? ` · v${mod.modVersion.replace(/^[vV]/, '')}` : mod.pzVersion ? ` · PZ ${mod.pzVersion}` : ''} · ${mod.path}`}
-      icon="pulse"
+      icon="shield"
       actions={
         <>
           {report && (
@@ -229,7 +229,7 @@ export function ValidateTool({ mod, knownIds }: ValidateToolProps) {
 
       {!report && !running && !error && (
         <div className="pane__empty pane__empty--big">
-          <Icon name="pulse" size={32} strokeWidth={1.2} />
+          <Icon name="shield" size={32} strokeWidth={1.2} />
           <span className="stencil">{t('wb.val.neverRun')}</span>
           <span className="label">{t('wb.val.neverRunBody')}</span>
         </div>
