@@ -35,6 +35,10 @@ import type {
   PackOptions,
   PackResult,
   PathsReport,
+  QuickFixRequest,
+  QuickFixResult,
+  DeployToGameRequest,
+  DeployToGameResult,
   ScaffoldOptions,
   ScaffoldResult,
   ScanProgress,
@@ -132,6 +136,8 @@ export interface PzApi {
     readInfo(modPath: string): Promise<ModInfoDraft>
     writeInfo(req: WriteModInfoRequest): Promise<WriteModInfoResult>
     validate(modPath: string, opts?: ValidateOptions): Promise<ValidationReport>
+    quickFix(req: QuickFixRequest): Promise<QuickFixResult>
+    deploy(req: DeployToGameRequest): Promise<DeployToGameResult>
     pack(opts: PackOptions): Promise<PackResult>
     /** Pack many mods in one run with a shared set of options. */
     shove(req: BatchPackRequest): Promise<BatchPackResult>

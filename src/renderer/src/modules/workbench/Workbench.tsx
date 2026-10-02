@@ -1,34 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AuthoringTarget, ModEntry } from '@shared/types'
 import { Hint } from '@renderer/components/Hint'
-import { Icon, type IconName } from '@renderer/components/Icon'
+import { Icon } from '@renderer/components/Icon'
 import { MenuProvider, useMenu } from '@renderer/components/Menu'
 import { Splitter } from '@renderer/components/Splitter'
 import { useToast } from '@renderer/components/Toast'
-import { useI18n, type TKey } from '@renderer/i18n'
+import { useI18n } from '@renderer/i18n'
 import { SOURCE_META } from '@renderer/lib/catmeta'
 import { copyText, formatCount, segmentByIndices } from '@renderer/lib/format'
 import { useVirtual } from '@renderer/lib/useVirtual'
 import { useAppStore } from '@renderer/state/store'
-import { InfoTool } from './InfoTool'
-import { PackTool } from './PackTool'
-import { ScaffoldTool } from './ScaffoldTool'
-import { ShoveTool } from './ShoveTool'
 import { ValidateTool } from './ValidateTool'
 import { useEditableMods, type EditableMod } from './useEditableMods'
 
 const LS_LEFT = 'pz.workbench.leftWidth'
 const ROW_H = 30
-
-type Tab = 'scaffold' | 'info' | 'validate' | 'pack' | 'shove'
-
-const TABS: Array<{ id: Tab; labelKey: TKey; icon: IconName }> = [
-  { id: 'scaffold', labelKey: 'wb.tabScaffold', icon: 'folder-plus' },
-  { id: 'info', labelKey: 'wb.tabInfo', icon: 'edit' },
-  { id: 'validate', labelKey: 'wb.tabValidate', icon: 'flask' },
-  { id: 'pack', labelKey: 'wb.tabPack', icon: 'package' },
-  { id: 'shove', labelKey: 'wb.tabShove', icon: 'layers' }
-]
 
 function readWidth(fallback: number): number {
   const raw = Number(localStorage.getItem(LS_LEFT))
@@ -50,8 +36,7 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
   const [targets, setTargets] = useState<AuthoringTarget[]>([])
   const [query, setQuery] = useState('')
   const [selectedKey, setSelectedKey] = useState<string>()
-  const [tab, setTab] = useState<Tab>('scaffold')
-  const [leftW, setLeftW] = useState(() => readWidth(300))
+  const [leftW, setLeftW] = useState(() => readWidth(320))
 
   const mods = useMemo(() => scan?.mods ?? [], [scan])
 
@@ -67,36 +52,18 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
 
   const { rows, writableCount } = useEditableMods(mods, targets, query)
 
+  // Default select first mod if none selected
+  useEffect(() => {
+    if (!selectedKey && rows.length > 0) {
+      setSelectedKey(rows[0]!.mod.key)
+    }
+  }, [rows, selectedKey])
+
   const selected = selectedKey ? byKey.get(selectedKey) : undefined
-  const selectedWritable = useMemo(() => {
-    if (!selected) return false
-    return rows.find((r) => r.mod.key === selected.key)?.writable ?? false
-  }, [selected, rows])
 
   const selectMod = useCallback((mod: ModEntry) => {
     setSelectedKey(mod.key)
-    setTab((prev) => (prev === 'scaffold' ? 'info' : prev))
   }, [])
-
-  // After scaffolding, rescan so the new mod appears, then select it.
-  const pendingSelect = useRef<string | undefined>(undefined)
-  const onCreated = useCallback(
-    (modPath: string) => {
-      pendingSelect.current = modPath.toLowerCase()
-      void refresh(true)
-    },
-    [refresh]
-  )
-
-  useEffect(() => {
-    if (!pendingSelect.current) return
-    const target = mods.find((m) => m.path.toLowerCase() === pendingSelect.current)
-    if (target) {
-      pendingSelect.current = undefined
-      setSelectedKey(target.key)
-      setTab('info')
-    }
-  }, [mods])
 
   const dragLeft = useCallback((dx: number) => {
     setLeftW((w) => {
@@ -117,11 +84,6 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [refresh])
 
-  // The mod.info / validate / pack tools all need a selected mod; batch pack
-  // (shove) drives off the whole scanned set instead.
-  const needsMod = tab !== 'scaffold' && tab !== 'shove'
-  const showPicker = needsMod && !selected
-
   return (
     <div className="workbench">
       <div className="toolbar">
@@ -131,43 +93,67 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
             {t('tb.hub')}
           </button>
           <div className="divider-v" />
-          <div className="wbtabs">
-            {TABS.map((tb) => (
-              <button
-                key={tb.id}
-                className={`wbtab ${tab === tb.id ? 'is-on' : ''}`}
-                onClick={() => setTab(tb.id)}
-              >
-                <Icon name={tb.icon} size={13} />
-                <span className="wbtab__label stencil">{t(tb.labelKey)}</span>
-              </button>
-            ))}
+
+          {/* Module branding */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 6px' }}>
+            <Icon name="pulse" size={16} color="var(--rust-hot)" />
+            <span
+              className="stencil"
+              style={{
+                fontSize: 12,
+                letterSpacing: '0.08em',
+                color: 'var(--bone)',
+                textTransform: 'uppercase'
+              }}
+            >
+              {t('wb.doctor.title')}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                borderRadius: 3,
+                background: 'rgba(56, 189, 248, 0.15)',
+                color: '#38bdf8',
+                fontWeight: 600
+              }}
+            >
+              BUILD 42
+            </span>
           </div>
-          <Hint title={t('module.workbench.tagline')} body={t('help.wb.tabs')} />
+
           <div className="toolbar__spacer" />
+
+          {selected && (
+            <div
+              className="mono truncate"
+              style={{
+                fontSize: 11,
+                color: 'var(--ash)',
+                maxWidth: 320,
+                padding: '2px 8px',
+                borderRadius: 4,
+                background: 'rgba(255, 255, 255, 0.04)'
+              }}
+            >
+              {selected.name}
+            </div>
+          )}
+
           <button
-            className="btn"
-            onClick={() => {
-              setTab('scaffold')
-              setSelectedKey(undefined)
-            }}
-            title={t('wb.newModTitle')}
+            className="btn btn-icon"
+            onClick={() => void refresh(true)}
+            disabled={scanning}
+            title={t('tb.rescanTitle')}
           >
-            <Icon name="folder-plus" size={13} />
-            {t('wb.newMod')}
-          </button>
-          <Hint title={t('wb.newMod')} body={t('help.wb.newMod')} />
-          <button className="btn btn-icon" onClick={() => void refresh(true)} disabled={scanning} title={t('tb.rescanTitle')}>
             <Icon name="refresh" size={13} className={scanning ? 'spin' : undefined} />
           </button>
-          <Hint title={t('tb.rescan')} body={t('help.wb.rescan')} />
         </div>
       </div>
 
       <div className="workbench__body">
-        <section className="pane pane--left" style={{ width: leftW, flex: `0 0 ${leftW}px` }}>
+        <section className="pane pane--left" style={{ width: leftW }}>
           <div className="pane__head">
-            <Icon name="wrench" size={13} color="var(--rust)" />
             <span className="pane__title stencil">{t('wb.paneMods')}</span>
             <span className="pane__count mono">
               {formatCount(writableCount)}
@@ -198,15 +184,14 @@ function WorkbenchBody({ onExit }: { onExit: () => void }) {
           <ModList rows={rows} selectedKey={selectedKey} onSelect={selectMod} query={query} />
         </section>
 
-        <Splitter onDrag={dragLeft} onDoubleClick={() => setLeftW(300)} />
+        <Splitter onDrag={dragLeft} onDoubleClick={() => setLeftW(320)} />
 
         <section className="pane pane--center workbench__main">
-          {tab === 'scaffold' && <ScaffoldTool targets={targets} onCreated={onCreated} />}
-          {tab !== 'scaffold' && showPicker && <PickPrompt />}
-          {tab === 'info' && selected && <InfoTool mod={selected} writable={selectedWritable} />}
-          {tab === 'validate' && selected && <ValidateTool mod={selected} knownIds={knownIds} />}
-          {tab === 'pack' && selected && <PackTool mod={selected} />}
-          {tab === 'shove' && <ShoveTool mods={mods} targets={targets} knownIds={knownIds} />}
+          {selected ? (
+            <ValidateTool mod={selected} knownIds={knownIds} />
+          ) : (
+            <PickPrompt />
+          )}
         </section>
       </div>
     </div>
@@ -217,7 +202,7 @@ function PickPrompt() {
   const { t } = useI18n()
   return (
     <div className="pane__empty pane__empty--big">
-      <Icon name="wrench" size={34} strokeWidth={1.2} />
+      <Icon name="pulse" size={36} strokeWidth={1.2} color="var(--rust-hot)" />
       <span className="stencil">{t('wb.pickMod')}</span>
       <span className="label">{t('wb.pickModHint')}</span>
     </div>
@@ -244,7 +229,7 @@ function ModList({
     return (
       <div className="pane__scroll">
         <div className="pane__empty">
-          <Icon name="wrench" size={22} />
+          <Icon name="pulse" size={22} />
           <span className="label">{t('wb.noMods')}</span>
           <span className="label wbmuted">{t('wb.noModsHint')}</span>
         </div>
@@ -253,7 +238,7 @@ function ModList({
   }
 
   const rowMenu = (e: React.MouseEvent, mod: ModEntry): void => {
-    onSelect(mod)
+    e.preventDefault()
     openMenu(e, [
       {
         label: t('wb.revealMod'),

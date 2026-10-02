@@ -37,6 +37,8 @@ export const IPC = {
   wbReadInfo: 'wb:read-info',
   wbWriteInfo: 'wb:write-info',
   wbValidate: 'wb:validate',
+  wbQuickFix: 'wb:quick-fix',
+  wbDeploy: 'wb:deploy',
   wbPack: 'wb:pack',
   wbShove: 'wb:shove',
   wbShoveCancel: 'wb:shove-cancel',

@@ -20,8 +20,11 @@ import type {
   WriteModInfoRequest,
   ApplyMemoryRequest,
   ToggleReadOnlyRequest,
-  ModGrepRequest
+  ModGrepRequest,
+  QuickFixRequest,
+  DeployToGameRequest
 } from '../shared/types'
+import { executeQuickFix, deployModToGame } from './services/workbenchOps'
 import {
   bbcodeToHtml,
   downloadWorkshopItem,
@@ -104,7 +107,7 @@ import { applyGameMemory, getMemoryReport, setEnvJavaOptions, toggleGameFilesRea
 import { packMod } from './services/pack'
 import { createMergePatch } from './services/patcher'
 import { detectGameDir, detectPaths } from './services/paths'
-import { scanMods, type ScanOptions } from './services/scanner'
+import { getCachedMods, scanMods, type ScanOptions } from './services/scanner'
 import { getSettings, setSettings } from './services/settings'
 import { shovelMods } from './services/shovel'
 import { validateMod } from './services/validate'
@@ -313,6 +316,21 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.wbValidate, async (e, modPath: string, opts: ValidateOptions = {}) => {
     const target = await assertPathAllowed(modPath)
+    const settings = await getSettings()
+    const paths = await detectPaths(settings)
+    const installed = getCachedMods()
+    const effectiveOpts: ValidateOptions = {
+      ...opts,
+      gameDir: opts.gameDir || paths.gameDir,
+      checkVanillaOverwrites: opts.checkVanillaOverwrites ?? true,
+      installedMods: opts.installedMods ?? installed.map((m) => ({
+        modId: m.modId,
+        rawModId: m.rawModId,
+        name: m.name,
+        path: m.path,
+        folderName: m.folderName
+      }))
+    }
     const sender = e.sender
     let last = 0
     const onProgress = (p: WorkbenchProgress): void => {
@@ -322,7 +340,16 @@ export function registerIpc(): void {
         if (!sender.isDestroyed()) sender.send(IPC.wbProgress, p)
       }
     }
-    return validateMod(target, opts, onProgress)
+    return validateMod(target, effectiveOpts, onProgress)
+  })
+
+  ipcMain.handle(IPC.wbQuickFix, async (_e, req: QuickFixRequest) => {
+    return executeQuickFix(req)
+  })
+
+  ipcMain.handle(IPC.wbDeploy, async (_e, req: DeployToGameRequest) => {
+    const settings = await getSettings()
+    return deployModToGame(settings, req)
   })
 
   ipcMain.handle(IPC.wbPack, async (e, opts: PackOptions) => {

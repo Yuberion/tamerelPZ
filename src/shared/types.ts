@@ -367,6 +367,20 @@ export interface WriteModInfoResult {
 
 export type ValidationSeverity = 'error' | 'warn' | 'info'
 
+export type IssueCategory =
+  | 'critical'
+  | 'engine-api'
+  | 'b42-syntax'
+  | 'assets'
+  | 'overwrites'
+  | 'hygiene'
+
+export interface IssueSnippetLine {
+  num: number
+  text: string
+  isTarget?: boolean
+}
+
 /**
  * One validator finding.
  *
@@ -376,11 +390,38 @@ export type ValidationSeverity = 'error' | 'warn' | 'info'
 export interface ValidationIssue {
   rule: string
   severity: ValidationSeverity
+  category?: IssueCategory
   /** Absolute path of the offending file, when the finding is file-scoped. */
   file?: string
   /** 1-based line number. */
   line?: number
   params?: Record<string, string | number>
+  /** Code snippet for inline inspection */
+  snippet?: {
+    lines: IssueSnippetLine[]
+    lang?: string
+  }
+}
+
+export type HealthGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F'
+
+export interface ModHealthScore {
+  overall: number // 0-100%
+  grade: HealthGrade
+  engineApi: number // 0-100%
+  b42Syntax: number // 0-100%
+  assets: number // 0-100%
+  hygiene: number // 0-100%
+  overwrites: number // 0-100%
+}
+
+export interface ValidationCategoriesCount {
+  critical: number
+  engineApi: number
+  b42Syntax: number
+  assets: number
+  overwrites: number
+  hygiene: number
 }
 
 export interface ValidationReport {
@@ -389,6 +430,8 @@ export interface ValidationReport {
   filesChecked: number
   bytesChecked: number
   issues: ValidationIssue[]
+  healthScore: ModHealthScore
+  categories: ValidationCategoriesCount
   /** A scan limit was hit, so the report is incomplete. */
   truncated: boolean
 }
@@ -399,7 +442,56 @@ export interface ValidateOptions {
   knownIds?: string[]
   /** The `mod.info` the scanner picked for this mod. */
   infoFile?: string
+  /** Project Zomboid installation directory containing projectzomboid.jar */
+  gameDir?: string
+  /** Whether to check for overwrites against vanilla game files */
+  checkVanillaOverwrites?: boolean
+  /** Installed mods on this machine for cross-mod dependency asset resolution */
+  installedMods?: Array<{
+    modId?: string
+    rawModId?: string
+    name: string
+    path: string
+    folderName?: string
+  }>
 }
+
+/* ------------------------------------------------------------- quick-fix -- */
+
+export type QuickFixType = 'all' | 'strip-bom' | 'remove-version-max' | 'fix-sandbox-version'
+
+export interface QuickFixRequest {
+  modPath: string
+  action: QuickFixType
+  files?: string[]
+}
+
+export interface QuickFixResult {
+  ok: boolean
+  action: QuickFixType
+  fixedFiles: string[]
+  error?: string
+}
+
+/* ----------------------------------------------------------- game-deploy -- */
+
+export interface DeployToGameRequest {
+  modPath: string
+  targetModId?: string
+  cleanExisting?: boolean
+  stripBom?: boolean
+}
+
+export interface DeployToGameResult {
+  ok: boolean
+  destPath: string
+  copiedFiles: number
+  bytes: number
+  isExistingLocalMod: boolean
+  durationMs: number
+  error?: string
+}
+
 
 /** `workshop` stages an uploadable project tree; `zip` writes one archive. */
 export type PackMode = 'workshop' | 'zip'
