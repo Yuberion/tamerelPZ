@@ -70,7 +70,24 @@ import type {
   ToggleReadOnlyResult,
   MeshPreviewData,
   ModGrepMatch,
-  ModGrepRequest
+  ModGrepRequest,
+  ModTranslationData,
+  SaveTranslationRequest,
+  SaveTranslationResult,
+  SavegameInfo,
+  WipeChunksRequest,
+  WipeChunksResult,
+  ResetPlayerRequest,
+  ResetPlayerResult,
+  ServerProfileSummary,
+  ServerFullConfig,
+  SaveServerConfigRequest,
+  SaveServerConfigResult,
+  SyncServerModsRequest,
+  SyncServerModsResult,
+  BackupServerResult,
+  LaunchServerRequest,
+  LaunchServerResult
 } from './types'
 
 export interface ScanRequest {
@@ -290,12 +307,38 @@ export interface PzApi {
     setReadOnly(req: ToggleReadOnlyRequest): Promise<ToggleReadOnlyResult>
   }
   /**
-   * Cartographer: Full interactive Knox County world map, cell visualizer, and collision detector.
+   * Cartographer & Triage: Interactive Knox County map, cell visualizer, and collision detector.
    */
   cartographer: {
     scan(): Promise<CartographerWorldData>
     getImage(filePath: string): Promise<string | undefined>
     scaffoldMap(req: CartographerScaffoldRequest): Promise<CartographerScaffoldResult>
     saveSpawns(req: CartographerSaveSpawnsRequest): Promise<CartographerSaveSpawnsResult>
+  }
+  /**
+   * Triage: Savegame Doctor & World Manager.
+   */
+  triage: {
+    scanSaves(): Promise<SavegameInfo[]>
+    wipeChunks(req: WipeChunksRequest): Promise<WipeChunksResult>
+    resetPlayer(req: ResetPlayerRequest): Promise<ResetPlayerResult>
+  }
+  /**
+   * Translation Studio: Mod localization, dictionary extraction, and clean UTF-8 export.
+   */
+  translation: {
+    scan(modPath: string, targetLang?: string): Promise<ModTranslationData>
+    save(req: SaveTranslationRequest): Promise<SaveTranslationResult>
+  }
+  /**
+   * Outpost: Dedicated & Local Server Cockpit, SandboxVars, and Loadout sync.
+   */
+  server: {
+    list(): Promise<ServerProfileSummary[]>
+    readConfig(serverName: string): Promise<ServerFullConfig>
+    saveConfig(req: SaveServerConfigRequest): Promise<SaveServerConfigResult>
+    syncMods(req: SyncServerModsRequest): Promise<SyncServerModsResult>
+    backup(serverName: string): Promise<BackupServerResult>
+    launch(req: LaunchServerRequest): Promise<LaunchServerResult>
   }
 }

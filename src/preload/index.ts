@@ -164,6 +164,23 @@ const api: PzApi = {
     getImage: (filePath: string) => ipcRenderer.invoke(IPC.cartographerGetImage, filePath),
     scaffoldMap: (req) => ipcRenderer.invoke(IPC.cartographerScaffold, req),
     saveSpawns: (req) => ipcRenderer.invoke(IPC.cartographerSaveSpawns, req)
+  },
+  triage: {
+    scanSaves: () => ipcRenderer.invoke(IPC.savegameScan),
+    wipeChunks: (req) => ipcRenderer.invoke(IPC.savegameWipeChunks, req),
+    resetPlayer: (req) => ipcRenderer.invoke(IPC.savegameResetPlayer, req)
+  },
+  translation: {
+    scan: (modPath, targetLang) => ipcRenderer.invoke(IPC.translationScan, modPath, targetLang),
+    save: (req) => ipcRenderer.invoke(IPC.translationSave, req)
+  },
+  server: {
+    list: () => ipcRenderer.invoke(IPC.serverList),
+    readConfig: (serverName) => ipcRenderer.invoke(IPC.serverReadConfig, serverName),
+    saveConfig: (req) => ipcRenderer.invoke(IPC.serverSaveConfig, req),
+    syncMods: (req) => ipcRenderer.invoke(IPC.serverSyncMods, req),
+    backup: (serverName) => ipcRenderer.invoke(IPC.serverBackup, serverName),
+    launch: (req) => ipcRenderer.invoke(IPC.serverLaunch, req)
   }
 }
 

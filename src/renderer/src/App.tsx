@@ -11,16 +11,34 @@ import { Explorer } from './modules/explorer/Explorer'
 import { Tools } from './modules/tools/Tools'
 import { Auditor } from './modules/auditor/Auditor'
 import { WorkshopOverview } from './modules/workshop/WorkshopOverview'
-import { Cartographer } from './modules/cartographer/Cartographer'
+import { Triage } from './modules/cartographer/Cartographer'
+import { Outpost } from './modules/outpost/Outpost'
 import { useAppStore } from './state/store'
 
 type View = 'hub' | ModuleId
 
 export default function App() {
   const [view, setView] = useState<View>('hub')
+  const [navParams, setNavParams] = useState<any>()
   const { scanning } = useAppStore()
 
-  const goHome = useCallback(() => setView('hub'), [])
+  const goHome = useCallback(() => {
+    setView('hub')
+    setNavParams(undefined)
+  }, [])
+
+  // Listen for programmatic cross-module navigation
+  useEffect(() => {
+    const onNav = (e: Event): void => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.module) {
+        setView(detail.module)
+        setNavParams(detail)
+      }
+    }
+    window.addEventListener('pz:navigate-module', onNav)
+    return () => window.removeEventListener('pz:navigate-module', onNav)
+  }, [])
 
   // Escape leaves a module. An open help popover swallows the key first (see
   // HelpProvider), so one press never both closes a hint and navigates away.
@@ -54,9 +72,16 @@ export default function App() {
               {view === 'explorer' ? <Explorer onExit={goHome} /> : null}
               {view === 'loadout' ? <Loadout onExit={goHome} /> : null}
               {view === 'workshop' ? <WorkshopOverview onExit={goHome} /> : null}
-              {view === 'auditor' || view === 'workbench' ? <Auditor onExit={goHome} /> : null}
-              {view === 'cartograph' ? <Cartographer onExit={goHome} /> : null}
+              {view === 'auditor' || view === 'workbench' ? (
+                <Auditor
+                  onExit={goHome}
+                  initialTab={navParams?.subTab}
+                  initialModKey={navParams?.modKey}
+                />
+              ) : null}
+              {view === 'triage' || view === 'cartograph' ? <Triage onExit={goHome} /> : null}
               {view === 'tools' ? <Tools onExit={goHome} /> : null}
+              {view === 'outpost' ? <Outpost onExit={goHome} /> : null}
               {view === 'ledger' ? <Ledger onExit={goHome} /> : null}
             </main>
           </div>

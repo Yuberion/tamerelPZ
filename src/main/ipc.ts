@@ -117,6 +117,16 @@ import {
   scaffoldMapMod,
   saveSpawnpoints
 } from './services/cartographer'
+import { scanModTranslations, saveModTranslations } from './services/translation'
+import { scanSavegames, wipeSavegameChunks, resetPlayerPosition } from './services/savegame'
+import {
+  listServers,
+  readServerConfig,
+  saveServerConfig,
+  syncServerMods,
+  backupServer,
+  launchServer
+} from './services/server'
 
 /**
  * Extensions Windows *executes* rather than opens.
@@ -774,6 +784,53 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.cartographerSaveSpawns, async (_e, req) => {
     return saveSpawnpoints(req)
+  })
+
+  /* Translation Studio */
+  ipcMain.handle(IPC.translationScan, async (_e, modPath: string, targetLang?: string) => {
+    return scanModTranslations(modPath, targetLang)
+  })
+
+  ipcMain.handle(IPC.translationSave, async (_e, req) => {
+    return saveModTranslations(req)
+  })
+
+  /* Savegame Doctor (Triage) */
+  ipcMain.handle(IPC.savegameScan, async () => {
+    return scanSavegames()
+  })
+
+  ipcMain.handle(IPC.savegameWipeChunks, async (_e, req) => {
+    return wipeSavegameChunks(req)
+  })
+
+  ipcMain.handle(IPC.savegameResetPlayer, async (_e, req) => {
+    return resetPlayerPosition(req)
+  })
+
+  /* Outpost (Server Cockpit) */
+  ipcMain.handle(IPC.serverList, async () => {
+    return listServers()
+  })
+
+  ipcMain.handle(IPC.serverReadConfig, async (_e, serverName: string) => {
+    return readServerConfig(serverName)
+  })
+
+  ipcMain.handle(IPC.serverSaveConfig, async (_e, req) => {
+    return saveServerConfig(req)
+  })
+
+  ipcMain.handle(IPC.serverSyncMods, async (_e, req) => {
+    return syncServerMods(req)
+  })
+
+  ipcMain.handle(IPC.serverBackup, async (_e, serverName: string) => {
+    return backupServer(serverName)
+  })
+
+  ipcMain.handle(IPC.serverLaunch, async (_e, req) => {
+    return launchServer(req)
   })
 
   // Start background live watcher for appworkshop_108600.acf

@@ -1548,3 +1548,164 @@ export interface ModGrepMatch {
   snippet: string
 }
 
+/* -------------------------------------------------------- Translation Studio -- */
+
+export interface ModTranslationEntry {
+  key: string
+  sourceText: string
+  targetText: string
+  fileType: string
+  isMissing: boolean
+  isModified?: boolean
+}
+
+export interface ModTranslationData {
+  modKey: string
+  modName: string
+  modPath: string
+  sourceLang: string
+  targetLang: string
+  availableLangs: string[]
+  entries: ModTranslationEntry[]
+  totalCount: number
+  translatedCount: number
+  missingCount: number
+}
+
+export interface SaveTranslationRequest {
+  modPath: string
+  targetLang: string
+  entries: {
+    key: string
+    targetText: string
+    fileType: string
+  }[]
+}
+
+export interface SaveTranslationResult {
+  ok: boolean
+  savedFiles: string[]
+  totalSaved: number
+  error?: string
+}
+
+/* ------------------------------------------- Triage (Savegame Doctor & World) -- */
+
+export interface SavegameCellInfo {
+  cellX: number
+  cellY: number
+  chunkCount: number
+  isSafehouse?: boolean
+}
+
+export interface SavegameInfo {
+  id: string
+  name: string
+  gameMode: string
+  folderPath: string
+  lastModified: number
+  thumbUrl?: string
+  totalSizeBytes: number
+  activeMods: string[]
+  exploredCells: SavegameCellInfo[]
+  totalChunks: number
+  playerCount?: number
+  vehicleCount?: number
+}
+
+export interface WipeChunksRequest {
+  savePath: string
+  protectedCells: { cellX: number; cellY: number }[]
+  createBackup: boolean
+}
+
+export interface WipeChunksResult {
+  ok: boolean
+  wipedChunks: number
+  bytesFreed: number
+  backupPath?: string
+  error?: string
+}
+
+export interface ResetPlayerRequest {
+  savePath: string
+  targetX?: number
+  targetY?: number
+  targetZ?: number
+}
+
+export interface ResetPlayerResult {
+  ok: boolean
+  message: string
+  error?: string
+}
+
+/* ----------------------------------------------- Outpost (Server Cockpit) -- */
+
+export interface ServerProfileSummary {
+  name: string
+  iniPath: string
+  sandboxPath?: string
+  maxPlayers: number
+  port: number
+  hasPassword: boolean
+  rconPort?: number
+  modCount: number
+  workshopItemCount: number
+  lastModified: number
+}
+
+export interface ServerFullConfig {
+  name: string
+  iniProperties: Record<string, string>
+  sandboxLua?: string
+  modsList: string[]
+  workshopItemsList: string[]
+}
+
+export interface SaveServerConfigRequest {
+  serverName: string
+  iniProperties: Record<string, string>
+  sandboxLua?: string
+}
+
+export interface SaveServerConfigResult {
+  ok: boolean
+  iniPath: string
+  backupPath?: string
+  error?: string
+}
+
+export interface SyncServerModsRequest {
+  serverName: string
+  mods: string[]
+  workshopItems: string[]
+}
+
+export interface SyncServerModsResult {
+  ok: boolean
+  iniPath: string
+  modsCount: number
+  workshopCount: number
+  error?: string
+}
+
+export interface BackupServerResult {
+  ok: boolean
+  backupPath?: string
+  bytes: number
+  error?: string
+}
+
+export interface LaunchServerRequest {
+  serverName: string
+  ramGb: number
+}
+
+export interface LaunchServerResult {
+  ok: boolean
+  pid?: number
+  commandLine: string
+  error?: string
+}
+

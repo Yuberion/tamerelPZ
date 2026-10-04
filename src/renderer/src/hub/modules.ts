@@ -69,21 +69,12 @@ export const MODULES: ModuleDef[] = [
     name: 'Triage',
     taglineKey: 'module.triage.tagline',
     descKey: 'module.triage.desc',
-    icon: 'alert',
-    status: 'sealed'
-  },
-  {
-    id: 'cartograph',
-    code: '06',
-    name: 'Cartograph',
-    taglineKey: 'module.cartograph.tagline',
-    descKey: 'module.cartograph.desc',
     icon: 'map',
-    status: 'sealed'
+    status: 'live'
   },
   {
     id: 'tools',
-    code: '07',
+    code: '06',
     name: 'Tools',
     taglineKey: 'module.tools.tagline',
     descKey: 'module.tools.desc',
@@ -92,16 +83,16 @@ export const MODULES: ModuleDef[] = [
   },
   {
     id: 'outpost',
-    code: '08',
+    code: '07',
     name: 'Outpost',
     taglineKey: 'module.outpost.tagline',
     descKey: 'module.outpost.desc',
     icon: 'server',
-    status: 'sealed'
+    status: 'live'
   },
   {
     id: 'ledger',
-    code: '09',
+    code: '08',
     name: 'Ledger',
     taglineKey: 'module.ledger.tagline',
     descKey: 'module.ledger.desc',

@@ -161,6 +161,18 @@ export function ModList({
                         void copyText(mod.path)
                         notify(t('toast.pathCopied'), 'ok')
                       }
+                    },
+                    { separator: true },
+                    {
+                      label: 'Открыть в Translation Studio',
+                      icon: 'terminal',
+                      onClick: () => {
+                        window.dispatchEvent(
+                          new CustomEvent('pz:navigate-module', {
+                            detail: { module: 'auditor', subTab: 'translation', modKey: mod.key }
+                          })
+                        )
+                      }
                     }
                   ]
 

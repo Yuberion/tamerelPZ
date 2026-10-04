@@ -13,6 +13,7 @@ import { MapLayersPanel } from './MapLayersPanel'
 import { MapInspectorPanel } from './MapInspectorPanel'
 import { CartographerStudioModal } from './CartographerStudioModal'
 import { SpawnEditorModal } from './SpawnEditorModal'
+import { SavegameDoctor } from './SavegameDoctor'
 
 interface CartographerProps {
   onExit: () => void
@@ -23,6 +24,7 @@ export function Cartographer({ onExit }: CartographerProps) {
   const isRu = lang === 'ru'
   const { notify } = useToast()
 
+  const [mainTab, setMainTab] = useState<'map' | 'doctor'>('map')
   const [worldData, setWorldData] = useState<CartographerWorldData | null>(null)
   const [loading, setLoading] = useState(true)
   const [visibleMapIds, setVisibleMapIds] = useState<Set<string>>(new Set())
@@ -200,15 +202,37 @@ export function Cartographer({ onExit }: CartographerProps) {
             <Icon name="arrow-left" size={16} />
           </button>
           <div className="carto-title-block">
-            <h2 className="carto-title">06 / CARTOGRAPH</h2>
+            <h2 className="carto-title">05 / TRIAGE</h2>
             <span className="carto-subtitle">
-              {isRu ? 'Атлас Knox & Студия Маппера' : 'Knox Atlas & Map Modder Studio'}
+              {isRu ? 'Доктор сохранений & Карта Knox' : 'Savegame Doctor & Knox Atlas'}
               {worldData && (
                 <span className="badge badge-subtle font-mono" style={{ marginLeft: 6, fontSize: 10 }}>
                   {worldData.gameVersion ? `${worldData.gameVersion} (${worldData.detectedBuild})` : worldData.detectedBuild}
                 </span>
               )}
             </span>
+          </div>
+
+          {/* Module Tab Switcher */}
+          <div className="btn-group" style={{ display: 'flex', gap: 4, marginLeft: 12 }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${mainTab === 'map' ? 'btn-active' : ''}`}
+              onClick={() => setMainTab('map')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}
+            >
+              <Icon name="map" size={13} color={mainTab === 'map' ? '#38bdf8' : undefined} />
+              {isRu ? 'Карта Нокса' : 'Knox Map'}
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${mainTab === 'doctor' ? 'btn-active' : ''}`}
+              onClick={() => setMainTab('doctor')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}
+            >
+              <Icon name="pulse" size={13} color={mainTab === 'doctor' ? 'var(--rust-hot)' : undefined} />
+              {isRu ? 'Доктор сохранений (Soft Reset)' : 'Savegame Doctor'}
+            </button>
           </div>
 
           {/* Quick Jump City Dropdown */}
@@ -307,8 +331,11 @@ export function Cartographer({ onExit }: CartographerProps) {
         </div>
       </div>
 
-      {/* 3-Pane Workspace: Left (Layers), Center (Canvas), Right (Inspector) */}
-      <div className="carto-workspace">
+      {/* 3-Pane Workspace: Left (Layers), Center (Canvas), Right (Inspector) or Savegame Doctor */}
+      {mainTab === 'doctor' ? (
+        <SavegameDoctor />
+      ) : (
+        <div className="carto-workspace">
         {/* Left: Layers & Towns Panel */}
         <MapLayersPanel
           vanillaMaps={worldData?.vanillaMaps || []}
@@ -416,6 +443,7 @@ export function Cartographer({ onExit }: CartographerProps) {
           onSelectZone={setSelectedZone}
         />
       </div>
+      )}
 
       {/* Map Modder Studio Scaffolding Modal */}
       {isStudioModalOpen && (
@@ -439,3 +467,6 @@ export function Cartographer({ onExit }: CartographerProps) {
     </div>
   )
 }
+
+export const Triage = Cartographer
+

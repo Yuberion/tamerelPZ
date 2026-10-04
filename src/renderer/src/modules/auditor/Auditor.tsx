@@ -11,6 +11,7 @@ import { copyText, formatCount, segmentByIndices } from '@renderer/lib/format'
 import { useVirtual } from '@renderer/lib/useVirtual'
 import { useAppStore } from '@renderer/state/store'
 import { ValidateTool } from './ValidateTool'
+import { TranslationStudio } from './TranslationStudio'
 import { useEditableMods, type EditableMod } from './useEditableMods'
 
 const LS_LEFT = 'pz.workbench.leftWidth'
@@ -21,23 +22,40 @@ function readWidth(fallback: number): number {
   return Number.isFinite(raw) && raw > 200 ? raw : fallback
 }
 
-export function Auditor({ onExit }: { onExit: () => void }) {
+export function Auditor({
+  onExit,
+  initialTab = 'audit',
+  initialModKey
+}: {
+  onExit: () => void
+  initialTab?: 'audit' | 'translation'
+  initialModKey?: string
+}) {
   return (
     <MenuProvider>
-      <AuditorBody onExit={onExit} />
+      <AuditorBody onExit={onExit} initialTab={initialTab} initialModKey={initialModKey} />
     </MenuProvider>
   )
 }
 
 export const Workbench = Auditor
 
-function AuditorBody({ onExit }: { onExit: () => void }) {
+function AuditorBody({
+  onExit,
+  initialTab = 'audit',
+  initialModKey
+}: {
+  onExit: () => void
+  initialTab?: 'audit' | 'translation'
+  initialModKey?: string
+}) {
   const { scan, scanning, refresh, byKey, paths } = useAppStore()
   const { t } = useI18n()
 
   const [targets, setTargets] = useState<AuthoringTarget[]>([])
   const [query, setQuery] = useState('')
-  const [selectedKey, setSelectedKey] = useState<string>()
+  const [selectedKey, setSelectedKey] = useState<string | undefined>(initialModKey)
+  const [subTab, setSubTab] = useState<'audit' | 'translation'>(initialTab)
   const [leftW, setLeftW] = useState(() => readWidth(320))
 
   const mods = useMemo(() => scan?.mods ?? [], [scan])
@@ -125,6 +143,25 @@ function AuditorBody({ onExit }: { onExit: () => void }) {
             </span>
           </div>
 
+          <div className="btn-group" style={{ display: 'flex', gap: 4, marginLeft: 12 }}>
+            <button
+              className={`btn btn-sm ${subTab === 'audit' ? 'btn-active' : ''}`}
+              onClick={() => setSubTab('audit')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}
+            >
+              <Icon name="pulse" size={13} color={subTab === 'audit' ? 'var(--rust-hot)' : undefined} />
+              Аудит и ошибки
+            </button>
+            <button
+              className={`btn btn-sm ${subTab === 'translation' ? 'btn-active' : ''}`}
+              onClick={() => setSubTab('translation')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}
+            >
+              <Icon name="terminal" size={13} color={subTab === 'translation' ? '#38bdf8' : undefined} />
+              Студия перевода
+            </button>
+          </div>
+
           <div className="toolbar__spacer" />
 
           {selected && (
@@ -209,7 +246,11 @@ function AuditorBody({ onExit }: { onExit: () => void }) {
 
         <section className="pane pane--center workbench__main">
           {selected ? (
-            <ValidateTool mod={selected} knownIds={knownIds} />
+            subTab === 'translation' ? (
+              <TranslationStudio mod={selected} />
+            ) : (
+              <ValidateTool mod={selected} knownIds={knownIds} />
+            )
           ) : (
             <PickPrompt />
           )}

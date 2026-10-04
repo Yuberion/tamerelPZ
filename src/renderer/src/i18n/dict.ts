@@ -60,18 +60,18 @@ export const EN = {
   'module.workbench.tagline': 'Mod audit & compatibility',
   'module.workbench.desc':
     'Audit mod against your installed game version: check engine Java API, item scripts, XML, Lua, and missing assets.',
-  'module.triage.tagline': 'Conflict resolver',
+  'module.triage.tagline': 'Savegame Doctor & Knox Map',
   'module.triage.desc':
-    'Identify duplicate mod IDs, missing required mods, and overlapping item scripts.',
-  'module.cartograph.tagline': 'World map & zones',
+    'Interactive Knox County map, savegame inspector, safehouse protection, and soft-reset chunk cleaner.',
+  'module.cartograph.tagline': 'Savegame Doctor & Knox Map',
   'module.cartograph.desc':
-    'Interactive Knox County map, custom map cell borders, spawn points, and tile collisions.',
+    'Interactive Knox County map, savegame inspector, safehouse protection, and soft-reset chunk cleaner.',
   'module.tools.tagline': 'Utilities & RAM tuning',
   'module.tools.desc':
     'Convert 3D models to FBX, syntax highlighting pack for Notepad++, and game memory (RAM) allocation.',
-  'module.outpost.tagline': 'Server & collections',
+  'module.outpost.tagline': 'Server Cockpit & Hub',
   'module.outpost.desc':
-    'Generate server.ini config lines, Workshop ID lists, and shareable mod collections.',
+    'Manage PZ servers, configure SandboxVars, sync mods with Loadout, and launch dedicated servers.',
   'module.ledger.tagline': 'Crash logs & errors',
   'module.ledger.desc':
     'Analyze console.txt logs, pinpoint the exact mod causing crashes or errors, view stack traces and problem code.',
@@ -1532,18 +1532,18 @@ export const RU: Record<TKey, string> = {
   'module.workbench.tagline': 'Диагностика и совместимость',
   'module.workbench.desc':
     'Сверка мода с установленной версией игры: проверка Java API движка, скриптов предметов, XML, Lua и связей ассетов.',
-  'module.triage.tagline': 'Устранение конфликтов',
+  'module.triage.tagline': 'Доктор сохранений и Карта',
   'module.triage.desc':
-    'Поиск дубликатов ID модов, отсутствующих зависимостей и конфликтующих скриптов предметов.',
-  'module.cartograph.tagline': 'Карта мира и зоны',
+    'Интерактивная карта округа Нокс, защита баз, инспектор сохранений, лечение персонажа и безопасный сброс внешних чанков (Soft Reset).',
+  'module.cartograph.tagline': 'Доктор сохранений и Карта',
   'module.cartograph.desc':
-    'Интерактивная карта округа Нокс, границы ячеек пользовательских карт, точки спавна и коллизии тайлов.',
+    'Интерактивная карта округа Нокс, защита баз, инспектор сохранений, лечение персонажа и безопасный сброс внешних чанков (Soft Reset).',
   'module.tools.tagline': 'Утилиты и память RAM',
   'module.tools.desc':
     'Конвертер 3D-моделей в формат FBX, подсветка синтаксиса для Notepad++ и настройка выделения оперативной памяти (RAM).',
-  'module.outpost.tagline': 'Сервер и коллекции',
+  'module.outpost.tagline': 'Центр серверов и песочница',
   'module.outpost.desc':
-    'Генерация строк для server.ini, списков Workshop ID и коллекций модов для друзей.',
+    'Управление серверами, редактор песочницы SandboxVars, синхронизация модов с Loadout и запуск выделенного сервера.',
   'module.ledger.tagline': 'Анализ вылетов и ошибок',
   'module.ledger.desc':
     'Анализ файла console.txt, мгновенное определение мода-виновника вылета или ошибки, стектрейсы и показ проблемного кода.',

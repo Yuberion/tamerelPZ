@@ -117,11 +117,28 @@ export const IPC = {
   wsInstalledCount: 'ws:installed-count',
   wsTranslate: 'ws:translate',
 
-  /* Cartographer */
+  /* Cartographer & Triage */
   cartographerScan: 'cartographer:scan',
   cartographerGetImage: 'cartographer:get-image',
   cartographerScaffold: 'cartographer:scaffold-map',
-  cartographerSaveSpawns: 'cartographer:save-spawns'
+  cartographerSaveSpawns: 'cartographer:save-spawns',
+
+  /* Translation Studio */
+  translationScan: 'translation:scan',
+  translationSave: 'translation:save',
+
+  /* Savegame Doctor (Triage) */
+  savegameScan: 'savegame:scan',
+  savegameWipeChunks: 'savegame:wipe-chunks',
+  savegameResetPlayer: 'savegame:reset-player',
+
+  /* Outpost (Server Cockpit) */
+  serverList: 'server:list',
+  serverReadConfig: 'server:read-config',
+  serverSaveConfig: 'server:save-config',
+  serverSyncMods: 'server:sync-mods',
+  serverBackup: 'server:backup',
+  serverLaunch: 'server:launch'
 } as const
 
 /** Custom protocol used to render local images inside the renderer. */
