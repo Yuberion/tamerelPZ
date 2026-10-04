@@ -960,23 +960,41 @@ export function KnoxMapCanvas({
     }
   }
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault()
-    const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const mx = e.clientX - rect.left
-    const my = e.clientY - rect.top
+  // Non-passive wheel listener attached to native canvas element
+  // Chromium defaults wheel listeners to passive: true, throwing console errors if preventDefault() is called on onWheel
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+  const panRef = useRef(pan)
+  panRef.current = pan
 
-    const delta = e.deltaY < 0 ? 1.15 : 0.87
-    const newZoom = Math.min(Math.max(8, Math.round(zoom * delta)), 70)
-    if (newZoom === zoom) return
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
 
-    setPan({
-      x: mx - (mx - pan.x) * (newZoom / zoom),
-      y: my - (my - pan.y) * (newZoom / zoom)
-    })
-    setZoom(newZoom)
-  }
+    const onNativeWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = canvas.getBoundingClientRect()
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+
+      const currentZoom = zoomRef.current
+      const currentPan = panRef.current
+      const delta = e.deltaY < 0 ? 1.15 : 0.87
+      const newZoom = Math.min(Math.max(8, Math.round(currentZoom * delta)), 70)
+      if (newZoom === currentZoom) return
+
+      setPan({
+        x: mx - (mx - currentPan.x) * (newZoom / currentZoom),
+        y: my - (my - currentPan.y) * (newZoom / currentZoom)
+      })
+      setZoom(newZoom)
+    }
+
+    canvas.addEventListener('wheel', onNativeWheel, { passive: false })
+    return () => {
+      canvas.removeEventListener('wheel', onNativeWheel)
+    }
+  }, [])
 
   // ResizeObserver ensures canvas pixel buffer matches container exactly
   useEffect(() => {
@@ -1021,7 +1039,6 @@ export function KnoxMapCanvas({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onWheel={handleWheel}
         onContextMenu={(e) => e.preventDefault()}
       />
 
