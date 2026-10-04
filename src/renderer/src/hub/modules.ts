@@ -69,7 +69,7 @@ export const MODULES: ModuleDef[] = [
     name: 'Triage',
     taglineKey: 'module.triage.tagline',
     descKey: 'module.triage.desc',
-    icon: 'pulse',
+    icon: 'map',
     status: 'live'
   },
   {
