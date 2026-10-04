@@ -98,6 +98,15 @@ export const MODULES: ModuleDef[] = [
     descKey: 'module.ledger.desc',
     icon: 'book',
     status: 'live'
+  },
+  {
+    id: 'cartograph',
+    code: '09',
+    name: 'Cartograph',
+    taglineKey: 'module.cartograph.tagline',
+    descKey: 'module.cartograph.desc',
+    icon: 'map-pin',
+    status: 'sealed'
   }
 ]
 

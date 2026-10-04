@@ -63,9 +63,9 @@ export const EN = {
   'module.triage.tagline': 'Savegame Doctor & Soft Reset',
   'module.triage.desc':
     'Scan saves, protect player safehouses, rescue stuck characters, and perform soft-reset chunk wiping to refresh world loot.',
-  'module.cartograph.tagline': 'Savegame Doctor & Soft Reset',
+  'module.cartograph.tagline': 'Knox Map & GIS Atlas',
   'module.cartograph.desc':
-    'Scan saves, protect player safehouses, rescue stuck characters, and perform soft-reset chunk wiping to refresh world loot.',
+    'Interactive 2D tactical map of Knox County, urban zone inspector, map mod collision detector, and terrain atlas.',
   'module.tools.tagline': 'Utilities & RAM tuning',
   'module.tools.desc':
     'Convert 3D models to FBX, syntax highlighting pack for Notepad++, and game memory (RAM) allocation.',
@@ -1535,9 +1535,9 @@ export const RU: Record<TKey, string> = {
   'module.triage.tagline': 'Доктор сохранений и Soft Reset',
   'module.triage.desc':
     'Инспектор сохранений, защита баз игроков, эвакуация застрявшего персонажа и безопасный сброс внешних чанков (Soft Reset) для обновления лута.',
-  'module.cartograph.tagline': 'Доктор сохранений и Soft Reset',
+  'module.cartograph.tagline': 'Карта Knox и GIS Атлас',
   'module.cartograph.desc':
-    'Инспектор сохранений, защита баз игроков, эвакуация застрявшего персонажа и безопасный сброс внешних чанков (Soft Reset) для обновления лута.',
+    'Интерактивная тактическая 2D карта округа Нокс, анализ городских зон, детекция конфликтов модов на карты и атлас рельефа.',
   'module.tools.tagline': 'Утилиты и память RAM',
   'module.tools.desc':
     'Конвертер 3D-моделей в формат FBX, подсветка синтаксиса для Notepad++ и настройка выделения оперативной памяти (RAM).',
