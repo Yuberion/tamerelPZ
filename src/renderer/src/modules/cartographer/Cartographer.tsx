@@ -468,5 +468,5 @@ export function Cartographer({ onExit }: CartographerProps) {
   )
 }
 
-export const Triage = Cartographer
+export const Triage = SavegameDoctor
 

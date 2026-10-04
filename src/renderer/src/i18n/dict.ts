@@ -60,12 +60,12 @@ export const EN = {
   'module.workbench.tagline': 'Mod audit & compatibility',
   'module.workbench.desc':
     'Audit mod against your installed game version: check engine Java API, item scripts, XML, Lua, and missing assets.',
-  'module.triage.tagline': 'Savegame Doctor & Knox Map',
+  'module.triage.tagline': 'Savegame Doctor & Soft Reset',
   'module.triage.desc':
-    'Interactive Knox County map, savegame inspector, safehouse protection, and soft-reset chunk cleaner.',
-  'module.cartograph.tagline': 'Savegame Doctor & Knox Map',
+    'Scan saves, protect player safehouses, rescue stuck characters, and perform soft-reset chunk wiping to refresh world loot.',
+  'module.cartograph.tagline': 'Savegame Doctor & Soft Reset',
   'module.cartograph.desc':
-    'Interactive Knox County map, savegame inspector, safehouse protection, and soft-reset chunk cleaner.',
+    'Scan saves, protect player safehouses, rescue stuck characters, and perform soft-reset chunk wiping to refresh world loot.',
   'module.tools.tagline': 'Utilities & RAM tuning',
   'module.tools.desc':
     'Convert 3D models to FBX, syntax highlighting pack for Notepad++, and game memory (RAM) allocation.',
@@ -1532,12 +1532,12 @@ export const RU: Record<TKey, string> = {
   'module.workbench.tagline': 'Диагностика и совместимость',
   'module.workbench.desc':
     'Сверка мода с установленной версией игры: проверка Java API движка, скриптов предметов, XML, Lua и связей ассетов.',
-  'module.triage.tagline': 'Доктор сохранений и Карта',
+  'module.triage.tagline': 'Доктор сохранений и Soft Reset',
   'module.triage.desc':
-    'Интерактивная карта округа Нокс, защита баз, инспектор сохранений, лечение персонажа и безопасный сброс внешних чанков (Soft Reset).',
-  'module.cartograph.tagline': 'Доктор сохранений и Карта',
+    'Инспектор сохранений, защита баз игроков, эвакуация застрявшего персонажа и безопасный сброс внешних чанков (Soft Reset) для обновления лута.',
+  'module.cartograph.tagline': 'Доктор сохранений и Soft Reset',
   'module.cartograph.desc':
-    'Интерактивная карта округа Нокс, защита баз, инспектор сохранений, лечение персонажа и безопасный сброс внешних чанков (Soft Reset).',
+    'Инспектор сохранений, защита баз игроков, эвакуация застрявшего персонажа и безопасный сброс внешних чанков (Soft Reset) для обновления лута.',
   'module.tools.tagline': 'Утилиты и память RAM',
   'module.tools.desc':
     'Конвертер 3D-моделей в формат FBX, подсветка синтаксиса для Notepad++ и настройка выделения оперативной памяти (RAM).',

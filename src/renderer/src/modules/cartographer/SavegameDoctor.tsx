@@ -4,7 +4,11 @@ import { Icon } from '@renderer/components/Icon'
 import { useToast } from '@renderer/components/Toast'
 import { formatBytes, formatCount } from '@renderer/lib/format'
 
-export function SavegameDoctor() {
+interface SavegameDoctorProps {
+  onExit?: () => void
+}
+
+export function SavegameDoctor({ onExit }: SavegameDoctorProps) {
   const { notify } = useToast()
 
   const [saves, setSaves] = useState<SavegameInfo[]>([])
@@ -158,11 +162,22 @@ export function SavegameDoctor() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {onExit && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-icon"
+              onClick={onExit}
+              title="Назад в меню"
+              style={{ marginRight: 4 }}
+            >
+              <Icon name="arrow-left" size={16} />
+            </button>
+          )}
           <Icon name="pulse" size={20} color="var(--rust-hot)" />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="stencil" style={{ fontSize: 13, color: 'var(--bone)' }}>
-                Доктор сохранений и сброс чанков (Soft Reset)
+                05 / TRIAGE • Доктор сохранений (Savegame Doctor)
               </span>
               <span
                 className="mono"
