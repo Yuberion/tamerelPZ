@@ -11,8 +11,9 @@ import { detectSteamRoot } from './paths'
  */
 export async function openExternal(url: string): Promise<boolean> {
   const trimmed = url.trim()
-  if (!/^(https?|steam):\/\//i.test(trimmed)) {
-    throw new Error('Only http(s) or steam urls can be opened')
+  // Reject URLs with quotes, control chars, spaces or unsafe schemes
+  if (!/^(https?|steam):\/\/[^\s"'`<>]+$/i.test(trimmed)) {
+    throw new Error('Only valid http(s) or steam urls can be opened')
   }
 
   // If opening a steam:// protocol URL on Windows, try launching Steam.exe directly
@@ -34,58 +35,52 @@ export async function openExternal(url: string): Promise<boolean> {
     } catch (err) {
       console.warn('[opener] Direct Steam.exe launch failed:', err)
     }
-
-    try {
-      const system32 = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32')
-      const cmdExe = join(system32, 'cmd.exe')
-      const child = spawn(cmdExe, ['/c', 'start', '""', trimmed], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true
-      })
-      child.unref()
-      return true
-    } catch (cmdErr) {
-      console.warn('[opener] cmd start steam:// failed:', cmdErr)
-    }
   }
 
-  // Try electron shell.openExternal with a safety timeout (600ms)
+  // Primary mechanism: Electron shell.openExternal with a reasonable timeout
   let electronOk = false
   try {
     const electronPromise = shell.openExternal(trimmed, { activate: true }).then(() => {
       electronOk = true
       return true
     })
-    const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 600))
+    const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500))
     const winner = await Promise.race([electronPromise, timeout])
     if (winner && electronOk) return true
   } catch (err) {
     console.warn('[opener] shell.openExternal failed:', err)
   }
 
-  // Windows system fallback: cmd.exe /c start "" "<url>"
+  // Windows system fallbacks: use isolated process arguments without shell string interpolation
   if (process.platform === 'win32') {
+    // 1. rundll32 url.dll,FileProtocolHandler invokes Win32 ShellExecute directly
     try {
       const system32 = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32')
-      const cmdExe = join(system32, 'cmd.exe')
-      const child = spawn(cmdExe, ['/c', 'start', '""', trimmed], {
+      const rundllExe = join(system32, 'rundll32.exe')
+      const child = spawn(rundllExe, ['url.dll,FileProtocolHandler', trimmed], {
         detached: true,
         stdio: 'ignore',
         windowsHide: true
       })
       child.unref()
       return true
-    } catch (cmdErr) {
-      console.warn('[opener] cmd.exe /c start failed, trying PowerShell:', cmdErr)
+    } catch (runErr) {
+      console.warn('[opener] rundll32 fallback failed, trying PowerShell:', runErr)
     }
 
+    // 2. PowerShell with parameterized arguments (no string interpolation into script)
     try {
       const system32 = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32')
       const psExe = join(system32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
       const child = spawn(
         psExe,
-        ['-NoProfile', '-NonInteractive', '-Command', `Start-Process "${trimmed.replace(/"/g, '`"')}"`],
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '& { param($target) Start-Process -FilePath $target }',
+          trimmed
+        ],
         {
           detached: true,
           stdio: 'ignore',
@@ -95,7 +90,7 @@ export async function openExternal(url: string): Promise<boolean> {
       child.unref()
       return true
     } catch (psErr) {
-      console.error('[opener] PowerShell Start-Process fallback failed:', psErr)
+      console.error('[opener] Parameterized PowerShell fallback failed:', psErr)
     }
   }
 

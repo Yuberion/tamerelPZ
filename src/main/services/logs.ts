@@ -646,7 +646,8 @@ export async function decompileJavaClass(
         const methodsCount = (stdout.match(/\b(?:public|protected|private)\s+[^;{]+;/g) ?? []).length
 
         if (filterMethod) {
-          const filterRe = new RegExp(`\\b${filterMethod}\\s*\\(`, 'i')
+          const safeMethod = filterMethod.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const filterRe = new RegExp(`\\b${safeMethod}\\s*\\(`, 'i')
           const lines = stdout.split(/\r?\n/)
           const matching = lines.filter((l) => filterRe.test(l))
           if (matching.length > 0) {

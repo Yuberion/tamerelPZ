@@ -70,6 +70,20 @@ export function MeshPreview({ path, name, size }: MeshPreviewProps) {
     setCutout(false)
   }, [path])
 
+  // Release WebGL hardware context on unmount to prevent Chromium context limit exhaustion
+  useEffect(() => {
+    return () => {
+      if (canvasRef.current) {
+        const gl =
+          (canvasRef.current.getContext('webgl2') as WebGLRenderingContext | null) ||
+          (canvasRef.current.getContext('webgl') as WebGLRenderingContext | null)
+        if (gl) {
+          gl.getExtension('WEBGL_lose_context')?.loseContext()
+        }
+      }
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
